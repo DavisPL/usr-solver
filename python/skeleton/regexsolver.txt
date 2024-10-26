@@ -1,0 +1,166 @@
+def derivative(expr, character) #Accepts GRE, Literal --> GRE
+	if expr is Literal:
+		if expr is empty string:
+			return Empty Set
+		else:
+			return If(expr.value == char, "", Empty Set)
+	else if expr is Empty Set:
+		return Empty Set
+	else if expr is ITE:
+		return ITE(predicate, derivative(trueCase, char), derivative(falseCase, char))
+	else if expr is intersection:
+		return derivative(left, char) AND derivative(right, char)
+	else if expr is union:
+		return derivative(left, char) OR derivative(right, char)
+	else if expr is Kleene:
+		return derivative(expr.inside, char) \cdot expr
+	else if expr is concatenation:
+		return derivative(left, char) \cdot right OR nullable(left) \cdot derivative(right, char)
+	else if expr is String Variable:
+		return If(expr[0] == char, expr[1:], EmptySEt)
+	else if expr is String Index:
+		return IF(expr == char, "", Empty Set)
+	else if expr is String Slice:
+		return IF(expr[index] == char, expr[index+1], Empty Set)
+	else if expr is Character Variable:
+		return IF(expr == char, "", Empty Set)
+	else if expr is Complement:
+		return derivative(expr, char)^C
+	return expr
+
+
+
+def nullable(expr)  #Accepts GRE --> GRE
+	if expr is Literal:
+		if expr is empty string:
+			return ""
+		else:
+			return EmptySet
+	else if expr is Empty Set:
+		return Empty Set
+	else if expr is ITE:
+		return ITE(predicate, nullable(trueCase), nullable(falseCase))
+	else if expr is intersection:
+		return nullable(left) AND nullable(right)
+	else if expr is union:
+		return nullable(left) OR nullable(right)
+	else if expr is Kleene:
+		return ""
+	else if expr is concatenation:
+		return nullable(left) \cdot nullable(right)
+	else if expr is String Variable:
+		return If(|expr| == 0, "", EmptySet)
+	else if expr is String Index:
+		return EmptySet
+	else if expr is String Slice:
+		return IF(|expr| = index, "", Empty Set)
+	else if expr is Character Variable:
+		return Empty Set
+	else if expr is Complement:
+		return "" AND (nullable(expr.inside))^C
+	return expr
+
+Note: no distinction is currently made between GRE and Predicates, right now both are just combinations of class objects
+def nullableProjection(expr): #Accepts GRE --> Predicate
+	expr = nullable(expr)
+	predicate = nullableProjectionHelper(expr)
+	result = evaluateComplete(predicate)
+	return res
+
+def nullableProjectionHelper(expr): //Using "" as True and EmptySet as False #Accepts GRE --> Predicate
+	if expr is Literal:
+		return ""
+	else if expr is Empty Set:
+		return Empty Set
+	else if expr is ITE:
+		trueSide = nullableProjectionHelper(trueCase)
+		falseSide = nullableProjectionHelper(falseCase)
+		if trueSide is EmptySet and falseSide is EmptySet:
+			return EmptySet
+		else if trueSide is emptySet:
+			return falseSide
+		else if falseSide is emptySet:
+			return trueSide
+		return ITE(predicate, trueSide, falseSide)
+	else if expr is intersection or Concatenation:
+		leftSide = nullableProjectionHelper(left)
+		rightSide = nullableProjectionHelper(right)
+		if leftSide is EmptySet or rightSide is EmptySet:
+			return EmptySet
+		else if leftSide is "":
+			return rightSide
+		else if rightSide is "":
+			return leftSide
+		return leftSide AND rightSide
+	else if expr is union:
+		leftSide = nullableProjectionHelper(left)
+		rightSide = nullableProjectionHelper(right)
+		if leftSide is EmptySet:
+			return rightSide
+		else if rightSide is EmptySet:
+			return leftSide
+		else if leftSide is "" or rightSide is "":
+			return ""
+		return leftSide OR rightSide
+	else if expr is Kleene:
+		return ""
+	else if expr is concatenation:
+		return nullable(left) \cdot nullable(right)
+	else if expr is Complement:
+		return NOT(nullableProjectionHelper(expr.inside))
+	return expr
+
+def satisfies(expr, proposed): #Accepts GRE, String --> Bool 
+	if proposed == "":
+		return nullableProjection(expr) is not EmptySet
+	else:
+		return satisfies(derivative(expr, proposed[0]), proposed[1:])
+ 
+def simplifies(expr): #Accepts GRE --> GRE
+	if expr is ITE:
+		simplifiedTrue = simplifes(trueCase)
+		simplifiedFalse = simplifes(falseCase)
+		if simplifiedTrue is ITE and simplifiedTrue.false is EmptySet and simplifiedFalse is EmptySet:
+			return IF(predicate and simplifiedTrue.predicate, simplifiedTrue.trueCase, EmptySet)
+	else if expr is Intersection:
+		leftSide = simplifies(left)
+		rightSide = simplifies(left)
+		if left is ITE and right is ITE and leftSide.falseCase is EmptySet and rightSide.falseCase is EmptySet:
+			return If(leftSide.predicate and rightSide.predicate, simplifies(leftSide AND rightSide), EmptySet)
+		if leftSide is EmptySet or rightSide is EmptySet:
+			return EmptySet
+		else if leftSide is Literal and rightSide is Literal:
+			if rightSide.value == leftSide.value:
+				return rightSide
+			else:
+				return EmptySet
+		return leftSide AND rightSide
+	else if expr is Union:
+		leftSide = simplifies(left)
+		rightSide = simplifies(right)
+
+		if left is EmptySEt:
+			return right
+		else if right is Empty SEt:
+			return left
+		else if left is Literal and right is Literal and right.value == left.value:
+			return right
+		return leftSide OR rightSide
+	else if expr is Kleene:
+		return Kleene(simplifies(expr.expr))
+	else if expr is Concatenation:
+		leftSide = simplifies(left)
+		rightSide = simplifies(right)
+		if leftSide is EmptySet or rightSide is EmptySet:
+			return EmptySet
+		else if leftSide is Literal and leftSide.value == "":
+			return rightSide
+		else if rightSide is Literal and rightSide.value
+			return leftSide
+		return leftSide \cdot rightSide
+	return expr
+
+
+
+
+
