@@ -14,115 +14,6 @@ def flatten_and_predicates(predicate):
             flattened.append(p)
     return flattened
 
-def evaluate2(predicate, unionFind=None):
-    if unionFind is None:
-        unionFind = UnionFind()
-        
-    if isinstance(predicate, AndPred):
-        all_predicates = flatten_and_predicates(predicate)
-        #print(all_predicates)
-
-        FinalPreds = []
-        NotEqualityPreds = set()
-        LengthPreds = set()
-        NotAllowedLengths = dict()
-        Equalities = set()
-        for p in all_predicates:
-            if isinstance(p, Not):
-                NotEqualityPreds.add(p)
-            elif isinstance(p, Equals):
-                Equalities.add(p)
-            elif isinstance(p, EqualLength):
-                LengthPreds.add(p)
-            elif isinstance(p, EmptySet):
-                return EmptySet()
-
-            #elif isinstance(p, Literal) and p.value == "":
-        for p in Equalities:
-            try:
-                if unionFind.union(p.left, p.right) == EmptySet():
-                    return EmptySet()
-                else:
-                    FinalPreds.append(p)
-            except:
-                return EmptySet()
-
-        for p in NotEqualityPreds:
-            q = p.predicate
-            if isinstance(q, Equals):
-                ufLeft = unionFind.find(q.left)
-                ufRight = unionFind.find(q.right)
-                ufLeftO = unionFind.stringToObject(unionFind.find(q.left))
-                ufRightO = unionFind.stringToObject(unionFind.find(q.right))
-                #ufRight = unionFind.find(q.right)
-                if ufLeft == ufRight:
-                    return EmptySet()
-                elif not(isinstance(ufLeftO, Literal)) or not(isinstance(ufRightO, Literal)):
-                    FinalPreds.append(p)
-            else:
-                flag = False
-                for key, value in unionFind.parent.items():
-                    tempKey = unionFind.stringToObject(key)
-                    tempValue = unionFind.stringToObject(value)
-                    if isinstance(tempKey, StringIndex) and tempKey.stringVar == p.left.name and tempKey.index >= p.right:
-                        if not(isinstance(tempValue, StringIndex) and tempValue.stringVar == tempKey.stringVar and tempValue.index == tempKey.index):
-                            flag = True
-                            break
-                if flag:
-                    continue
-                if not q.right:
-                    FinalPreds.append(p)
-                    continue
-                pObj = unionFind.stringToObject(unionFind.find(StringIndex(q.left, q.right-1)))
-                if not(isinstance(pObj, StringIndex) and pObj.stringVar == q.left.name and q.right == pObj.index):
-                    NotAllowedLengths[q.left.name] = NotAllowedLengths.get(q.left.name, set())
-                    NotAllowedLengths[q.left.name].add(q.right)
-                    FinalPreds.append(p)
-                else:
-                    return EmptySet()
-
-                #pObj = unionFind.stringToObject(unionFind.find(StringIndex(q.left, q.right)))
-                #if not(isinstance(pObj, StringIndex) and pObj.stringVar == p.left.name and p.right == pObj.index):
-                    #return EmptySet()
-                #else:
-                    #FinalPreds.append(p)
-                #if isinstance
-        for p in LengthPreds:
-            if p.right in NotAllowedLengths.get(p.left.name, set()):
-                return EmptySet()
-            #pObj = unionFind.stringToObject(unionFind.find(StringIndex(p.left, p.right)))
-            #print(unionFind.parent, p.left.name, p.right)
-            for key, value in unionFind.parent.items():
-                tempKey = unionFind.stringToObject(key)
-                tempValue = unionFind.stringToObject(value)
-                if isinstance(tempKey, StringIndex) and tempKey.stringVar == p.left.name and tempKey.index >= p.right:
-                    if not(isinstance(tempValue, StringIndex) and tempValue.stringVar == tempKey.stringVar and tempValue.index == tempKey.index):
-                        return EmptySet()
-            #if not(isinstance(pObj, StringIndex) and pObj.stringVar == p.left.name and p.right == pObj.index):
-                #return EmptySet()
-            FinalPreds.append(p)
-        if len(FinalPreds) == 1:
-            return FinalPreds[0]
-        elif len(FinalPreds) == 0:
-            return Literal("")
-        return AndPred(*FinalPreds)
-
-    elif isinstance(predicate, UnionPred):
-        final_set = []
-        for p in predicate.predicates:
-            p_eval = evaluate(p, UnionFind())
-            if isinstance(p_eval, Literal) and p_eval.value == "":
-                return Literal("")
-            elif not isinstance(p_eval, EmptySet):
-                final_set.append(p_eval)
-                
-        if not final_set:
-            return EmptySet()
-        if len(final_set) == 1:
-            return final_set[0]
-        return UnionPred(*final_set)
-        
-    return predicate
 def evaluate(predicate, unionFind = None):
     if unionFind is None:
         unionFind = UnionFind()
@@ -142,7 +33,7 @@ def evaluate(predicate, unionFind = None):
             elif isinstance(p, Equals):
                 Equalities.add(p)
             elif isinstance(p, EqualLength):
-                temp = LengthPreds.get(unionFind.simplify(p.left.name), None)
+                temp = LengthPreds.get(p.left.name, None)
                 if temp is not None and temp != p.right:
                     return EmptySet()
                 LengthPreds[p.left.name] = p.right
@@ -151,8 +42,9 @@ def evaluate(predicate, unionFind = None):
 
             #elif isinstance(p, Literal) and p.value == "":
         for p in Equalities:
+            #print(p.left, p.right)
             try:
-                if unionFind.union(p.left, p.right) == EmptySet():
+                if isinstance(unionFind.union(p.left, p.right), EmptySet):
                     return EmptySet()
                 else:
                     FinalPreds.append(p)
@@ -180,22 +72,22 @@ def evaluate(predicate, unionFind = None):
                 for key, value in unionFind.parent.items():
                     tempKey = unionFind.stringToObject(key)
                     tempValue = unionFind.stringToObject(value)
-                    if isinstance(tempKey, StringIndex) and tempKey.stringVar == p.left.name and tempKey.index >= p.right:
+                    if isinstance(tempKey, StringIndex) and tempKey.stringVar == q.left.name and tempKey.index >= q.right:
                         if not(isinstance(tempValue, StringIndex) and tempValue.stringVar == tempKey.stringVar and tempValue.index == tempKey.index):
                             flag = True
                             break
                 if flag:
                     continue
-                if not q.right:
-                    FinalPreds.append(p)
-                    continue
-                pObj = unionFind.stringToObject(unionFind.find(StringIndex(q.left, q.right-1)))
-                if not(isinstance(pObj, StringIndex) and pObj.stringVar == q.left.name and q.right == pObj.index):
-                    NotAllowedLengths[q.left.name] = NotAllowedLengths.get(q.left.name, set())
-                    NotAllowedLengths[q.left.name].add(q.right)
-                    FinalPreds.append(p)
-                else:
-                    return EmptySet()
+                #if not q.right:
+                FinalPreds.append(p)
+                    #continue
+                #pObj = unionFind.stringToObject(unionFind.find(StringIndex(q.left, q.right-1)))
+                #if not(isinstance(pObj, StringIndex) and pObj.stringVar == q.left.name and q.right == pObj.index):
+                    #NotAllowedLengths[q.left.name] = NotAllowedLengths.get(q.left.name, set())
+                    #NotAllowedLengths[q.left.name].add(q.right)
+                    #FinalPreds.append(p)
+                #else:
+                    #return EmptySet()
 
                 #pObj = unionFind.stringToObject(unionFind.find(StringIndex(q.left, q.right)))
                 #if not(isinstance(pObj, StringIndex) and pObj.stringVar == p.left.name and p.right == pObj.index):
@@ -294,28 +186,6 @@ def convertToDNF(predicate):
 
 
 
-def convertToDNF2(predicate):
-    if isinstance(predicate, Equals):
-        return predicate
-    elif isinstance(predicate, UnionPred):
-        return UnionPred(*[convertToDNF(child) for child in predicate.predicates])
-    elif isinstance(predicate, AndPred):
-        #print(predicate.predicates)
-        return distributeOrs([convertToDNF(child) for child in predicate.predicates])
-    elif isinstance(predicate, Not):
-        if isinstance(predicate.predicate, AndPred):
-            return UnionPred(*[convertToDNF(Not(child)) for child in predicate.predicate.predicates])
-        elif isinstance(predicate.predicate, UnionPred):
-            return AndPred(*[convertToDNF(Not(child)) for child in predicate.predicate.predicates])
-        elif isinstance(predicate.predicate, Not):
-            return predicate.predicate.predicate
-        else:
-            return Not(predicate.predicate)
-    else:
-        #print(predicate)
-        return predicate
-
-
 def evaluateComplete(predicate):
     predicate = convertToDNF(predicate)
     #print("DNF", printsExpr(predicate))
@@ -356,17 +226,6 @@ def printsExpr(expr):
     return expr
 
 
-def distributeOrs2(predicates):
-    distributed = []
-    for pred in predicates:
-        if isinstance(pred, UnionPred):
-            distributed.append(pred.predicates)
-        else:
-            distributed.append([pred])
-    product = list(itertools.product(*distributed))
-    dnf_result = [AndPred(*group) for group in product]
-    return UnionPred(*dnf_result)
-
 def distributeOrs(predicates):
     distributed = []
     for pred in predicates:
@@ -390,39 +249,7 @@ def distributeOrs(predicates):
     return UnionPred(*dnf_result) if len(dnf_result) > 1 else dnf_result[0]
 
 
-def distributeOrs3(predicates):
-    distributed = []
-    for pred in predicates:
-        if isinstance(pred, UnionPred):
-            distributed.append(pred.predicates)
-        else:
-            distributed.append([pred])
-    product = list(itertools.product(*distributed))
-    dnf_result = [AndPred(*group) for group in product]
-    return UnionPred(*dnf_result) if len(dnf_result) > 1 else dnf_result[0]
 
-
-def distributionAnd(clauses):
-    if len(clauses) == 0:
-        return True
-    elif len(clauses) == 1:
-        return clauses[0]
-    result = []
-    
-    # Check if any of the predicates are OrPreds
-    for predicate in predicates:
-        if isinstance(predicate, OrPred):
-            # Distribute AND over OR
-            new_result = []
-            for child in predicate.predicates:
-                for existing in result:
-                    new_result.append(AndPred(existing, child))
-            result = new_result  # Update result with new combinations
-        else:
-            result.append(predicate)  # Add the AND predicate directly
-
-    # Return the overall expression as an OR of the result clauses
-    return OrPred(*result)  # Combine all clauses with OR
 simplified = evaluate(UnionPred(Equals(CharVar("c1"), Literal("B")),  Equals(CharVar("c2"), Literal("C")),  Not(Equals(CharVar("c3"), Literal("E")))))
 #print(printExpr(simplified))
 #print(printExpr(convertToDNF(AndPred(UnionPred(Equals(Literal("A"), CharVar("c")), Equals(Literal("d"), CharVar("c"))),  UnionPred(Equals(Literal("b"), CharVar("c")), Equals(Literal("l"), CharVar("c")))  ))))

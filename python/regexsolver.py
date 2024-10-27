@@ -408,7 +408,9 @@ def simplifies(expr):
 #expr = Complement(Kleene(Literal("a")))
 #print(satisfies(expr, "aa"))
 
-expr = Concatenation(StringVar("w1"),Concatenation(StringVar("w1"),Concatenation(StringVar("w1"), StringVar("w1"))))
-print(satisfies(expr, "catcatcatcatcatcat"))
+#expr = Concatenation(StringVar("w1"),Concatenation(StringVar("w1"),Concatenation(StringVar("w1"), StringVar("w1"))))
+expr = IfThenElse(Equals(StringIndex(StringVar("w1"), 2), Literal("c")), Concatenation(CharVar("c2"), Concatenation(StringVar("w1"), CharVar("c2"))), Literal("b"))
+
+print(satisfies(expr, "babcdefgb"))
 #print(satisfies(expr, "catcatcatcats"))
 

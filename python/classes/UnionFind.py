@@ -59,6 +59,7 @@ class UnionFind:
     def union(self, x, y):
         rootX = self.find(x)
         rootY = self.find(y)
+        print(rootX, rootY)
         x = self.stringToObject( rootX)
         y = self.stringToObject(rootY)
         if isinstance(x, Literal) and isinstance(y, Literal):
