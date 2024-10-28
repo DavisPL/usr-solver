@@ -1,0 +1,41 @@
+Literal:
+	value: <string>
+
+StringVar:
+	name: <string>
+
+CharVar:
+	name: <string>
+
+StringIndex:
+	stringVar: <StringVar>
+	index: <int>
+
+StringSlice
+	stringVar: <StringVar>
+	index: <int>
+
+EmptySet
+
+AndOp:
+	left = <gre>
+	right = <gre>
+
+OrOp:
+	left = <gre>
+	right = <gre>
+
+Concatenation:
+	left = <gre>
+	right = <gre>
+
+IfThenElse:
+	predicate = <Predicate>
+	trueExpr = <gre>
+	falseExpr = <gre>
+
+Complement:
+	expr = <gre>
+
+Kleene:
+	expr = <gre>

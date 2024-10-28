@@ -2,75 +2,7 @@ from classes import Literal, AndOp, Concatenation, Kleene, OrOp, IfThenElse, Emp
 from PredicateEvaluation import *
 #def determineSatisfiable(expr):
 
-def derivative3(expr, char):
-    '''
-    If the expression is a literal:
-        If the expression is empty string, return empty set, else return ITE(char = expr, "", emptyset)
-    
-    '''
-    if isinstance(expr, Literal):
-        if (expr.value == ""):
-            return EmptySet()
-        else:
-            return simplifies2(IfThenElse(Equals(Literal(expr.value[0]), char), Literal(expr.value[1:]), EmptySet()))
-    elif isinstance(expr, EmptySet):
-        return EmptySet()
-    elif isinstance(expr, IfThenElse):
-        return simplifies2(IfThenElse(expr.predicate, derivative(expr.trueExpr, char), derivative(expr.falseExpr, char)))
-    elif isinstance(expr, AndOp):
-        return simplifies2(AndOp(derivative(expr.left, char), derivative(expr.right, char)))
-    elif isinstance(expr, OrOp):
-        return simplifies2(OrOp(derivative(expr.left, char), derivative(expr.right, char)))
-    elif isinstance(expr, Kleene):
-        return simplifies2(Concatenation(derivative(expr.expr, char), expr))
-    elif isinstance(expr, Concatenation):
-        return simplifies2(OrOp(Concatenation(derivative(expr.left, char), expr.right), Concatenation(nullable(expr.left), derivative(expr.right, char))))
-    elif isinstance(expr, StringVar):
-        return simplifies2(IfThenElse(Equals(StringIndex(expr, 0), char), StringSlice(expr, 1), EmptySet()))
-    elif isinstance(expr, StringIndex):
-        return simplifies2(IfThenElse(Equals(expr.stringVar, char), Literal(""), EmptySet()))
-    elif isinstance(expr, StringSlice):
-        return simplifies2(IfThenElse(Equals(StringIndex(expr.stringVar, expr.index), char), StringSlice(expr.stringVar, expr.index+1), EmptySet()))
-    elif isinstance(expr, CharVar):
-        return simplifies2(IfThenElse(Equals(expr, char), Literal(""), EmptySet()))
-    elif isinstance(expr, Complement):
-        return Complement(derivative(expr.expr, char))
-    return expr
 
-def derivative2(expr, char):
-    '''
-    If the expression is a literal:
-        If the expression is empty string, return empty set, else return ITE(char = expr, "", emptyset)
-    
-    '''
-    if isinstance(expr, Literal):
-        if (expr.value == ""):
-            return EmptySet()
-        else:
-            return IfThenElse(Equals(Literal(expr.value[0]), char), Literal(expr.value[1:]), EmptySet())
-    elif isinstance(expr, EmptySet):
-        return EmptySet()
-    elif isinstance(expr, IfThenElse):
-        return IfThenElse(expr.predicate, derivative(expr.trueExpr, char), derivative(expr.falseExpr, char))
-    elif isinstance(expr, AndOp):
-        return AndOp(derivative(expr.left, char), derivative(expr.right, char))
-    elif isinstance(expr, OrOp):
-        return OrOp(derivative(expr.left, char), derivative(expr.right, char))
-    elif isinstance(expr, Kleene):
-        return Concatenation(derivative(expr.expr, char), expr)
-    elif isinstance(expr, Concatenation):
-        return OrOp(Concatenation(derivative(expr.left, char), expr.right), Concatenation(nullable(expr.left), derivative(expr.right, char)))
-    elif isinstance(expr, StringVar):
-        return IfThenElse(Equals(StringIndex(expr, 0), char), StringSlice(expr, 1), EmptySet())
-    elif isinstance(expr, StringIndex):
-        return IfThenElse(Equals(expr.stringVar, char), Literal(""), EmptySet())
-    elif isinstance(expr, StringSlice):
-        return IfThenElse(Equals(StringIndex(expr.stringVar, expr.index), char), StringSlice(expr.stringVar, expr.index+1), EmptySet())
-    elif isinstance(expr, CharVar):
-        return IfThenElse(Equals(expr, char), Literal(""), EmptySet())
-    elif isinstance(expr, Complement):
-        return Complement(derivative(expr.expr, char))
-    return expr
 
 def derivative(expr, char):
     '''
@@ -232,94 +164,70 @@ def printExpr(expr):
 
 
 
-def satisfies(expr, proposed):
+def matching(expr, proposed):
     expr = simplifies(expr)
     print(" matching with the string " + proposed)
     if proposed == "":
         return not(isinstance(nullableProjection(expr), EmptySet))
-    return satisfies(derivative(expr, Literal(proposed[0])), proposed[1:])
+    return matching(derivative(expr, Literal(proposed[0])), proposed[1:])
 #return satisfiesHelper(expr, proposed)
 
+def satisfiable(expr, index, visited = None):
+    if visited is None:
+        visited = set()
+    print("satisfiable", visited)
+    expr = visitedCheck(expr, visited)
+    expr = simplifies(expr)
+    if isinstance(expr, EmptySet): #Update with a function that checks if subparts are empty and simplifies
+        return False
+    else:
+        visited = addToVisited(expr, visited)
+        print("gaslightl", visited)
+    if isinstance(nullableProjection(expr), EmptySet):
+        char = CharVar("f" + str(index))
+        deriv = derivative(expr, char)
+        if isinstance(deriv, EmptySet):
+            return False
+        index += 1
+        return satisfiable(deriv, index, visited)
+    return True
 
-def simplifies2(expr):
-    if isinstance(expr, Literal):
-        return expr
-    elif isinstance(expr, EmptySet):
-        return expr
-    elif isinstance(expr, CharVar):
-        return expr
-    elif isinstance(expr, IfThenElse):
-        simplified = expr.predicate
-        simplifiedTrue = expr.trueExpr
-        simplifiedFalse = expr.falseExpr
-        if (isinstance(simplifiedTrue, IfThenElse) and 
-            isinstance(simplifiedTrue.falseExpr, EmptySet) and 
-            isinstance(simplifiedFalse, EmptySet)):
-            # Combine the predicates
-            combined_pred = AndPred(simplified, simplifiedTrue.predicate)
-            return IfThenElse(combined_pred, 
-                            simplifiedTrue.trueExpr, 
-                            EmptySet())
-        if isinstance(simplified, Equals) and isinstance(simplified.left, Literal) and isinstance(simplified.right, Literal):
-            if isinstance(simplified, Equals):
-                if simplified.left.value == simplified.right.value:
-                    return simplifiedTrue
-                return simplifiedFalse
-        elif isinstance(expr.trueExpr, EmptySet) and isinstance(expr.falseExpr, EmptySet):
-            return EmptySet()
-        else:
-            return IfThenElse(simplified, simplifiedTrue, simplifiedFalse)
-    elif isinstance(expr, AndOp):
-        #left = simplifies2(expr.left)
-        #right = simplifies2(expr.right)
-        left = expr.left
-        right = expr.right
-        if (isinstance(left, IfThenElse) and isinstance(right, IfThenElse) and
-            isinstance(left.falseExpr, EmptySet) and isinstance(right.falseExpr, EmptySet)):
-            combined_pred = AndPred(left.predicate, right.predicate)
-            combined_true = AndOp(left.trueExpr, right.trueExpr)
-            return IfThenElse(combined_pred, 
-                            combined_true, 
-                            EmptySet())
-        if isinstance(left, EmptySet) or isinstance(right, EmptySet):
-            return EmptySet()
-        elif isinstance(left, Literal) and isinstance(right, Literal):
-            if right.value == left.value:
-                return right
-            else:
-                return EmptySet()
-        return AndOp(left, right)
+def visitedCheck(expr, visited):
+    print(visited)
+    if isinstance(expr, AndOp):
+        leftSide = visitedCheck(expr.left, visited)
+        rightSide = visitedCheck(expr.right, visited)
+        return AndOp(leftSide, rightSide)
     elif isinstance(expr, OrOp):
-        left = expr.left
-        right = expr.right
-        if isinstance(left, EmptySet):
-            return right
-        if isinstance(right, EmptySet):
-            return left
-        elif isinstance(left, Literal) and isinstance(right, Literal):
-            if right.value == left.value:
-                return right
-        return OrOp(left, right)
-    elif isinstance(expr, Kleene):
-        return Kleene(simplifies2(expr.expr))
-    elif isinstance(expr, Concatenation):
-        #left = simplifies(expr.left)
-        #right = simplifies(expr.right)
-        left = expr.left
-        right = expr.right
-        if isinstance(left, EmptySet) or isinstance(right, EmptySet):
-            return EmptySet()
-        elif isinstance(left, Literal) and isinstance(right, Literal):
-            return Literal(left.value + right.value)
-        elif isinstance(left, Literal) and left.value == "":
-            return right
-        elif isinstance(right, Literal) and right.value == "":
-            return left
-
-        return Concatenation(left, right)
-    elif isinstance(expr, StringVar):
-        return expr
+        leftSide = visitedCheck(expr.left, visited)
+        rightSide = visitedCheck(expr.right, visited)
+        return OrOp(leftSide, rightSide)
+    elif isinstance(expr, IfThenElse):
+        leftSide = visitedCheck(expr.trueExpr, visited)
+        rightSide = visitedCheck(expr.falseExpr, visited)
+        return IfThenElse(expr.predicate, leftSide, rightSide)
+    if printExpr(expr) in visited:
+        return EmptySet()
     return expr
+
+def addToVisited(expr, visited):
+    if isinstance(expr, AndOp):
+        visited = addToVisited(expr.left, visited)
+        visited = addToVisited(expr.right, visited)
+        return visited
+    elif isinstance(expr, OrOp):
+        visited = addToVisited(expr.left, visited)
+        visited = addToVisited(expr.right, visited)
+        return visited
+    elif isinstance(expr, IfThenElse):
+        visited = addToVisited(expr.trueExpr, visited)
+        visited = addToVisited(expr.falseExpr, visited)
+        return visited
+    else:
+        visited.add(printExpr(expr))
+        return visited
+
+
 
 
 
@@ -411,6 +319,8 @@ def simplifies(expr):
 #expr = Concatenation(StringVar("w1"),Concatenation(StringVar("w1"),Concatenation(StringVar("w1"), StringVar("w1"))))
 expr = IfThenElse(Equals(StringIndex(StringVar("w1"), 2), Literal("c")), Concatenation(CharVar("c2"), Concatenation(StringVar("w1"), CharVar("c2"))), Literal("b"))
 
-print(satisfies(expr, "babcdefgb"))
+#print(matching(expr, "babcdefgb"))
 #print(satisfies(expr, "catcatcatcats"))
 
+expr = AndOp(Concatenation(Literal("a"), StringVar("w1")), Concatenation(StringVar("w1"), Literal("b")))
+print(satisfiable(expr, 0))

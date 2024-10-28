@@ -1,0 +1,20 @@
+Predicate Class?
+
+Equals:
+	left = CharVar or StringIndex
+	right = CharVar or StringIndex
+
+EqualLength:
+	left = StringVar or StringSlice
+	right = int
+
+Not:
+	predicate = Predicate or EmptySet or Literal("")
+
+UnionPred:
+	left = Predicate or EmptySet or Literal("")
+	right = Predicate or EmptySet or Literal("")
+
+AndPred:
+	left = Predicate or EmptySet or Literal("")
+	right = Predicate or EmptySet or Literal("")
