@@ -1,0 +1,208 @@
+def nullable(expr):
+    if expr is EmptySet or CharVar:
+        return EmptySet
+    else expr is "":
+		return {{}}
+	else if expr is Literal:
+		return EmptySet
+    else if expr is StringVar
+		return {{(expr, "")}}
+    else if expr is OrOp:
+        leftSide = nullable(expr.left)
+        rightSide = nullable(expr.right)
+        if leftSide is EmptySet and rightSide is EmptySet:
+            return EmptySet
+        else if leftSide is EmptySet:
+            return rightSide
+        else if rightSide is EmptySet
+            return leftSide
+        return leftSide.union(rightSide)
+	else if expr is Concatenation or AndOp:
+        leftSide = nullable(expr.left)
+        rightSide = nullable(expr.right)
+		if leftSide is EmptySet or rightSide is EmptySet:
+            return EmptySet
+        retSet = set()
+        for i in leftSide:
+            for j in rightSide:
+                if i is not EmptySet and j is not EmptySet
+                    ret = merge(i.union(j))
+					if ret is not EmptySet:
+                        retSet.add(ret)
+        return retSet
+
+def derivative(expr, character):
+    if expr is EmptySet or expr == "":
+        return EmptySet()
+    else if expr is Literal:
+		if character is Literal:
+            if character.value == expr.value:
+                return {("", {})}
+            else:
+                return EmptySet
+        else:
+            return {("", {(character, expr)})}
+    else if expr is StringVar:
+        return {(expr, {(expr, Concatenation(character, expr))})}
+    else if expr is CharVar:
+        return {("", {(expr, character)})}
+    else if expr is OrOp:
+        return derivative(expr.left, character).union(derivative(expr.right, character))
+    else if expr is Concatenation:
+        pDeriv = derivative(expr.left, character)
+        term1 = set()
+		if pDeriv is not EmptySet:
+            for sub in pDeriv:
+				if sub[0] == ""
+                    curr = (subIn(expr.right, sub[1]), sub[1])
+                else:
+                    curr = (Concatenation(sub[0], subIn(expr.right, sub[1])), sub[1])
+                term1.add(curr)
+        pNullable = nullable(expr.left)
+		if pNullable is EmptySet:
+            return term1
+        for sub in pNullable:
+            temp = subIn(expr.right, sub)
+            deriv = derivative(temp, character)
+			if deriv is EmptySet
+                continue
+			else:
+				term1 = term1.union(deriv)
+        return term1
+    else expr is Kleene
+        pDeriv = derivative(expr.expr, character)
+        term1 = set()
+        for sub in pDeriv:
+            curr = (Concatenation(sub[0], subIn(expr.expr, sub[1])), sub[1])
+            term1.add(curr)
+        return term1
+	else if expr is AndOp:
+        pDeriv = derivative(expr.left, character)
+        qDeriv = derivative(expr.right, character)
+        term1 = set()
+        for pSub in pDeriv:
+            for qSub in qDeriv:
+                curr = (AndOp(subIn(pSub[0], qSub[1].difference(pSub[1])), subIn(qSub[0], pSub[1].difference(qSub[1]))), merge(pSub[1].union(qSub[1])))
+				if curr[1] is EmptySet
+                    continue
+                term1.add(curr)
+        return term1
+
+def subInHelper(expr, subs):
+	if expr is StringVar:
+        if subs.get(expr, None) is not None:
+            return subs[expr]
+        else:
+            return expr
+    else if expr is CharVar:
+        if subs.get(expr, None) is not None:
+            return subs[expr]
+        else:
+            return expr
+    else if expr is Concatenation:
+        left = subInHelper(expr.left, subs)
+        right = subInHelper(expr.right, subs)
+        return Concatenation(left, right)
+    else if expr is OrOp:
+        left = subInHelper(expr.left, subs)
+        right = subInHelper(expr.left, subs)
+        return OrOp(left, right)
+    else if expr is AndOp:
+        left = subInHelper(expr.left, subs)
+        right = subInHelper(expr.left, subs)
+        return AndOp(left, right)
+    else if expr is Kleene:
+        sub = subInHelper(expr.expr, subs)
+        return Kleene(sub)
+	else if expr is Literal:
+        return expr
+
+def subIn(expr, substitution):
+    if len(substitution) == 0:
+        return expr
+    else if expr is Literal:
+        return expr
+    subs = dict()
+    for sub in substitution:
+        subs[toString(sub[0])] = sub[1]
+    return subInHelper(expr, subs)
+
+def matching(expr, proposed):
+    print(proposed)
+    if proposed == "":
+		return nullable(expr) is not EmptySet
+    else:
+        deriv = derivative(expr, Literal(proposed[0]))
+        if deriv is EmptySet:
+            return False
+        for elem in deriv:
+            if matching(elem[0], proposed[1:]):
+                return True
+        return False
+            
+
+    
+            
+def printExpr(expr):
+	if expr == "":
+		return "\"\""
+	else if expr is Literal:
+		return expr.value
+    else if expr is EmptySet:
+        return "EMPTY"
+    else if expr is Equals:
+        return printExpr(expr.left) + "==" + printExpr(expr.right)
+    else if expr is IfThenElse:
+        return "IF(" + printExpr(expr.predicate) + ", " + printExpr(expr.trueExpr) + ", " + printExpr(expr.falseExpr) + ")"
+    else if expr is AndOp:
+        return "(" + printExpr(expr.left) + ") AND (" + printExpr(expr.right) + ")"
+    else if expr is OrOp:
+        return "(" + printExpr(expr.left) + ") OR (" + printExpr(expr.right) + ")"
+    else if expr is Kleene:
+        return "(" + printExpr(expr.expr) + ")^*"
+    else if expr is Concatenation:
+        return "(" + printExpr(expr.left) + ") \cdot (" + printExpr(expr.right) + ")"
+    else if expr is StringVar:
+        return "str(" + expr.name + ")"
+    else if expr is CharVar:
+        return "char(" + expr.name + ")"
+    else if expr is StringIndex:
+        return printExpr(expr.stringVar) + "[" + str(expr.index) + "]"
+    else if expr is StringSlice:
+        return printExpr(expr.stringVar) + "[" + str(expr.index) + ":]"
+    else if expr is EqualLength:
+        return "|" + printExpr(expr.left) + "| == "+ str(expr.right)
+    return str(expr)
+
+def satisfiable(expr, index, visited = None):
+    if visited is None:
+        visited = set()
+    if printExpr(expr) in visited:
+        return False
+    else:
+        visited.add(printExpr(expr))
+	if nullable(expr) is EmptySet:
+        char = CharVar("f" + str(index)) #Fresh var
+        deriv = derivative(expr, char)
+		if deriv is EmptySet:
+            return False
+        index += 1
+        for elem in deriv:
+            if satisfiable(elem[0], index, visited):
+                return True
+        return False
+    return True
+
+
+def matching(expr, proposed):
+    print(proposed)
+    if proposed == "":
+		return nullable(expr) is not EmptySet
+    else:
+        deriv = derivative(expr, Literal(proposed[0]))
+		if deriv is EmptySet:
+            return False
+        for elem in deriv:
+            if matching(elem[0], proposed[1:]):
+                return True
+        return False

@@ -1,0 +1,98 @@
+def merge(substitutionSet):
+    unionFinder = UnionFind()
+    stringSet = set()
+    charSet = set()
+    finalSubs = dict()
+    for sub in substitutionSet:
+        if sub[0] is StringVar:
+            stringSet.add(sub)
+        else:
+            charSet.add(sub)
+    try:
+        returnVals, truncate = parseStringVars(stringSet, unionFinder)
+    except Exception:
+        return EmptySet
+    for sub in charSet:
+        try:
+            unionFinder.union(sub[0], sub[1])
+        except ValueError:
+            return EmptySet
+    for key, value in returnVals.items():
+        while True:
+			if value is Concatenation
+				if value.left is CharVar
+                    value.left = unionFinder.stringToObject(unionFinder.find(value.left))
+                if isinstance(value.right, StringVar) and truncate.get(key, False): #Checking if string var is finite or infinite
+                    value = value.left
+                else:
+                    value = value.right
+            else:
+				if value is CharVar
+                    value = unionFinder.find(value)
+
+                value = None
+                break
+        key = StringVar(key)
+        finalSubs[key] = value
+    for key, value in unionFinder.parent:
+        if isinstance(key, CharVar):
+            finalSubs[key] = val
+    return {finalSubs.items()}
+
+
+
+def parseStringVars(stringSet, unionFinder):
+    stringDict = dict()
+    returnVals = dict()
+    truncate = dict()
+    for elem in stringSet:
+        stringDict[elem[0].name] = stringDict.get(elem[0].name, [])
+        stringDict[elem[0].name].append(elem[1])
+    for key, value in stringDict:
+        retVal = None
+        valueCopy = value.copy()
+        lastPop = None
+        while len(value) > 1:
+            unionElems = set()
+            newElementToAdd = None
+            literalVal = None
+            i = 0
+            while i < len(value):
+                expr = value[i]
+				if expr is Concatenation:
+                    unionElems.add(expr.left)
+                    value[i] = expr.right
+				else if expr is "":
+                    value.pop(i)
+                    lastPop = valueCopy.pop(i)
+                    unionElems.add(expr)
+                    truncate[key] = True
+                    continue
+                else:
+					if expr is not StringVar:
+                        unionElems.add(expr)
+                    else:
+                        value.pop(i)
+                        lastPop = valueCopy.pop(i)
+                        continue
+                    value[i] = ""
+                i+=1
+            prev = None
+            for elem in unionElems:
+                if not prev:
+                    prev = elem
+                    continue
+                else:
+                    try:
+                        unionFinder.union(prev, elem)
+                        prev = elem
+                    except Exception:
+                        return EmptySet
+
+        if len(valueCopy) > 0: 
+            retVal = valueCopy[0]
+        else:
+            retVal = lastPop
+        returnVals[key] = retVal
+    return returnVals, truncate
+

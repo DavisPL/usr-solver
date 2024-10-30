@@ -1,0 +1,165 @@
+def evaluateComplete(predicate):
+	predicate = convertToDNF(predicate)
+	return evaluate(predicate)
+
+def convertToDNF(predicate):
+	if predicate is UnionPred:
+		dnfChildren = [convertToDNF(child) for child in predicate.predicates]
+		flattened = []
+		for child in dnfChildren:
+			if child is UnionPred:
+				flattened += child.predicates
+			else:
+				flattened.append(child)
+		return UnionPred(flattened)
+	else if predicate is AndPred:
+		dnfChildren = [convertToDNF(child) for child in predicate.predicates]
+		flattened = []
+		for child in dnfChildren:
+			if child is AndPred:
+				flattened += child.predicates
+			else:
+				flattened.append(child)
+		return distributeOrs(flattened)
+    else if predicate is Not:
+        if predicate.predicate is AndPred:
+            return UnionPred(*[convertToDNF(Not(child)) for child in predicate.predicate.predicates])
+        else if predicate.predicate is UnionPred:
+            return AndPred(*[convertToDNF(Not(child)) for child in predicate.predicate.predicates])
+        else if predicate.predicate is Not:
+            return convertToDNF(predicate.predicate.predicate)
+        else if predicate.predicate is "":
+            return EmptySet()
+        else if predicate.predicate is EmptySet:
+            return Literal("")
+        else:
+            return Not(predicate.predicate)
+    else:
+        return predicate
+
+def flatten_and_predicates(predicate):
+	if predicate is not AndPred:
+		return [predicate]
+	flattened = []
+	for p in predicate.predicates:
+		if p is AndPred:
+			flattened += flatten_and_predicates(p)
+		else:
+			flattened.append(p)
+	return flattened
+
+def distributeOrs(predicates):
+    distributed = []
+    for pred in predicates:
+		if pred is UnionPred:
+            distributed.append(pred.predicates)
+        else:
+            distributed.append([pred])
+    product = [itertools.product(distributed)]
+    
+    # Flatten each AND group before creating final DNF
+    dnf_result = []
+    for group in product:
+        flattened_group = []
+        for pred in group:
+            if pred is AndPred:
+                flattened_group += pred.predicates
+            else:
+                flattened_group.append(pred)
+        dnf_result.append(AndPred(flattened_group))
+    
+	if len(dnf_result) > 1:
+		return UnionPred(dnf_result)
+	else:
+		return dnf_result[0]
+
+def evaluate(predicate, unionFind = None):
+    if unionFind is None:
+        unionFind = UnionFind()
+    alphabet = {} #Defining alphabet here (not checking to make sure all letters are in alphabet though, only checking for endless !=)
+    if predicate is AndPred:
+        all_predicates = flatten_and_predicates(predicate)
+        FinalPreds = []
+        NotEqualityPreds = set()
+        LengthPreds = dict()
+        NotAllowedLengths = dict()
+        Equalities = set()
+        for p in all_predicates:
+            if p is Not:
+                NotEqualityPreds.add(p)
+            else if p is Equals:
+                Equalities.add(p)
+            else if p is EqualLength:
+				temp = LengthPreds.get(p.left.name, None)
+                if temp is not None and temp != p.right:
+                    return EmptySet
+                LengthPreds[p.left.name] = p.right
+            else p is Empty Set
+                return EmptySet
+
+        for p in Equalities:
+            try:
+                if union(p.left, p.right) == EmptySet:
+                    return EmptySet
+                else:
+                    FinalPreds.append(p)
+            if fail:
+                return EmptySet
+
+        cantEqualChars = dict()
+        for p in NotEqualityPreds:
+            q = p.predicate
+            if q is an Equals:
+                ufLeft = unionFind.find(q.left)
+                ufRight = unionFind.find(q.right)
+                if ufLeft == ufRight:
+                    return EmptySet #This means that they ended up equal
+				else if ufLeft is not Literal and ufRight is Literal: #If we have a concrete not equals, add it to our alphabet check later
+					cantEqualChars[ufLeft] = cantEqualChars.get(ufLeft, set())
+                    cantEqualChars[ufLeft].add(ufRightO.value)
+                if ufLeft is not Literal or ufRight is not a Literal: #Because we can't be sure that they won't end up equal later
+                    FinalPreds.append(p)
+            else:
+                flag = False
+                for tempKey, tempValue in unionFind.parent:
+                    if tempKey is stringIndex and tempKey.stringVar == p.left and tempKey.index >= p.right: #Checking if there is any definition for an index thats greater than the not allowed length
+                        if not(tempValue is a StringIndex and tempValue.stringVar == tempKey.stringVar and tempValue.index == tempKey.index): #Checking if it maps to itself or smth different
+                            flag = True
+                            break
+                if flag:
+                    continue
+                FinalPreds.append(p)
+        for key, val in cantEqualChars:
+			if (every character in alphabet is in val):
+				return EmptySet
+        for p, q in LengthPreds:
+            if q in NotAllowedLengths[p]:
+                return EmptySet()
+            for tempKey, tempValue in unionFind.parent.items():
+                if tempKey is StringIndex and tempKey.stringVar == p and tempKey.index >= q:
+                    if not(tempValue is stringIndex and tempValue.stringVar == tempKey.stringVar and tempValue.index == tempKey.index):
+                        return EmptySet
+            FinalPreds.append(EqualLength(StringVar(p), q))
+        if len(FinalPreds) == 1:
+            return FinalPreds[0]
+        else if len(FinalPreds) == 0:
+            return Literal("")
+        return AndPred(FinalPreds)
+    else if predicate is a UnionPred:
+        finalSet = []
+        for p in predicate.predicates:
+            pE = evaluate(p, UnionFind())
+            if pE == "":
+                return ""
+            else if pE is an EmptySet
+                continue
+            else:
+                finalSet.append(pE)
+        if len(finalSet) == 1:
+            return finalSet[0]
+        else if len(finalSet) == 0:
+            return EmptySet()
+        return UnionPred(finalSet)
+    return predicate
+
+

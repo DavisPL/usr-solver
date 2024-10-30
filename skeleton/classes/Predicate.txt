@@ -18,3 +18,7 @@ UnionPred:
 AndPred:
 	left = Predicate or EmptySet or Literal("")
 	right = Predicate or EmptySet or Literal("")
+
+True
+
+False
