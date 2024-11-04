@@ -19,10 +19,10 @@ pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
             for child in children {
                 flattened.push(convertToDNF(&Rc::clone(child)))
             }
-            return flattened;
+            flattened
         }
         _ => {
-            return vec![Rc::clone(pred)];
+            vec![Rc::clone(pred)]
         }
     }
 }
@@ -30,7 +30,7 @@ pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
 pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
     let predicate = convertToDNF(pred);
     let uf = &mut UnionFind::new();
-    return evaluate(&predicate, uf);
+    evaluate(&predicate, uf)
 }
 
 fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
