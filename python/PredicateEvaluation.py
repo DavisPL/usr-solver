@@ -80,21 +80,6 @@ def evaluate(predicate, unionFind = None):
                     continue
                 #if not q.right:
                 FinalPreds.append(p)
-                    #continue
-                #pObj = unionFind.stringToObject(unionFind.find(StringIndex(q.left, q.right-1)))
-                #if not(isinstance(pObj, StringIndex) and pObj.stringVar == q.left.name and q.right == pObj.index):
-                    #NotAllowedLengths[q.left.name] = NotAllowedLengths.get(q.left.name, set())
-                    #NotAllowedLengths[q.left.name].add(q.right)
-                    #FinalPreds.append(p)
-                #else:
-                    #return EmptySet()
-
-                #pObj = unionFind.stringToObject(unionFind.find(StringIndex(q.left, q.right)))
-                #if not(isinstance(pObj, StringIndex) and pObj.stringVar == p.left.name and p.right == pObj.index):
-                    #return EmptySet()
-                #else:
-                    #FinalPreds.append(p)
-                #if isinstance
         for key, val in cantEqualChars.items():
             if all(char in val for char in alphabet):
                 return EmptySet()
@@ -135,12 +120,6 @@ def evaluate(predicate, unionFind = None):
         return UnionPred(*finalSet)
     return predicate
 
-            #sets = evaluate(p, unionFind)
-            #if not finalSet:
-                #finalSet = sets
-            #else:
-                #finalSet -= sets
-            #retVal.add(temp)
 
 def convertToDNF(predicate):
     if isinstance(predicate, Equals):

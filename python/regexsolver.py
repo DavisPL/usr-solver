@@ -120,12 +120,10 @@ def nullableProjectionHelper(expr):
 
 def nullableProjection(expr):
     expr = nullable(expr)
-    print(printExpr(expr))
+    #print(printExpr(expr))
     expr = nullableProjectionHelper(expr)
     #print("nullp")
-    print(printsExpr(expr))
     res = evaluateComplete(expr)
-    print(printsExpr(res))
     return res
 
 def printExpr(expr):
@@ -179,13 +177,15 @@ def satisfiable(expr, index, visited = None):
     expr = visitedCheck(expr, visited)
     expr = simplifies(expr)
     if isinstance(expr, EmptySet): #Update with a function that checks if subparts are empty and simplifies
+        print("LOOP")
         return False
     else:
         visited = addToVisited(expr, visited)
-        print("gaslightl", visited)
+    print(visited)
     if isinstance(nullableProjection(expr), EmptySet):
         char = CharVar("f" + str(index))
         deriv = derivative(expr, char)
+        #print(deriv)
         if isinstance(deriv, EmptySet):
             return False
         index += 1
@@ -193,7 +193,6 @@ def satisfiable(expr, index, visited = None):
     return True
 
 def visitedCheck(expr, visited):
-    print(visited)
     if isinstance(expr, AndOp):
         leftSide = visitedCheck(expr.left, visited)
         rightSide = visitedCheck(expr.right, visited)
@@ -206,6 +205,10 @@ def visitedCheck(expr, visited):
         leftSide = visitedCheck(expr.trueExpr, visited)
         rightSide = visitedCheck(expr.falseExpr, visited)
         return IfThenElse(expr.predicate, leftSide, rightSide)
+    if isinstance(expr, Concatenation):
+        leftSide = visitedCheck(expr.left, visited)
+        rightSide = visitedCheck(expr.right, visited)
+        return Concatenation(leftSide, rightSide)
     if printExpr(expr) in visited:
         return EmptySet()
     return expr
@@ -219,9 +222,18 @@ def addToVisited(expr, visited):
         visited = addToVisited(expr.left, visited)
         visited = addToVisited(expr.right, visited)
         return visited
+    elif isinstance(expr, Concatenation):
+        if (isinstance(expr.left, IfThenElse) or isinstance(expr.left, AndOp) or isinstance(expr.left, OrOp) or isinstance(expr.left, Concatenation)):
+            visited = addToVisited(expr.left, visited)
+            visited = addToVisited(expr.right, visited)
+
+        return visited
     elif isinstance(expr, IfThenElse):
+        print(expr.trueExpr)
         visited = addToVisited(expr.trueExpr, visited)
         visited = addToVisited(expr.falseExpr, visited)
+        return visited
+    elif isinstance(expr, EmptySet):
         return visited
     else:
         visited.add(printExpr(expr))
@@ -323,4 +335,9 @@ expr = IfThenElse(Equals(StringIndex(StringVar("w1"), 2), Literal("c")), Concate
 #print(satisfies(expr, "catcatcatcats"))
 
 expr = AndOp(Concatenation(Literal("a"), StringVar("w1")), Concatenation(StringVar("w1"), Literal("b")))
+expr = Concatenation(AndOp(StringVar("w1"), Literal("a")), Complement(StringIndex(StringVar("w1"), 3)))
+#print(matching(expr, "b"))
+#print(satisfiable(expr, 0))
+#expr = AndOp(Concatenation(Literal("a"), Kleene(Literal("a"))), Kleene(Literal("b")))
+expr = AndOp(Kleene(Literal("a")), Concatenation(Literal("a"), Literal("a")))
 print(satisfiable(expr, 0))
