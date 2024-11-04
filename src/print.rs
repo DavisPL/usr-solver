@@ -1,4 +1,27 @@
-//mod classes;
+// Better to fix and remove, allowing for now
+#![allow(non_snake_case)]
+/*
+This file should be done by implementing
+the Display trait.
+
+https://doc.rust-lang.org/std/fmt/trait.Display.html
+
+Example:
+
+use fmt::{self, Display};
+
+impl Display for Predicate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // paste in your print logic below here
+        // instead of format!( you would then use write! to write the result to the formatter.
+    }
+}
+
+Using Display means you would be able to print both to a string, or to a file, by using the
+`{}` syntax (instead of `{:?}` for Debug) and get the printing style you want by default.
+*/
+// Remove after converting to Display
+#![allow(dead_code)]
 
 use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
 use either::Either;
@@ -27,6 +50,7 @@ pub fn print_predicate(pred: &Rc<Predicate>) -> String {
         }
     }
 }
+
 pub fn print_equals_arg(equals_arg: &Either<Rc<CharExpression>, Rc<StringIndex>>) -> String {
     match equals_arg.as_ref() {
         Either::Left(char_expr) => print_char_expression(char_expr),

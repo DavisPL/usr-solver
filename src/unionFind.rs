@@ -1,4 +1,24 @@
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
+// Better to fix and remove, allowing for now
+#![allow(non_snake_case)]
+
+/*
+    Conceptually, something seems amiss that the UnionFind impl lis using
+    imports from crate::classes.
+
+    Even if we use a String-focused implementation
+    (I think the below is likely not super efficient),
+    UnionFind should be a generic data structure that just takes in strings
+    and determines if they are equal; it shouldn't need to import
+    CharExpression, GenRegex, etc.
+    That suggests something is not set up correctly with the design.
+
+    Also, making in generic (work for any String type) will help us if we want
+    to replace it later with a more efficient implementation with something like
+    disjoint-sets
+    https://docs.rs/disjoint-sets/latest/disjoint_sets/
+*/
+
+use crate::classes::{CharExpression, StringIndex, StringVar};
 use either::Either;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -28,43 +48,46 @@ impl UnionFind {
             }
         }
     }
-    pub fn final_find(
-        &mut self,
-        x: Either<Rc<CharExpression>, Rc<StringIndex>>,
-    ) -> Either<Rc<CharExpression>, Rc<StringIndex>> {
-        let key = self.get_key(x.clone());
 
-        if !self.parent.contains_key(&key) {
-            self.parent.insert(key.clone(), key.clone());
-            self.rank.insert(key.clone(), 0);
-        }
+    // TODO: Dead code
+    // pub fn final_find(
+    //     &mut self,
+    //     x: Either<Rc<CharExpression>, Rc<StringIndex>>,
+    // ) -> Either<Rc<CharExpression>, Rc<StringIndex>> {
+    //     let key = self.get_key(x.clone());
 
-        let parent_key = self.parent.get(&key).unwrap().clone();
-        if parent_key != key {
-            let new_parent = self.final_find(self.string_to_object(&parent_key));
-            let new_parent_key = self.get_key(new_parent.clone());
-            self.parent.insert(key.clone(), new_parent_key);
-        }
+    //     if !self.parent.contains_key(&key) {
+    //         self.parent.insert(key.clone(), key.clone());
+    //         self.rank.insert(key.clone(), 0);
+    //     }
 
-        if parent_key == key {
-            if key.starts_with("Literal_") {
-                return Either::Left(Rc::new(CharExpression::Literal(key[8..].to_string())));
-            } else if key.starts_with("CharVar_") {
-                return Either::Left(Rc::new(CharExpression::CharVar(key[8..].to_string())));
-            } else if key.starts_with("StringIndex_") {
-                let parts: Vec<&str> = key[12..].split('_').collect();
-                let name = parts[0].to_string();
-                let index = parts[1].parse::<i32>().unwrap();
-                let string_var = Rc::new(StringVar { name });
-                return Either::Right(Rc::new(StringIndex {
-                    var: string_var,
-                    index,
-                }));
-            }
-        }
+    //     let parent_key = self.parent.get(&key).unwrap().clone();
+    //     if parent_key != key {
+    //         let new_parent = self.final_find(self.string_to_object(&parent_key));
+    //         let new_parent_key = self.get_key(new_parent.clone());
+    //         self.parent.insert(key.clone(), new_parent_key);
+    //     }
 
-        self.string_to_object(&parent_key)
-    }
+    //     if parent_key == key {
+    //         if key.starts_with("Literal_") {
+    //             return Either::Left(Rc::new(CharExpression::Literal(key[8..].to_string())));
+    //         } else if key.starts_with("CharVar_") {
+    //             return Either::Left(Rc::new(CharExpression::CharVar(key[8..].to_string())));
+    //         } else if key.starts_with("StringIndex_") {
+    //             let parts: Vec<&str> = key[12..].split('_').collect();
+    //             let name = parts[0].to_string();
+    //             let index = parts[1].parse::<i32>().unwrap();
+    //             let string_var = Rc::new(StringVar { name });
+    //             return Either::Right(Rc::new(StringIndex {
+    //                 var: string_var,
+    //                 index,
+    //             }));
+    //         }
+    //     }
+
+    //     self.string_to_object(&parent_key)
+    // }
+
     pub fn string_to_object(&self, x: &String) -> Either<Rc<CharExpression>, Rc<StringIndex>> {
         if x.starts_with("Literal_") {
             Either::Left(Rc::new(CharExpression::Literal(x[8..].to_string())))
@@ -166,7 +189,6 @@ impl UnionFind {
                 _ => None,
             },
             (Either::Right(_), Either::Right(_)) => None,
-            _ => None,
         };
 
         let root_x = self.simplify(x_obj.clone());

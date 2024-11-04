@@ -1,7 +1,12 @@
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
-use crate::print::{
-    print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
-};
+// Better to fix and remove, allowing for now
+#![allow(non_snake_case)]
+
+use crate::classes::{CharExpression, Predicate, StringVar};
+// TODO: Unused imports
+// Replace with Display trait
+// use crate::print::{
+//     print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
+// };
 use crate::unionFind::UnionFind;
 use either::Either;
 use std::collections::{HashMap, HashSet};
@@ -24,7 +29,7 @@ pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
 
 pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
     let predicate = convertToDNF(pred);
-    let mut uf = &mut UnionFind::new();
+    let uf = &mut UnionFind::new();
     return evaluate(&predicate, uf);
 }
 
@@ -34,11 +39,13 @@ fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
     let alphabet: HashSet<String> = vec!["a".to_string(), "b".to_string()].into_iter().collect();
 
     match pred.as_ref() {
-        Predicate::And(predicates) => {
+        Predicate::And(_predicates) => {
+            // TODO: Unused variable?
+
             let mut final_preds = Vec::new();
             let mut not_equality_preds = HashSet::new();
             let mut length_preds: HashMap<String, i32> = HashMap::new();
-            let mut not_allowed_lengths: HashMap<String, HashSet<i32>> = HashMap::new();
+            let not_allowed_lengths: HashMap<String, HashSet<i32>> = HashMap::new();
             let mut equalities = HashSet::new();
 
             let all_preds = flatten_and_predicates(pred);

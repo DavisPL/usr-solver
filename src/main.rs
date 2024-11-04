@@ -1,3 +1,8 @@
+//! Main entrypoint
+
+// Better to fix and remove, allowing for now
+#![allow(non_snake_case)]
+
 mod classes;
 mod predicateEvaluation;
 mod print;
@@ -5,11 +10,18 @@ mod unionFind;
 
 use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
 use either::Either;
-use predicateEvaluation::{convertToDNF, evaluateComplete, flatten_and_predicates};
-use print::{
-    print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
-};
 use std::rc::Rc;
+
+// TODO: remove unused imports
+// use predicateEvaluation::{convertToDNF, evaluateComplete, flatten_and_predicates};
+use predicateEvaluation::evaluateComplete;
+// These should use Display instead
+// use print::{
+//     print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
+// };
+use print::print_predicate;
+
+// This is Brzozowski derivative, right?
 
 fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
     let empty_string = || {
@@ -103,6 +115,7 @@ fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRege
             )));
         }
         GenRegex::StringIndex(string_index) => {
+            // TODO: unused?
             return simplifies(&Rc::new(GenRegex::IfThenElse(
                 Rc::new(Predicate::Equals(
                     Either::Right(Rc::clone(&string_index)),
@@ -118,9 +131,11 @@ fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRege
 fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
     match gre.as_ref() {
         GenRegex::EmptySet => return Rc::clone(gre),
-        GenRegex::StringIndex(string_index) => return Rc::new(GenRegex::EmptySet),
         GenRegex::CharExpression(cExpr) => match cExpr.as_ref() {
-            CharExpression::CharVar(name) => return Rc::new(GenRegex::EmptySet),
+            CharExpression::CharVar(_name) => {
+                // TODO: Unused?
+                return Rc::new(GenRegex::EmptySet);
+            }
             CharExpression::Literal(value) => {
                 if value.is_empty() {
                     return Rc::clone(gre);
@@ -147,8 +162,7 @@ fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
                 Rc::new(GenRegex::EmptySet),
             ))
         }
-        GenRegex::StringIndex(string_index) => {
-            //TODO
+        GenRegex::StringIndex(_string_index) => {
             return Rc::new(GenRegex::EmptySet);
         }
         GenRegex::Union(side1, side2) => {
@@ -179,7 +193,7 @@ fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
                 )))),
             ))
         }
-        GenRegex::Kleene(side1) => {
+        GenRegex::Kleene(_) => {
             return Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
                 String::from(""),
             ))))
@@ -199,8 +213,8 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
         GenRegex::EmptySet => Rc::new(Predicate::False),
 
         GenRegex::CharExpression(cExpr) => match cExpr.as_ref() {
-            CharExpression::CharVar(name) => return Rc::new(Predicate::False),
-            CharExpression::Literal(value) => return Rc::new(Predicate::True),
+            CharExpression::CharVar(_name) => return Rc::new(Predicate::False),
+            CharExpression::Literal(_value) => return Rc::new(Predicate::True),
         },
 
         GenRegex::IfThenElse(pred, true_expr, false_expr) => {
@@ -481,14 +495,15 @@ fn main() {
 
     //let char_expr = CharExpression::StringIndex(string_var, 0);
 
-    let predicate = Predicate::Equals(
+    // TODO: Unused code?
+    let _predicate = Predicate::Equals(
         Either::Left(Rc::new(CharExpression::Literal(String::from("a")))), // First argument wrapped in Either::Left
         Either::Right(Rc::new(StringIndex {
             var: Rc::clone(&string_var),
             index: 0,
         })),
     );
-    let intersect = &Rc::new(GenRegex::Intersect(
+    let _intersect = &Rc::new(GenRegex::Intersect(
         Rc::new(GenRegex::StringVar(Rc::clone(&string_var))),
         Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
             String::from("a"),

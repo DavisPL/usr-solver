@@ -1,6 +1,10 @@
+//! Object definitions
+
 use either::Either;
 use std::rc::Rc;
 
+// TODO: variants `Kleene`, `Complement`, and `StringIndex` are never constructed
+#[allow(dead_code)]
 #[derive(PartialEq, Eq, Hash)]
 pub enum GenRegex {
     EmptySet,
