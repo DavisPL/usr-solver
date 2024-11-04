@@ -7,7 +7,7 @@ use crate::classes::{CharExpression, Predicate, StringVar};
 // use crate::print::{
 //     print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
 // };
-use crate::unionFind::UnionFind;
+use crate::union_find::UnionFind;
 use either::Either;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;

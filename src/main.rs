@@ -4,9 +4,9 @@
 #![allow(non_snake_case)]
 
 mod classes;
-mod predicateEvaluation;
+mod predicate_evaluation;
 mod print;
-mod unionFind;
+mod union_find;
 
 use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
 use either::Either;
@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 // TODO: remove unused imports
 // use predicateEvaluation::{convertToDNF, evaluateComplete, flatten_and_predicates};
-use predicateEvaluation::evaluateComplete;
+use predicate_evaluation::evaluateComplete;
 // These should use Display instead
 // use print::{
 //     print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
