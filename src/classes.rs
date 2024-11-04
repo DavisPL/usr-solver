@@ -1,8 +1,7 @@
-use std::rc::Rc;
 use either::Either;
+use std::rc::Rc;
 
-
-#[derive(PartialEq, Eq, Hash)] 
+#[derive(PartialEq, Eq, Hash)]
 pub enum GenRegex {
     EmptySet,
     CharExpression(Rc<CharExpression>),
@@ -14,21 +13,24 @@ pub enum GenRegex {
     Kleene(Rc<GenRegex>),
     Complement(Rc<GenRegex>),
     IfThenElse(Rc<Predicate>, Rc<GenRegex>, Rc<GenRegex>),
-    StringIndex(Rc<StringIndex>)
+    StringIndex(Rc<StringIndex>),
 }
 
-#[derive(PartialEq, Eq, Hash)] 
+#[derive(PartialEq, Eq, Hash)]
 pub enum Predicate {
     And(Vec<Rc<Predicate>>),
     Or(Vec<Rc<Predicate>>),
     Not(Rc<Predicate>),
     True,
     False,
-    Equals(Either<Rc<CharExpression>, Rc<StringIndex>>,Either<Rc<CharExpression>, Rc<StringIndex>>),
-    EqualLength(Rc<StringVar>, i32)
+    Equals(
+        Either<Rc<CharExpression>, Rc<StringIndex>>,
+        Either<Rc<CharExpression>, Rc<StringIndex>>,
+    ),
+    EqualLength(Rc<StringVar>, i32),
 }
 
-#[derive(PartialEq, Eq, Hash)] 
+#[derive(PartialEq, Eq, Hash)]
 pub enum CharExpression {
     CharVar(String),
     Literal(String),
@@ -40,11 +42,11 @@ pub enum StringObject{
     StringVar(Rc<StringVar>)
 }*/
 
-#[derive(PartialEq, Eq, Hash)] 
+#[derive(PartialEq, Eq, Hash)]
 pub struct StringVar {
-    pub name: String
+    pub name: String,
 }
-#[derive(PartialEq, Eq, Hash)] 
+#[derive(PartialEq, Eq, Hash)]
 pub struct StringIndex {
     pub var: Rc<StringVar>,
     pub index: i32,
