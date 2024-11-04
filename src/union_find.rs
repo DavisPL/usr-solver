@@ -88,7 +88,7 @@ impl UnionFind {
     //     self.string_to_object(&parent_key)
     // }
 
-    pub fn string_to_object(&self, x: &String) -> Either<Rc<CharExpression>, Rc<StringIndex>> {
+    pub fn string_to_object(&self, x: &str) -> Either<Rc<CharExpression>, Rc<StringIndex>> {
         if x.starts_with("Literal_") {
             Either::Left(Rc::new(CharExpression::Literal(x[8..].to_string())))
         } else if x.starts_with("CharVar_") {
@@ -207,16 +207,15 @@ impl UnionFind {
                 let rank_x = *self.rank.get(&root_x).unwrap_or(&0);
                 let rank_y = *self.rank.get(&root_y).unwrap_or(&0);
 
-                if rank_x > rank_y {
-                    self.parent.insert(root_y.clone(), root_x.clone());
-                    Ok(self.string_to_object(&root_x))
-                } else if rank_x < rank_y {
-                    self.parent.insert(root_x.clone(), root_y.clone());
-                    Ok(self.string_to_object(&root_y))
-                } else {
-                    self.parent.insert(root_y, root_x.clone());
-                    *self.rank.entry(root_x.clone()).or_insert(0) += 1;
-                    Ok(self.string_to_object(&root_x))
+                match (rank_x > rank_y, rank_x < rank_y) {
+                    (true, _) => {
+                        self.parent.insert(root_y.clone(), root_x.clone());
+                        Ok(self.string_to_object(&root_x))
+                    }
+                    (_, true) => Ok(self.string_to_object(&root_y)),
+                    _ => {
+                        Ok(self.string_to_object(&root_x)) // Handle equality or other cases if needed
+                    }
                 }
             }
         } else {

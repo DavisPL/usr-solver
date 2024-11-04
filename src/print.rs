@@ -69,7 +69,7 @@ pub fn print_char_expression(char_expr: &Rc<CharExpression>) -> String {
             if name.is_empty() {
                 "\"\"".to_string()
             } else {
-                format!("{}", name)
+                name.to_string()
             }
         }
     }
@@ -81,13 +81,9 @@ pub fn print_string_var(string_var: &Rc<StringVar>) -> String {
 
 pub fn print_gre(genregex: &Rc<GenRegex>) -> String {
     match genregex.as_ref() {
-        GenRegex::StringVar(var) => {
-            format!("{}", print_string_var(var))
-        }
+        GenRegex::StringVar(var) => print_string_var(var).to_string(),
         GenRegex::EmptySet => "EMPTY".to_string(),
-        GenRegex::CharExpression(char_expr) => {
-            format!("{}", print_char_expression(char_expr))
-        }
+        GenRegex::CharExpression(char_expr) => print_char_expression(char_expr).to_string(),
         GenRegex::Union(gre1, gre2) => {
             format!("({}) OR ({})", print_gre(gre1), print_gre(gre2))
         }

@@ -75,9 +75,7 @@ fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
             for p in equalities {
                 if let Predicate::Equals(left, right) = &*p {
                     match union_find.union(left.clone(), right.clone()) {
-                        Ok(result) => match result {
-                            _ => final_preds.push(p),
-                        },
+                        Ok(_) => final_preds.push(p),
                         Err(_) => {
                             return Rc::new(Predicate::False);
                         }
@@ -100,15 +98,16 @@ fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
                             //Need to fix with correct Eithers TODO
                             (Either::Left(c_expr_1), Either::Left(c_expr_2)) => {
                                 match c_expr_1.as_ref() {
-                                    CharExpression::Literal(_) => match c_expr_2.as_ref() {
-                                        CharExpression::CharVar(_) => final_preds.push(not_pred),
-                                        _ => {}
-                                    },
+                                    CharExpression::Literal(_) => {
+                                        if let CharExpression::CharVar(_) = c_expr_2.as_ref() {
+                                            final_preds.push(not_pred)
+                                        }
+                                    }
                                     CharExpression::CharVar(_) => match c_expr_2.as_ref() {
                                         CharExpression::Literal(val) => {
                                             cant_equal_chars
                                                 .entry(uf_left)
-                                                .or_insert_with(HashSet::new)
+                                                .or_default()
                                                 .insert(val.clone());
                                             final_preds.push(not_pred);
                                         }
@@ -122,7 +121,7 @@ fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
                                 CharExpression::Literal(val) => {
                                     cant_equal_chars
                                         .entry(uf_left)
-                                        .or_insert_with(HashSet::new)
+                                        .or_default()
                                         .insert(val.clone());
                                     final_preds.push(not_pred);
                                 }
@@ -287,7 +286,7 @@ fn distribute_ors(predicates: Vec<Rc<Predicate>>) -> Rc<Predicate> {
     }
 }
 
-fn cartesian_product<'a>(vectors: &[&'a [Rc<Predicate>]]) -> Vec<Vec<Rc<Predicate>>> {
+fn cartesian_product(vectors: &[&[Rc<Predicate>]]) -> Vec<Vec<Rc<Predicate>>> {
     if vectors.is_empty() {
         return vec![];
     }
