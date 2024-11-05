@@ -2,12 +2,12 @@
 #![allow(non_snake_case)]
 
 use crate::classes::{CharExpression, Predicate, StringVar};
+use disjoint_sets::UnionFind;
 // TODO: Unused imports
 // Replace with Display trait
 // use crate::print::{
 //     print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
 // };
-use crate::union_find::UnionFind;
 use either::Either;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -27,13 +27,141 @@ pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
     }
 }
 
-pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
-    let predicate = convertToDNF(pred);
-    let uf = &mut UnionFind::new();
-    evaluate(&predicate, uf)
+fn assign_unique_ids(predicate: &Predicate, id_map: &mut HashMap<String, i32>, next_id: &mut i32) {
+    match predicate {
+        Predicate::Equals(left, right) => match (left.as_ref(), right.as_ref()) {
+            (Either::Right(str_ind_1), Either::Right(str_ind_2)) => {
+                let mut index_str = format!(
+                    "StringIndex(var: {}, index: {})",
+                    str_ind_1.var.name, str_ind_1.index
+                );
+                id_map.entry(index_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+                index_str = format!(
+                    "StringIndex(var: {}, index: {})",
+                    str_ind_2.var.name, str_ind_2.index
+                );
+                id_map.entry(index_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+            }
+            (Either::Left(char_expr_1), Either::Right(str_ind_2)) => {
+                let index_str = format!(
+                    "StringIndex(var: {}, index: {})",
+                    str_ind_2.var.name, str_ind_2.index
+                );
+                id_map.entry(index_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+                let expr_str = match char_expr_1.as_ref() {
+                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                    CharExpression::Literal(value) => format!("Literal({})", value),
+                };
+                id_map.entry(expr_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+            }
+            (Either::Right(str_ind_2), Either::Left(char_expr_1)) => {
+                let index_str = format!(
+                    "StringIndex(var: {}, index: {})",
+                    str_ind_2.var.name, str_ind_2.index
+                );
+                id_map.entry(index_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+                let expr_str = match char_expr_1.as_ref() {
+                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                    CharExpression::Literal(value) => format!("Literal({})", value),
+                };
+                id_map.entry(expr_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+            }
+            (Either::Left(char_expr_1), Either::Left(char_expr_2)) => {
+                let mut expr_str = match char_expr_1.as_ref() {
+                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                    CharExpression::Literal(value) => format!("Literal({})", value),
+                };
+                id_map.entry(expr_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+                expr_str = match char_expr_2.as_ref() {
+                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                    CharExpression::Literal(value) => format!("Literal({})", value),
+                };
+                id_map.entry(expr_str).or_insert_with(|| {
+                    let id = *next_id;
+                    *next_id += 1;
+                    id
+                });
+            }
+        },
+        Predicate::And(predicates) | Predicate::Or(predicates) => {
+            // Recurse down for each sub-predicate in `And` or `Or` lists
+            for sub_predicate in predicates {
+                assign_unique_ids(sub_predicate, id_map, next_id);
+            }
+        }
+        Predicate::Not(sub_predicate) => {
+            // Recurse down for single `Not` sub-predicate
+            assign_unique_ids(sub_predicate, id_map, next_id);
+        }
+        Predicate::EqualLength(var, _) => {
+            let var_str = format!("StringVar({})", var.name);
+            id_map.entry(var_str).or_insert_with(|| {
+                let id = *next_id;
+                *next_id += 1;
+                id
+            });
+        }
+        _ => {}
+    }
 }
 
-fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
+pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
+    let mut id_map: HashMap<String, i32> = HashMap::new();
+    let mut string_map: HashMap<i32, String> = HashMap::new();
+    let mut canonical_map: HashMap<i32, i32> = HashMap::new();
+    let mut next_id = 1;
+    assign_unique_ids(pred, &mut id_map, &mut next_id);
+    for (expr, id) in &id_map {
+        string_map.insert(*id, expr.to_string());
+        //println!("{} {} {}", expr, id, id_map.len());
+    }
+    let mut uf: UnionFind<usize> = UnionFind::new((next_id) as usize);
+    let predicate = convertToDNF(pred);
+    //let uf = &mut UnionFind2::new();
+    evaluate(
+        &predicate,
+        &mut uf,
+        &mut id_map,
+        //&mut string_map,
+        &mut canonical_map,
+    )
+}
+
+fn evaluate(
+    pred: &Rc<Predicate>,
+    union_find: &mut UnionFind,
+    id_map: &mut HashMap<String, i32>,
+    //string_map: &mut HashMap<i32, String>,
+    map: &mut HashMap<i32, i32>,
+) -> Rc<Predicate> {
     //let uf = union_find.unwrap_or_else(|| UnionFind::new());
 
     let alphabet: HashSet<String> = vec!["a".to_string(), "b".to_string()].into_iter().collect();
@@ -73,85 +201,197 @@ fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
                 }
             }
             for p in equalities {
-                if let Predicate::Equals(left, right) = &*p {
-                    match union_find.union(left.clone(), right.clone()) {
-                        Ok(_) => final_preds.push(p),
-                        Err(_) => {
-                            return Rc::new(Predicate::False);
+                let leftId;
+                let rightId;
+                if let Predicate::Equals(left, right) = p.as_ref() {
+                    match (left.as_ref(), right.as_ref()) {
+                        (Either::Right(str_ind_1), Either::Right(str_ind_2)) => {
+                            let mut index_str = format!(
+                                "StringIndex(var: {}, index: {})",
+                                str_ind_1.var.name, str_ind_1.index
+                            );
+                            leftId = id_map[&index_str];
+                            index_str = format!(
+                                "StringIndex(var: {}, index: {})",
+                                str_ind_2.var.name, str_ind_2.index
+                            );
+                            rightId = id_map[&index_str];
                         }
+                        (Either::Left(char_expr_1), Either::Right(str_ind_2)) => {
+                            let index_str = format!(
+                                "StringIndex(var: {}, index: {})",
+                                str_ind_2.var.name, str_ind_2.index
+                            );
+                            leftId = id_map[&index_str];
+                            let expr_str = match char_expr_1.as_ref() {
+                                CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                CharExpression::Literal(value) => format!("Literal({})", value),
+                            };
+                            rightId = id_map[&expr_str];
+                        }
+                        (Either::Right(str_ind_2), Either::Left(char_expr_1)) => {
+                            let index_str = format!(
+                                "StringIndex(var: {}, index: {})",
+                                str_ind_2.var.name, str_ind_2.index
+                            );
+                            let expr_str = match char_expr_1.as_ref() {
+                                CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                CharExpression::Literal(value) => format!("Literal({})", value),
+                            };
+                            leftId = id_map[&index_str];
+                            rightId = id_map[&expr_str];
+                        }
+                        (Either::Left(char_expr_1), Either::Left(char_expr_2)) => {
+                            let mut expr_str = match char_expr_1.as_ref() {
+                                CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                CharExpression::Literal(value) => format!("Literal({})", value),
+                            };
+                            leftId = id_map[&expr_str];
+                            expr_str = match char_expr_2.as_ref() {
+                                CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                CharExpression::Literal(value) => format!("Literal({})", value),
+                            };
+                            rightId = id_map[&expr_str];
+                        }
+                    }
+                    if leftId == rightId {
+                        final_preds.push(p);
+                    }
+                    if let (Some(value1), Some(value2)) = (map.get(&leftId), map.get(&rightId)) {
+                        if value1 != value2 {
+                            return Rc::new(Predicate::False);
+                        } else {
+                            union_find.union(leftId as usize, rightId as usize);
+                        }
+                    } else if let Some(value1) = map.get(&leftId) {
+                        union_find.union(leftId as usize, rightId as usize);
+                        let new_canon = union_find.find(leftId as usize);
+                        map.insert(new_canon as i32, *value1);
+                    } else if let Some(value1) = map.get(&rightId) {
+                        union_find.union(leftId as usize, rightId as usize);
+                        let new_canon = union_find.find(leftId as usize);
+                        map.insert(new_canon as i32, *value1);
+                    } else {
+                        union_find.union(leftId as usize, rightId as usize);
                     }
                 }
             }
-            let mut cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
+            let  cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
+            println!("hello there");
             for not_pred in not_equality_preds {
                 if let Predicate::Not(inner) = &*not_pred {
-                    if let Predicate::Equals(left, right) = &**inner {
-                        let uf_left = union_find.find(left.clone());
-                        let uf_right = union_find.find(right.clone());
-                        let uf_left_obj = union_find.string_to_object(&uf_left);
-                        let uf_right_obj = union_find.string_to_object(&uf_right);
-
-                        if uf_left == uf_right {
-                            return Rc::new(Predicate::False);
-                        }
-                        match (uf_left_obj, uf_right_obj) {
-                            //Need to fix with correct Eithers TODO
-                            (Either::Left(c_expr_1), Either::Left(c_expr_2)) => {
-                                match c_expr_1.as_ref() {
-                                    CharExpression::Literal(_) => {
-                                        if let CharExpression::CharVar(_) = c_expr_2.as_ref() {
-                                            final_preds.push(not_pred)
-                                        }
-                                    }
-                                    CharExpression::CharVar(_) => match c_expr_2.as_ref() {
-                                        CharExpression::Literal(val) => {
-                                            cant_equal_chars
-                                                .entry(uf_left)
-                                                .or_default()
-                                                .insert(val.clone());
-                                            final_preds.push(not_pred);
-                                        }
-                                        _ => {
-                                            final_preds.push(not_pred);
-                                        }
-                                    },
+                    let  leftId;
+                    let  rightId;
+                    if let Predicate::Equals(left, right) = inner.as_ref() {
+                        match (left.as_ref(), right.as_ref()) {
+                            (Either::Right(str_ind_1), Either::Right(str_ind_2)) => {
+                                let mut index_str = format!(
+                                    "StringIndex(var: {}, index: {})",
+                                    str_ind_1.var.name, str_ind_1.index
+                                );
+                                leftId = id_map[&index_str];
+                                index_str = format!(
+                                    "StringIndex(var: {}, index: {})",
+                                    str_ind_2.var.name, str_ind_2.index
+                                );
+                                rightId = id_map[&index_str];
+                                if leftId == rightId {
+                                    return Rc::new(Predicate::False);
+                                }
+                                if let (Some(_), Some(_)) =
+                                    (map.get(&leftId), map.get(&rightId))
+                                {
+                                    final_preds.push(not_pred)
                                 }
                             }
-                            (Either::Right(..), Either::Left(c_expr)) => match c_expr.as_ref() {
-                                CharExpression::Literal(val) => {
-                                    cant_equal_chars
-                                        .entry(uf_left)
-                                        .or_default()
-                                        .insert(val.clone());
-                                    final_preds.push(not_pred);
+                            (Either::Left(char_expr_1), Either::Right(str_ind_2)) => {
+                                let index_str = format!(
+                                    "StringIndex(var: {}, index: {})",
+                                    str_ind_2.var.name, str_ind_2.index
+                                );
+                                leftId = id_map[&index_str];
+                                let expr_str = match char_expr_1.as_ref() {
+                                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                    CharExpression::Literal(value) => format!("Literal({})", value),
+                                };
+                                rightId = id_map[&expr_str];
+                                if leftId == rightId {
+                                    return Rc::new(Predicate::False);
                                 }
-                                _ => {
-                                    final_preds.push(not_pred);
+                                if let (Some(_), Some(_)) =
+                                    (map.get(&leftId), map.get(&rightId))
+                                {
+                                    final_preds.push(not_pred)
                                 }
-                            },
-                            (_, _) => {
-                                final_preds.push(not_pred);
+                            }
+                            (Either::Right(str_ind_2), Either::Left(char_expr_1)) => {
+                                let index_str = format!(
+                                    "StringIndex(var: {}, index: {})",
+                                    str_ind_2.var.name, str_ind_2.index
+                                );
+                                let expr_str = match char_expr_1.as_ref() {
+                                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                    CharExpression::Literal(value) => format!("Literal({})", value),
+                                };
+                                leftId = id_map[&index_str];
+                                rightId = id_map[&expr_str];
+                                if leftId == rightId {
+                                    return Rc::new(Predicate::False);
+                                }
+                                if let (Some(_), Some(_)) =
+                                    (map.get(&leftId), map.get(&rightId))
+                                {
+                                    final_preds.push(not_pred)
+                                }
+                            }
+                            (Either::Left(char_expr_1), Either::Left(char_expr_2)) => {
+                                let mut expr_str = match char_expr_1.as_ref() {
+                                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                    CharExpression::Literal(value) => format!("Literal({})", value),
+                                };
+                                leftId = id_map[&expr_str];
+                                expr_str = match char_expr_2.as_ref() {
+                                    CharExpression::CharVar(name) => format!("CharVar({})", name),
+                                    CharExpression::Literal(value) => format!("Literal({})", value),
+                                };
+                                rightId = id_map[&expr_str];
+                                if leftId == rightId {
+                                    return Rc::new(Predicate::False);
+                                }
+                                if let (Some(_), Some(_)) =
+                                    (map.get(&leftId), map.get(&rightId))
+                                {
+                                    final_preds.push(not_pred)
+                                }
                             }
                         }
                     } else if let Predicate::EqualLength(var_name, length) = &**inner {
                         //let Predicate::EqualLength(var_name, length) = &**inner;
                         let mut flag = false;
-                        for (key, value) in union_find.parent.iter() {
-                            let object = union_find.string_to_object(&key.to_string());
-                            let objectV = union_find.string_to_object(&value.to_string());
-                            if let Either::Right(str_var) = object {
-                                if str_var.var.name == var_name.name && str_var.index >= *length {
-                                    if !matches!(objectV, Either::Right(_)) {
-                                        flag = true;
-                                        break;
-                                    } else if let Either::Right(str_i) = objectV {
-                                        let str_ind = str_i.as_ref();
-                                        if str_ind.var.name != str_var.var.name
-                                            || str_ind.index == str_var.index
-                                        {
-                                            flag = true;
-                                            break;
+                        for (key, value) in id_map.iter() {
+                            if key.starts_with("StringIndex"){
+                                if let Some(start_pos) = key.find("var: ") {
+                                    let start = start_pos + 5;  // 5 is the length of "var: "
+                                    if let Some(end_pos) = key[start..].find(",") {
+                                        if Some(key[start..start + end_pos].to_string()) == Some(var_name.name.clone()){
+                                            if let Some(start_pos_index) = key.find("index: ") {
+                                                // Skip past "index: " to the start of the actual index value
+                                                let start_index = start_pos_index + 7; // 7 is the length of "index: "
+                                                // Extract the index value, assuming it ends with a closing parenthesis or end of the string
+                                                if let Some(end_pos_index) = key[start_index..].find(")") {
+                                                    let index_value = key[start_index..start_index + end_pos_index].to_string();
+                                                    if let Ok(index) = index_value.parse::<i32>() {
+                                                        // If parsing is successful, compare the index with length
+                                                        if index >= *length && union_find.find(*value as usize) != *value as usize {
+                                                            flag = true;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+
                                         }
+
                                     }
                                 }
                             }
@@ -177,27 +417,33 @@ fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
                 {
                     return Rc::new(Predicate::False);
                 }
+                for (key, value) in id_map.iter() {
+                    if key.starts_with("StringIndex"){
+                        if let Some(start_pos) = key.find("var: ") {
+                            let start = start_pos + 5;  // 5 is the length of "var: "
+                            if let Some(end_pos) = key[start..].find(",") {
+                                if Some(key[start..start + end_pos].to_string()) == Some(var_name.clone()){
+                                    if let Some(start_pos_index) = key.find("index: ") {
+                                        // Skip past "index: " to the start of the actual index value
+                                        let start_index = start_pos_index + 7; // 7 is the length of "index: "
+                                        // Extract the index value, assuming it ends with a closing parenthesis or end of the string
+                                        if let Some(end_pos_index) = key[start_index..].find(")") {
+                                            let index_value = key[start_index..start_index + end_pos_index].to_string();
+                                            if let Ok(index) = index_value.parse::<i32>() {
+                                                // If parsing is successful, compare the index with length
+                                                if index >= length && union_find.find(*value as usize) != *value as usize {
+                                                     return Rc::new(Predicate::False);
+                                                }
+                                            }
+                                        }
+                                    }
 
-                for (key, value) in union_find.parent.iter() {
-                    let object = union_find.string_to_object(&key.to_string());
-                    let objectV = union_find.string_to_object(&value.to_string());
-                    if let Either::Right(str_var) = object {
-                        if str_var.var.name == var_name && str_var.index >= length {
-                            if !matches!(objectV, Either::Right(_)) {
-                                return Rc::new(Predicate::False);
-                            } else if let Either::Right(str_i) = objectV {
-                                let str_ind = str_i.as_ref();
-                                if str_ind.var.name != str_var.var.name
-                                    || str_ind.index != str_var.index
-                                {
-                                    println!("damn it {} {}", key, value);
-                                    return Rc::new(Predicate::False);
                                 }
+
                             }
                         }
                     }
                 }
-
                 let string_var = Rc::new(StringVar { name: var_name });
                 final_preds.push(Rc::new(Predicate::EqualLength(string_var, length)));
             }
@@ -211,7 +457,9 @@ fn evaluate(pred: &Rc<Predicate>, union_find: &mut UnionFind) -> Rc<Predicate> {
             let mut final_set = Vec::new();
 
             for p in predicates {
-                let p_eval = evaluate(&p.clone(), &mut UnionFind::new());
+                let mut canonical_map: HashMap<i32, i32> = HashMap::new();
+                let mut uf: UnionFind<usize> = UnionFind::new(id_map.len()+1);
+                let p_eval = evaluate(&p.clone(), &mut uf, id_map, &mut canonical_map);
                 match &*p_eval {
                     Predicate::True => return Rc::new(Predicate::True),
                     Predicate::False => {

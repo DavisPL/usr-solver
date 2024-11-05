@@ -24,14 +24,14 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone)]
-pub struct UnionFind {
+pub struct UnionFind2 {
     pub parent: HashMap<String, String>,
     rank: HashMap<String, i32>,
 }
 
-impl UnionFind {
+impl UnionFind2 {
     pub fn new() -> Self {
-        UnionFind {
+        UnionFind2 {
             parent: HashMap::new(),
             rank: HashMap::new(),
         }

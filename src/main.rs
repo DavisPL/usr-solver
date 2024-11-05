@@ -6,9 +6,9 @@
 mod classes;
 mod predicate_evaluation;
 mod print;
-mod union_find;
 
 use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
+use print::{print_gre};
 use either::Either;
 use std::rc::Rc;
 
@@ -19,7 +19,7 @@ use predicate_evaluation::evaluateComplete;
 // use print::{
 //     print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
 // };
-use print::print_predicate;
+//use print::print_predicate;
 
 // This is Brzozowski derivative, right?
 
@@ -185,7 +185,7 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
         GenRegex::IfThenElse(pred, true_expr, false_expr) => {
             let true_proj = nullableProjectionHelper(true_expr);
             let false_proj = nullableProjectionHelper(false_expr);
-            println!("{}", print_predicate(&true_proj));
+            //println!("{}", print_predicate(&true_proj));
 
             match (true_proj.as_ref(), false_proj.as_ref()) {
                 (Predicate::False, Predicate::False) => Rc::new(Predicate::False),
@@ -236,7 +236,7 @@ fn nullableProjection(gre: &Rc<GenRegex>) -> Rc<Predicate> {
     let nullableGre = &nullable(gre);
     let mut nullablePredicates = nullableProjectionHelper(nullableGre);
     nullablePredicates = evaluateComplete(&nullablePredicates);
-    println!("{}", print_predicate(&nullablePredicates));
+    //println!("{}", print_predicate(&nullablePredicates));
     nullablePredicates
 }
 
@@ -485,10 +485,10 @@ fn main() {
     //let complex_predicate = Rc::new(Predicate::And(vec![Rc::new(predicate), Rc::new(Predicate::False)]));
     //let gre = &Rc::new(GenRegex::IfThenElse(complex_predicate.clone(), Rc::new(GenRegex::EmptySet), Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::CharVar(String::from("c")))))));
     //println!("{}", print_predicate(&complex_predicate));
-    //println!("{}", print_gre(&Rc::clone(gre)));
+    println!("{}", print_gre(&Rc::clone(gre4)));
     //let deriv = &Rc::new(derivative(&Rc::clone(gre), &Rc::new(CharExpression::Literal(String::from("b")))));
     //println!("{}", print_predicate(&nullableProjection(&Rc::clone(deriv))));
-    let matcher = matching(&Rc::clone(gre4), String::from("abcabcabcabc"));
+    let matcher = matching(&Rc::clone(gre4), String::from("catscatsacatscats"));
     println!("{}", matcher);
-    println!("Hello World!");
+    //println!("Hello World!");
 }
