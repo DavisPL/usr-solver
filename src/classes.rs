@@ -5,7 +5,7 @@ use either::Either;
 use std::rc::Rc;
 
 // TODO: variants `Kleene`, `Complement`, and `StringIndex` are never constructed
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
     EmptySet,
     CharExpression(Rc<CharExpression>),
@@ -20,7 +20,7 @@ pub enum GenRegex {
     StringIndex(Rc<StringIndex>),
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub enum Predicate {
     And(Vec<Rc<Predicate>>),
     Or(Vec<Rc<Predicate>>),
@@ -34,23 +34,24 @@ pub enum Predicate {
     EqualLength(Rc<StringVar>, i32),
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub enum CharExpression {
     CharVar(String),
     Literal(String),
 }
 
-/*#[derive(PartialEq, Eq, Hash)] // Deriving PartialEq, Eq, and Hash
+/*#[derive(PartialEq, Eq, Hash, Clone)] // Deriving PartialEq, Eq, and Hash
 pub enum StringObject{
     StringSlice(Rc<StringVar>, i32),
     StringVar(Rc<StringVar>)
 }*/
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub struct StringVar {
     pub name: String,
 }
-#[derive(PartialEq, Eq, Hash)]
+
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub struct StringIndex {
     pub var: Rc<StringVar>,
     pub index: i32,
