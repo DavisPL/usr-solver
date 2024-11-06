@@ -30,11 +30,11 @@ use std::rc::Rc;
 pub fn print_predicate(pred: &Rc<Predicate>) -> String {
     match pred.as_ref() {
         Predicate::And(kids) => {
-            let parts: Vec<String> = kids.iter().map(|child| print_predicate(child)).collect();
+            let parts: Vec<String> = kids.iter().map(print_predicate).collect();
             format!("({})", parts.join(" AND "))
         }
         Predicate::Or(kids) => {
-            let parts: Vec<String> = kids.iter().map(|child| print_predicate(child)).collect();
+            let parts: Vec<String> = kids.iter().map(print_predicate).collect();
             format!("({})", parts.join(" OR "))
         }
         Predicate::Not(pred1) => {
