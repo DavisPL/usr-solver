@@ -276,12 +276,12 @@ fn evaluate(
                     }
                 }
             }
-            let  cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
+            let cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
             println!("hello there");
             for not_pred in not_equality_preds {
                 if let Predicate::Not(inner) = &*not_pred {
-                    let  leftId;
-                    let  rightId;
+                    let leftId;
+                    let rightId;
                     if let Predicate::Equals(left, right) = inner.as_ref() {
                         match (left.as_ref(), right.as_ref()) {
                             (Either::Right(str_ind_1), Either::Right(str_ind_2)) => {
@@ -298,9 +298,7 @@ fn evaluate(
                                 if leftId == rightId {
                                     return Rc::new(Predicate::False);
                                 }
-                                if let (Some(_), Some(_)) =
-                                    (map.get(&leftId), map.get(&rightId))
-                                {
+                                if let (Some(_), Some(_)) = (map.get(&leftId), map.get(&rightId)) {
                                     final_preds.push(not_pred)
                                 }
                             }
@@ -318,9 +316,7 @@ fn evaluate(
                                 if leftId == rightId {
                                     return Rc::new(Predicate::False);
                                 }
-                                if let (Some(_), Some(_)) =
-                                    (map.get(&leftId), map.get(&rightId))
-                                {
+                                if let (Some(_), Some(_)) = (map.get(&leftId), map.get(&rightId)) {
                                     final_preds.push(not_pred)
                                 }
                             }
@@ -338,9 +334,7 @@ fn evaluate(
                                 if leftId == rightId {
                                     return Rc::new(Predicate::False);
                                 }
-                                if let (Some(_), Some(_)) =
-                                    (map.get(&leftId), map.get(&rightId))
-                                {
+                                if let (Some(_), Some(_)) = (map.get(&leftId), map.get(&rightId)) {
                                     final_preds.push(not_pred)
                                 }
                             }
@@ -358,9 +352,7 @@ fn evaluate(
                                 if leftId == rightId {
                                     return Rc::new(Predicate::False);
                                 }
-                                if let (Some(_), Some(_)) =
-                                    (map.get(&leftId), map.get(&rightId))
-                                {
+                                if let (Some(_), Some(_)) = (map.get(&leftId), map.get(&rightId)) {
                                     final_preds.push(not_pred)
                                 }
                             }
@@ -369,29 +361,36 @@ fn evaluate(
                         //let Predicate::EqualLength(var_name, length) = &**inner;
                         let mut flag = false;
                         for (key, value) in id_map.iter() {
-                            if key.starts_with("StringIndex"){
+                            if key.starts_with("StringIndex") {
                                 if let Some(start_pos) = key.find("var: ") {
-                                    let start = start_pos + 5;  // 5 is the length of "var: "
+                                    let start = start_pos + 5; // 5 is the length of "var: "
                                     if let Some(end_pos) = key[start..].find(",") {
-                                        if Some(key[start..start + end_pos].to_string()) == Some(var_name.name.clone()){
+                                        if Some(key[start..start + end_pos].to_string())
+                                            == Some(var_name.name.clone())
+                                        {
                                             if let Some(start_pos_index) = key.find("index: ") {
                                                 // Skip past "index: " to the start of the actual index value
                                                 let start_index = start_pos_index + 7; // 7 is the length of "index: "
-                                                // Extract the index value, assuming it ends with a closing parenthesis or end of the string
-                                                if let Some(end_pos_index) = key[start_index..].find(")") {
-                                                    let index_value = key[start_index..start_index + end_pos_index].to_string();
+                                                                                       // Extract the index value, assuming it ends with a closing parenthesis or end of the string
+                                                if let Some(end_pos_index) =
+                                                    key[start_index..].find(")")
+                                                {
+                                                    let index_value = key
+                                                        [start_index..start_index + end_pos_index]
+                                                        .to_string();
                                                     if let Ok(index) = index_value.parse::<i32>() {
                                                         // If parsing is successful, compare the index with length
-                                                        if index >= *length && union_find.find(*value as usize) != *value as usize {
+                                                        if index >= *length
+                                                            && union_find.find(*value as usize)
+                                                                != *value as usize
+                                                        {
                                                             flag = true;
                                                             break;
                                                         }
                                                     }
                                                 }
                                             }
-
                                         }
-
                                     }
                                 }
                             }
@@ -418,28 +417,33 @@ fn evaluate(
                     return Rc::new(Predicate::False);
                 }
                 for (key, value) in id_map.iter() {
-                    if key.starts_with("StringIndex"){
+                    if key.starts_with("StringIndex") {
                         if let Some(start_pos) = key.find("var: ") {
-                            let start = start_pos + 5;  // 5 is the length of "var: "
+                            let start = start_pos + 5; // 5 is the length of "var: "
                             if let Some(end_pos) = key[start..].find(",") {
-                                if Some(key[start..start + end_pos].to_string()) == Some(var_name.clone()){
+                                if Some(key[start..start + end_pos].to_string())
+                                    == Some(var_name.clone())
+                                {
                                     if let Some(start_pos_index) = key.find("index: ") {
                                         // Skip past "index: " to the start of the actual index value
                                         let start_index = start_pos_index + 7; // 7 is the length of "index: "
-                                        // Extract the index value, assuming it ends with a closing parenthesis or end of the string
+                                                                               // Extract the index value, assuming it ends with a closing parenthesis or end of the string
                                         if let Some(end_pos_index) = key[start_index..].find(")") {
-                                            let index_value = key[start_index..start_index + end_pos_index].to_string();
+                                            let index_value = key
+                                                [start_index..start_index + end_pos_index]
+                                                .to_string();
                                             if let Ok(index) = index_value.parse::<i32>() {
                                                 // If parsing is successful, compare the index with length
-                                                if index >= length && union_find.find(*value as usize) != *value as usize {
-                                                     return Rc::new(Predicate::False);
+                                                if index >= length
+                                                    && union_find.find(*value as usize)
+                                                        != *value as usize
+                                                {
+                                                    return Rc::new(Predicate::False);
                                                 }
                                             }
                                         }
                                     }
-
                                 }
-
                             }
                         }
                     }
@@ -458,7 +462,7 @@ fn evaluate(
 
             for p in predicates {
                 let mut canonical_map: HashMap<i32, i32> = HashMap::new();
-                let mut uf: UnionFind<usize> = UnionFind::new(id_map.len()+1);
+                let mut uf: UnionFind<usize> = UnionFind::new(id_map.len() + 1);
                 let p_eval = evaluate(&p.clone(), &mut uf, id_map, &mut canonical_map);
                 match &*p_eval {
                     Predicate::True => return Rc::new(Predicate::True),

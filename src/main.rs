@@ -8,8 +8,8 @@ mod predicate_evaluation;
 mod print;
 
 use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
-use print::{print_gre};
 use either::Either;
+use print::print_gre;
 use std::rc::Rc;
 
 // TODO: remove unused imports
