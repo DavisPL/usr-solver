@@ -1,34 +1,10 @@
-// Better to fix and remove, allowing for now
-#![allow(non_snake_case)]
 /*
-This file should be done by implementing
-the Display trait.
-
-https://doc.rust-lang.org/std/fmt/trait.Display.html
-
-Example:
-
-use fmt::{self, Display};
-
-impl Display for Predicate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // paste in your print logic below here
-        // instead of format!( you would then use write! to write the result to the formatter.
-    }
-}
-
-Using Display means you would be able to print both to a string, or to a file, by using the
-`{}` syntax (instead of `{:?}` for Debug) and get the printing style you want by default.
+    Display implementations for pretty printing
 */
-// Remove after converting to Display
 
 use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
 use std::fmt::{self, Display};
 use std::rc::Rc;
-
-/*
-    Display implementations
-*/
 
 impl Display for CharExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
