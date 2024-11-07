@@ -135,14 +135,9 @@ fn assign_unique_ids(predicate: &Predicate, id_map: &mut HashMap<String, i32>, n
 
 pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
     let mut id_map: HashMap<String, i32> = HashMap::new();
-    let mut string_map: HashMap<i32, String> = HashMap::new();
     let mut canonical_map: HashMap<i32, i32> = HashMap::new();
     let mut next_id = 1;
     assign_unique_ids(pred, &mut id_map, &mut next_id);
-    for (expr, id) in &id_map {
-        string_map.insert(*id, expr.to_string());
-        //println!("{} {} {}", expr, id, id_map.len());
-    }
     let mut uf: UnionFind<usize> = UnionFind::new((next_id) as usize);
     let predicate = convertToDNF(pred);
     //let uf = &mut UnionFind2::new();
@@ -150,7 +145,6 @@ pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
         &predicate,
         &mut uf,
         &mut id_map,
-        //&mut string_map,
         &mut canonical_map,
     )
 }
