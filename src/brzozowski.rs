@@ -1,5 +1,5 @@
 use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex};
-use crate::predicate_evaluation::{evaluateComplete};
+use crate::predicate_evaluation::evaluateComplete;
 use either::Either;
 use std::rc::Rc;
 

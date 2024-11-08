@@ -2,13 +2,13 @@
 
 // Better to fix and remove, allowing for now
 #![allow(non_snake_case)]
-mod brzozowski;
 mod antimirov;
+mod brzozowski;
 mod classes;
 mod predicate_evaluation;
 mod print;
 
-use antimirov::{matching};
+use antimirov::matching;
 use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
 use either::Either;
 use print::print_gre;
@@ -23,7 +23,6 @@ use std::rc::Rc;
 //use print::print_predicate;
 
 // This is Brzozowski derivative, right?
-
 
 fn main() {
     let string_var = Rc::new(StringVar {
@@ -53,20 +52,24 @@ fn main() {
         Rc::clone(stringVarGre),
     ));
     let gre3 = &Rc::new(GenRegex::Concatenation(
-        Rc::clone(gre2),
+        Rc::clone(stringVarGre),
         Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
             String::from("a"),
         )))),
     ));
     let gre4 = &Rc::new(GenRegex::Concatenation(Rc::clone(gre3), Rc::clone(gre2)));
+    let gre5 = &Rc::new(GenRegex::Intersect(
+        Rc::clone(gre3),
+        Rc::new(GenRegex::Kleene(Rc::clone(stringVarGre))),
+    ));
 
     //let complex_predicate = Rc::new(Predicate::And(vec![Rc::new(predicate), Rc::new(Predicate::False)]));
     //let gre = &Rc::new(GenRegex::IfThenElse(complex_predicate.clone(), Rc::new(GenRegex::EmptySet), Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::CharVar(String::from("c")))))));
     //println!("{}", print_predicate(&complex_predicate));
-    println!("{}", print_gre(&Rc::clone(gre4)));
+    println!("{}", print_gre(&Rc::clone(gre5)));
     //let deriv = &Rc::new(derivative(&Rc::clone(gre), &Rc::new(CharExpression::Literal(String::from("b")))));
     //println!("{}", print_predicate(&nullableProjection(&Rc::clone(deriv))));
-    let matcher = matching(&Rc::clone(gre4), String::from("catscatsacatscats"));
+    let matcher = matching(&Rc::clone(gre4), String::from("babb"));
     println!("{}", matcher);
     //println!("Hello World!");
 }

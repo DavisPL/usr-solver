@@ -1,8 +1,6 @@
-
-
 #![allow(dead_code)]
-use std::cmp::Ordering;
 use either::Either;
+use std::cmp::Ordering;
 use std::rc::Rc;
 
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -103,7 +101,6 @@ impl PartialOrd for GenRegex {
         Some(self.cmp(other))
     }
 }
-
 
 #[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum Predicate {

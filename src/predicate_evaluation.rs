@@ -141,12 +141,7 @@ pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
     let mut uf: UnionFind<usize> = UnionFind::new((next_id) as usize);
     let predicate = convertToDNF(pred);
     //let uf = &mut UnionFind2::new();
-    evaluate(
-        &predicate,
-        &mut uf,
-        &mut id_map,
-        &mut canonical_map,
-    )
+    evaluate(&predicate, &mut uf, &mut id_map, &mut canonical_map)
 }
 
 fn evaluate(
