@@ -2,6 +2,7 @@
 
 // Better to fix and remove, allowing for now
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 mod antimirov;
 mod brzozowski;
 mod classes;
@@ -58,7 +59,7 @@ fn main() {
             String::from("a"),
         )))),
     ));
-    let gre4 = &Rc::new(GenRegex::Concatenation(Rc::clone(gre3), Rc::clone(gre2)));
+    let _gre4 = &Rc::new(GenRegex::Concatenation(Rc::clone(gre3), Rc::clone(gre2)));
     let gre5 = &Rc::new(GenRegex::Intersect(
         Rc::clone(gre3),
         Rc::new(GenRegex::Kleene(Rc::clone(stringVarGre))),
