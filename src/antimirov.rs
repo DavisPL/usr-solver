@@ -38,8 +38,8 @@ fn parse_string_vars(
         let mut last_pop = None;
         while value.len() > 1 {
             let mut union_elems = HashSet::new();
-            let mut new_element_to_add: std::option::Option<Rc<GenRegex>> = None;
-            let mut literal_val: std::option::Option<String> = None;
+            //let mut new_element_to_add: std::option::Option<Rc<GenRegex>> = None;
+ //           let mut literal_val: std::option::Option<String> = None;
             let mut i = 0;
             while i < value.len() {
                 let temp = value[i].clone(); // Clone the value to avoid borrowing issues
@@ -362,8 +362,8 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
             ret
         }
         GenRegex::Union(side1, side2) => {
-            let side1_deriv = derivative(&side1, deriv_char);
-            let side2_deriv = derivative(&side2, deriv_char);
+            let side1_deriv = derivative(side1, deriv_char);
+            let side2_deriv = derivative(side2, deriv_char);
             side1_deriv.union(&side2_deriv).cloned().collect()
         }
         GenRegex::Intersect(left, right) => {
@@ -381,31 +381,30 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
                     for sub in subDiff2{
                         println!("q-p{}", sub.1);
                     }
-                    let curr = (
-                        Rc::new(GenRegex::Intersect(
-                            sub_in(
-                                &p_sub.0,
-                                &q_sub
-                                    .1
-                                    .difference(&p_sub.1)
-                                    .cloned()
-                                    .collect::<BTreeSet<_>>(),
-                            ),
-                            sub_in(
-                                &q_sub.0,
-                                &p_sub
-                                    .1
-                                    .difference(&q_sub.1)
-                                    .cloned()
-                                    .collect::<BTreeSet<_>>(),
-                            ),
-                        )),
-                        merge(p_sub.1.union(&q_sub.1).cloned().collect::<BTreeSet<_>>()),
-                    );
-                    if curr.1.len() == 0 {
+                    let merged = merge(p_sub.1.union(&q_sub.1).cloned().collect::<BTreeSet<_>>());
+                    if merged.is_empty(){
                         continue;
                     }
-                    term1.insert(curr);
+                    let p_new = sub_in(left, &merged);
+                    let q_new = sub_in(right, &merged);
+                    let p_new_deriv = derivative(&p_new, deriv_char);
+                    let q_new_deriv = derivative(&q_new, deriv_char);
+                    for p_sub_new in &p_new_deriv{
+                        for q_sub_new in &q_new_deriv{
+                            let curr = (
+                                Rc::new(GenRegex::Intersect(
+                                        p_sub_new.0.clone(),
+                                        q_sub_new.0.clone()
+                                )),
+                                merged.clone()
+                            );
+                            term1.insert(curr);
+                        }
+                    }
+
+                    //if curr.1.len() == 0 {
+                     //   continue;
+                    //}
                 }
             }
 
@@ -422,7 +421,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
                     if let GenRegex::CharExpression(c_expr) = sub.0.as_ref() {
                         if let CharExpression::Literal(lit) = c_expr.as_ref() {
                             //                    if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
-                            if lit == "" {
+                            if lit.is_empty() {
                                 let curr = (sub_in(right, &sub.1.clone()), sub.1.clone());
                                 term1.insert(curr);
                             } else {
@@ -465,7 +464,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
                         let elem_subs = elem.1;
                         let elem_subs_final = merge(elem_subs.union(&sub).cloned().collect::<BTreeSet<_>>());
 
-                        if elem_subs_final.len() == 0 {
+                        if elem_subs_final.is_empty() {
                             continue;
                         }
                         derivatives.insert((elem_term, elem_subs_final));
@@ -499,7 +498,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
 }
 
 fn sub_in(expr: &Rc<GenRegex>, substitution: &GenRegexPairSet) -> Rc<GenRegex> {
-    if substitution.len() == 0 {
+    if substitution.is_empty() {
         return Rc::clone(expr); // Return a clone of the Rc, as Rc handles reference counting
     }
 
@@ -550,7 +549,7 @@ fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<String, &Rc<GenRegex>>) -> Rc
         }
         GenRegex::Kleene(inner) => {
             let innerSub = sub_in_helper(inner, sub);
-            return Rc::new(GenRegex::Kleene(innerSub));
+            Rc::new(GenRegex::Kleene(innerSub))
         }
         _ => Rc::clone(expr),
     }
@@ -559,7 +558,6 @@ fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<String, &Rc<GenRegex>>) -> Rc
 pub fn matching(expr: &Rc<GenRegex>, proposed: String) -> bool {
     println!("{}", expr);
     if proposed.is_empty() {
-        println!("yoyoyo");
         return !nullable(expr).is_empty();
     }
     let literal = Rc::new(CharExpression::Literal(String::from(&proposed[0..1])));
@@ -609,8 +607,8 @@ pub fn nullable(gre: &Rc<GenRegex>) -> BTreeSet<GenRegexPairSet> {
         GenRegex::Union(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
             let right_null = nullable(&Rc::clone(side2));
-            left_null.union(&right_null);
-            left_null
+            let unionLR: BTreeSet<_> = left_null.union(&right_null).cloned().collect();
+            unionLR
         }
         GenRegex::Intersect(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
@@ -620,9 +618,9 @@ pub fn nullable(gre: &Rc<GenRegex>) -> BTreeSet<GenRegexPairSet> {
             let mut retSet = BTreeSet::new();
             for left_elem in &left_null {
                 for right_elem in &right_null {
-                    left_elem.union(right_elem);
-                    let ret = merge(left_elem.clone());
-                    if ret.len() != 0 {
+                    let unionLR: BTreeSet<_> = left_elem.union(right_elem).cloned().collect();
+                    let ret = merge(unionLR.clone());
+                    if !ret.is_empty() {
                         retSet.insert(ret);
                     }
                 }
@@ -635,9 +633,9 @@ pub fn nullable(gre: &Rc<GenRegex>) -> BTreeSet<GenRegexPairSet> {
             let mut retSet = BTreeSet::new();
             for left_elem in &left_null {
                 for right_elem in &right_null {
-                    left_elem.union(right_elem);
-                    let ret = merge(left_elem.clone());
-                    if ret.len() != 0 {
+                    let unionLR: BTreeSet<_> = left_elem.union(right_elem).cloned().collect();
+                    let ret = merge(unionLR.clone());
+                    if !ret.is_empty() {
                         retSet.insert(ret);
                     }
                 }

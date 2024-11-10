@@ -28,6 +28,7 @@ fn main() {
     let string_var = Rc::new(StringVar {
         name: String::from("w0"),
     });
+    let char_var = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::CharVar(String::from("c1")))));
 
     //let char_expr = CharExpression::StringIndex(string_var, 0);
 
@@ -52,7 +53,7 @@ fn main() {
         Rc::clone(stringVarGre),
     ));
     let gre3 = &Rc::new(GenRegex::Concatenation(
-        Rc::clone(stringVarGre),
+        Rc::clone(char_var),
         Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
             String::from("a"),
         )))),
@@ -69,7 +70,7 @@ fn main() {
     println!("{}", print_gre(&Rc::clone(gre5)));
     //let deriv = &Rc::new(derivative(&Rc::clone(gre), &Rc::new(CharExpression::Literal(String::from("b")))));
     //println!("{}", print_predicate(&nullableProjection(&Rc::clone(deriv))));
-    let matcher = matching(&Rc::clone(gre4), String::from("babb"));
+    let matcher = matching(&Rc::clone(gre5), String::from("ab"));
     println!("{}", matcher);
     //println!("Hello World!");
 }
