@@ -1,23 +1,88 @@
+//!
+//! Implementation of the Antimirov Derivative
+//!
+
 use crate::classes::{CharExpression, GenRegex, StringVar};
-use crate::print::print_gre;
 use disjoint_sets::UnionFind;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+/*
+    Some placeholder functions and types
+
+    NB: There's a bit of shady design going on with converting GenRegex to Strings and back,
+    and using things like &key[4..key.len() - 1] to extract the name of a StringVar.
+    These are not super extensible, we should instead use custom types for things like charvars and
+    stringvars that will support these operations more directly.
+
+    The below will help transition in that direction by wrapping the GenRegex (when used as a string)
+    in a type GenRegexId which supports the necessary operations.
+*/
+
+// Use String for IDs
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct GenRegexId(String);
+
+// Function used to inset GenRegexes into a HashMap.
+// TBD: This should probably be replaced by using Hash directly on
+// GenRegex, which should be more efficient.
+fn gre_id(gre: &Rc<GenRegex>) -> GenRegexId {
+    // Use ToString for now
+    GenRegexId(gre.to_string())
+}
+
+impl GenRegexId {
+    fn is_char_var(&self) -> bool {
+        self.0.starts_with("char(") && self.0.ends_with(")")
+    }
+
+    fn get_char_var(&self) -> Option<CharExpression> {
+        if self.is_char_var() {
+            let name = &self.0[5..self.0.len() - 1];
+            Some(CharExpression::CharVar(name.to_string()))
+        } else {
+            None
+        }
+    }
+
+    fn into_gre_char_expr(self) -> GenRegex {
+        GenRegex::CharExpression(Rc::new(CharExpression::Literal(self.0)))
+    }
+
+    fn is_string_var(&self) -> bool {
+        self.0.starts_with("STR(") && self.0.ends_with(")")
+    }
+
+    fn get_string_var(&self) -> Option<StringVar> {
+        if self.is_string_var() {
+            let name = &self.0[4..self.0.len() - 1];
+            Some(StringVar {
+                name: name.to_string(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
 type GenRegexPairSet = BTreeSet<(Rc<GenRegex>, Rc<GenRegex>)>;
+type GenRegexHashSet = HashSet<(Rc<GenRegex>, Rc<GenRegex>)>;
+type GenRegexHashMap = HashMap<Rc<GenRegex>, Rc<GenRegex>>;
+type GenRegexBoolHashMap = HashMap<Rc<GenRegex>, bool>;
 type OuterSet = HashSet<(Rc<GenRegex>, GenRegexPairSet)>;
+
+/*
+    Main functions
+*/
 
 //TODO: DEbug
 fn parse_string_vars(
-    string_set: &HashSet<(Rc<GenRegex>, Rc<GenRegex>)>,
+    string_set: &GenRegexHashSet,
     union_find: &mut UnionFind<usize>,
-    id_map: &HashMap<String, i32>,
+    id_map: &HashMap<GenRegexId, i32>,
     canonical_map: &mut HashMap<i32, i32>,
-) -> (
-    HashMap<Rc<GenRegex>, Rc<GenRegex>>,
-    HashMap<Rc<GenRegex>, bool>,
-) {
+) -> (GenRegexHashMap, GenRegexBoolHashMap) {
     let mut string_dict = HashMap::new();
     let mut id_dict = HashMap::new();
     let mut return_vals = HashMap::new();
@@ -26,20 +91,20 @@ fn parse_string_vars(
 
     for elem in string_set {
         string_dict
-            .entry(print_gre(&elem.0))
+            .entry(gre_id(&elem.0))
             .or_insert(Vec::new())
             .push(elem.1.clone());
     }
     for elem in string_set {
-        id_dict.insert(print_gre(&elem.0.clone()), elem.0.clone());
+        id_dict.insert(gre_id(&elem.0), elem.0.clone());
     }
     for (key, mut value) in string_dict {
         let mut value_copy = value.clone();
         let mut last_pop = None;
         while value.len() > 1 {
             let mut union_elems = HashSet::new();
-            //let mut new_element_to_add: std::option::Option<Rc<GenRegex>> = None;
- //           let mut literal_val: std::option::Option<String> = None;
+            // let mut new_element_to_add: std::option::Option<Rc<GenRegex>> = None;
+            // let mut literal_val: std::option::Option<String> = None;
             let mut i = 0;
             while i < value.len() {
                 let temp = value[i].clone(); // Clone the value to avoid borrowing issues
@@ -58,7 +123,7 @@ fn parse_string_vars(
                                 to_remove.push(i);
                                 last_pop = Some(value_copy.remove(i));
                                 union_elems.insert(expr.clone()); // Insert cloned value
-                                truncate.insert(id_dict[&key].clone(), true); 
+                                truncate.insert(id_dict[&key].clone(), true);
                                 continue;
                             } else {
                                 union_elems.insert(expr.clone()); // Insert cloned value
@@ -84,17 +149,16 @@ fn parse_string_vars(
             let mut prev: std::option::Option<Rc<GenRegex>> = None;
             for elem in union_elems {
                 if let GenRegex::CharExpression(c_expr_temp) = elem.as_ref() {
-                    if let CharExpression::Literal(val) = c_expr_temp.as_ref(){
-                        if val.is_empty(){
+                    if let CharExpression::Literal(val) = c_expr_temp.as_ref() {
+                        if val.is_empty() {
                             truncate.insert(id_dict[&key].clone(), false);
                             return (HashMap::new(), truncate);
-
                         }
                     }
                 }
                 if let Some(p) = prev {
-                    if let Some(leftId) = id_map.get(&print_gre(&p)) {
-                        if let Some(rightId) = id_map.get(&print_gre(&elem)) {
+                    if let Some(leftId) = id_map.get(&gre_id(&p)) {
+                        if let Some(rightId) = id_map.get(&gre_id(&elem)) {
                             let rightId = *rightId;
                             let leftId = *leftId; // Dereference if you need the inner value directly
                             if let (Some(value1), Some(value2)) =
@@ -124,38 +188,35 @@ fn parse_string_vars(
             }
         }
         if !value_copy.is_empty() {
-            let string_var = Rc::new(StringVar {
-                name: String::from(&key[4..key.len() - 1]),
-            });
+            let string_var = Rc::new(key.get_string_var().expect("expected string var"));
             let str_var = Rc::new(GenRegex::StringVar(string_var));
             println!("{}", value_copy[0].clone());
             return_vals.insert(str_var, value_copy[0].clone());
         } else {
-            let string_var = Rc::new(StringVar {
-                name: String::from(&key[4..key.len() - 1]),
-            });
+            let string_var = Rc::new(key.get_string_var().expect("expected string var"));
             let str_var = Rc::new(GenRegex::StringVar(string_var));
-            return_vals.insert(str_var, last_pop.expect("reason"));
-
+            return_vals.insert(str_var, last_pop.expect("last_pop expected nonempty"));
         }
     }
     (return_vals, truncate)
 }
 
 fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
-    if substitutions.is_empty(){
-        let t_gre = Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal("".to_string()))));
+    if substitutions.is_empty() {
+        let t_gre = Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+            "".to_string(),
+        ))));
         let mut ret_set = BTreeSet::new();
         ret_set.insert((t_gre.clone(), t_gre.clone()));
         return ret_set;
     }
-    let mut id_map: HashMap<String, i32> = HashMap::new();
-    let mut string_map: HashMap<i32, String> = HashMap::new();
+    let mut id_map: HashMap<GenRegexId, i32> = HashMap::new();
+    let mut string_map: HashMap<i32, GenRegexId> = HashMap::new();
     let mut canonical_map: HashMap<i32, i32> = HashMap::new();
     let mut next_id = 1;
     assign_unique_ids(substitutions.clone(), &mut id_map, &mut next_id);
     for (expr, id) in &id_map {
-        string_map.insert(*id, expr.to_string());
+        string_map.insert(*id, expr.clone());
     }
     let mut union_find: UnionFind<usize> = UnionFind::new((next_id) as usize);
     let mut string_set = HashSet::new();
@@ -178,8 +239,8 @@ fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
         return BTreeSet::new(); // Return an empty set if there’s an error
     }
     for sub in &char_set {
-        let index_str_1 = print_gre(&sub.0);
-        let index_str_2 = print_gre(&sub.1);
+        let index_str_1 = gre_id(&sub.0);
+        let index_str_2 = gre_id(&sub.1);
         let leftId = id_map[&index_str_1];
         let rightId = id_map[&index_str_2];
         if let (Some(value1), Some(value2)) =
@@ -206,42 +267,38 @@ fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
         let mut temp = value.clone();
         //let mut temp_l;
         while let GenRegex::Concatenation(left, right) = temp.clone().as_ref() {
-                let mut temp_l = left.clone();
-                if let GenRegex::CharExpression(left_char) = left.as_ref() {
-                    if let CharExpression::CharVar(_) = left_char.as_ref() {
-                        if let Some(val_1) = canonical_map.get(&id_map[&print_gre(left)]) {
-                            temp_l = Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(string_map[val_1].clone()))));
-                            /*temp = Rc::new(GenRegex::Concatenation(
-                                Rc::new(GenRegex::CharExpression(temp_left_char)),
-                                right.clone(),
-                            ));*/
-                        }
+            let mut temp_l = left.clone();
+            if let GenRegex::CharExpression(left_char) = left.as_ref() {
+                if let CharExpression::CharVar(_) = left_char.as_ref() {
+                    if let Some(val_1) = canonical_map.get(&id_map[&gre_id(left)]) {
+                        temp_l = Rc::new(string_map[val_1].clone().into_gre_char_expr());
+                        /*temp = Rc::new(GenRegex::Concatenation(
+                            Rc::new(GenRegex::CharExpression(temp_left_char)),
+                            right.clone(),
+                        ));*/
                     }
                 }
+            }
 
-                if let GenRegex::StringVar(_) = right.as_ref() {
-                    if truncate.get(key).copied().unwrap_or(false) {
-                        //let GenRegex::Concatenation(left_n, right_n) = temp.clone().as_ref();
-                        temp = temp_l.clone()
-                        // temp.right = Literal("");
-                    } else {
-                        temp = right.clone();
-                    }
+            if let GenRegex::StringVar(_) = right.as_ref() {
+                if truncate.get(key).copied().unwrap_or(false) {
+                    //let GenRegex::Concatenation(left_n, right_n) = temp.clone().as_ref();
+                    temp = temp_l.clone()
+                    // temp.right = Literal("");
                 } else {
                     temp = right.clone();
                 }
+            } else {
+                temp = right.clone();
             }
+        }
 
         let final_key = key.clone(); // Assuming StringVar takes a String
         final_subs.insert(final_key, value.clone()); // Assuming final_subs is a HashMap
     }
     for key in id_map.keys() {
-        if key.starts_with("char(") && key.ends_with(")") {
-            let name = &key[5..key.len() - 1];
-            let c_obj = Rc::new(CharExpression::CharVar(
-                name
-                    .to_string(),
-            ));
+        if let Some(c_expr) = key.get_char_var() {
+            let c_obj = Rc::new(c_expr);
 
             // Try to get the value from canonical_map
             if let Some(value) = canonical_map.get(&(union_find.find(id_map[key] as usize) as i32))
@@ -249,9 +306,7 @@ fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
                 // Insert CharExpression mapped to a literal value
                 final_subs.insert(
                     Rc::new(GenRegex::CharExpression(c_obj.clone())),
-                    Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
-                        string_map[value].clone(),
-                    )))),
+                    Rc::new(string_map[value].clone().into_gre_char_expr()),
                 );
             } else {
                 // Attempt to get the map value from id_map (safe lookup)
@@ -260,11 +315,8 @@ fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
 
                     // Get the corresponding string from string_map
                     if let Some(map_str) = string_map.get(&(map_val as i32)) {
-                        if map_str.starts_with("char(") && map_str.ends_with(")") {
-                            let name_char = &map_str[5..map_str.len() - 1]; // Extract the content inside "char(...)"
-                            let c_obj_map = Rc::new(CharExpression::CharVar(
-                                name_char.to_string(),
-                            ));
+                        if let Some(c_expr) = map_str.get_char_var() {
+                            let c_obj_map = Rc::new(c_expr);
 
                             // Insert the generated CharExpression object
                             final_subs.insert(
@@ -358,37 +410,45 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
 
             for p_sub in p_deriv {
                 for q_sub in &q_deriv {
-                    let subDiff = &p_sub.1.difference(&q_sub.1).cloned().collect::<BTreeSet<_>>();
-                    for sub in subDiff{
+                    let subDiff = &p_sub
+                        .1
+                        .difference(&q_sub.1)
+                        .cloned()
+                        .collect::<BTreeSet<_>>();
+                    for sub in subDiff {
                         println!("p-q {}", sub.1);
                     }
-                    let subDiff2 = &q_sub.1.difference(&p_sub.1).cloned().collect::<BTreeSet<_>>();
-                    for sub in subDiff2{
+                    let subDiff2 = &q_sub
+                        .1
+                        .difference(&p_sub.1)
+                        .cloned()
+                        .collect::<BTreeSet<_>>();
+                    for sub in subDiff2 {
                         println!("q-p{}", sub.1);
                     }
                     let merged = merge(p_sub.1.union(&q_sub.1).cloned().collect::<BTreeSet<_>>());
-                    if merged.is_empty(){
+                    if merged.is_empty() {
                         continue;
                     }
                     let p_new = sub_in(left, &merged);
                     let q_new = sub_in(right, &merged);
                     let p_new_deriv = derivative(&p_new, deriv_char);
                     let q_new_deriv = derivative(&q_new, deriv_char);
-                    for p_sub_new in &p_new_deriv{
-                        for q_sub_new in &q_new_deriv{
+                    for p_sub_new in &p_new_deriv {
+                        for q_sub_new in &q_new_deriv {
                             let curr = (
                                 Rc::new(GenRegex::Intersect(
-                                        p_sub_new.0.clone(),
-                                        q_sub_new.0.clone()
+                                    p_sub_new.0.clone(),
+                                    q_sub_new.0.clone(),
                                 )),
-                                merged.clone()
+                                merged.clone(),
                             );
                             term1.insert(curr);
                         }
                     }
 
                     //if curr.1.len() == 0 {
-                     //   continue;
+                    //   continue;
                     //}
                 }
             }
@@ -443,17 +503,17 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
                     if deriv.is_empty() {
                         continue;
                     }
-                    for elem in deriv{
+                    for elem in deriv {
                         let elem_term = elem.0;
                         println!("{}", elem_term);
                         let elem_subs = elem.1;
-                        let elem_subs_final = merge(elem_subs.union(&sub).cloned().collect::<BTreeSet<_>>());
+                        let elem_subs_final =
+                            merge(elem_subs.union(&sub).cloned().collect::<BTreeSet<_>>());
 
                         if elem_subs_final.is_empty() {
                             continue;
                         }
                         derivatives.insert((elem_term, elem_subs_final));
-
                     }
                     term1 = term1.union(&derivatives).cloned().collect();
                 }
@@ -488,20 +548,20 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &GenRegexPairSet) -> Rc<GenRegex> {
     }
 
     // Create a HashMap for substitutions
-    let mut subs: HashMap<String, &Rc<GenRegex>> = HashMap::new();
+    let mut subs: HashMap<GenRegexId, &Rc<GenRegex>> = HashMap::new();
 
     // Populate the HashMap with substitutions
     for sub in substitution.iter() {
-        let key = print_gre(&sub.0); // Assuming this converts GenRegex to String
+        let key = gre_id(&sub.0); // Assuming this converts GenRegex to String
         subs.insert(key, &sub.1); // Insert the key-value pair into the HashMap
     }
     sub_in_helper(expr, subs)
 }
 
-fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<String, &Rc<GenRegex>>) -> Rc<GenRegex> {
+fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<GenRegexId, &Rc<GenRegex>>) -> Rc<GenRegex> {
     match expr.as_ref() {
         GenRegex::StringVar(_) => {
-            let key = print_gre(expr);
+            let key = gre_id(expr);
             match sub.get(&key) {
                 Some(value) => Rc::clone(value),
                 None => Rc::clone(expr),
@@ -509,7 +569,7 @@ fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<String, &Rc<GenRegex>>) -> Rc
         }
         GenRegex::CharExpression(c_expr) => match c_expr.as_ref() {
             CharExpression::CharVar(_) => {
-                let key = print_gre(expr);
+                let key = gre_id(expr);
                 match sub.get(&key) {
                     Some(value) => Rc::clone(value),
                     None => Rc::clone(expr),
@@ -550,9 +610,8 @@ pub fn matching(expr: &Rc<GenRegex>, proposed: String) -> bool {
     if deriv.is_empty() {
         return false;
     }
-    for elem in &deriv{
+    for elem in &deriv {
         println!("deriv {} {}", elem.0, proposed);
-
     }
     for elem in deriv {
         if matching(&elem.0, String::from(&proposed[1..])) {
@@ -637,46 +696,48 @@ pub fn nullable(gre: &Rc<GenRegex>) -> BTreeSet<GenRegexPairSet> {
 }
 fn assign_unique_ids(
     substitutions: GenRegexPairSet,
-    id_map: &mut HashMap<String, i32>,
+    id_map: &mut HashMap<GenRegexId, i32>,
     next_id: &mut i32,
 ) {
     for sub in &substitutions {
         match sub.0.as_ref() {
             GenRegex::StringVar(_) => {
-                let index_str = print_gre(&sub.0);
+                let index_str = gre_id(&sub.0);
                 id_map.entry(index_str).or_insert_with(|| {
                     let id = *next_id;
                     *next_id += 1;
                     id
                 });
             }
-            GenRegex::CharExpression(c_expr) => if let CharExpression::CharVar(_) = c_expr.as_ref() {
-                let index_str = print_gre(&sub.0);
-                id_map.entry(index_str).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-            },
+            GenRegex::CharExpression(c_expr) => {
+                if let CharExpression::CharVar(_) = c_expr.as_ref() {
+                    let index_str = gre_id(&sub.0);
+                    id_map.entry(index_str).or_insert_with(|| {
+                        let id = *next_id;
+                        *next_id += 1;
+                        id
+                    });
+                }
+            }
             _ => {}
         }
         match sub.1.as_ref() {
             GenRegex::StringVar(_) => {
-                let index_str = print_gre(&sub.1);
+                let index_str = gre_id(&sub.1);
                 id_map.entry(index_str).or_insert_with(|| {
                     let id = *next_id;
                     *next_id += 1;
                     id
                 });
             }
-            GenRegex::CharExpression(_) =>{
-                let index_str = print_gre(&sub.1);
+            GenRegex::CharExpression(_) => {
+                let index_str = gre_id(&sub.1);
                 id_map.entry(index_str).or_insert_with(|| {
                     let id = *next_id;
                     *next_id += 1;
                     id
                 });
-            },
+            }
             _ => {}
         }
     }

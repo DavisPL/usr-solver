@@ -1,5 +1,6 @@
-// Better to fix and remove, allowing for now
-#![allow(non_snake_case)]
+//! Alternate UnionFind implementation
+
+// TBD: Unused
 
 /*
     Conceptually, something seems amiss that the UnionFind impl lis using
@@ -18,6 +19,7 @@
     https://docs.rs/disjoint-sets/latest/disjoint_sets/
 */
 
+/*
 use crate::classes::{CharExpression, StringIndex, StringVar};
 use either::Either;
 use std::collections::HashMap;
@@ -223,3 +225,4 @@ impl UnionFind2 {
         }
     }
 }
+*/

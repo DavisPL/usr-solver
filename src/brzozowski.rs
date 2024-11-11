@@ -1,3 +1,7 @@
+//!
+//! Implementation of the Brzozowski Derivative
+//!
+
 use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex};
 use crate::predicate_evaluation::evaluateComplete;
 use either::Either;

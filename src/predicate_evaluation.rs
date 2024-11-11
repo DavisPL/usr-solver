@@ -1,13 +1,12 @@
+//!
+//! Predicate evaluation and manipulation functions
+//!
+
 // Better to fix and remove, allowing for now
 #![allow(non_snake_case)]
 
 use crate::classes::{CharExpression, Predicate, StringVar};
 use disjoint_sets::UnionFind;
-// TODO: Unused imports
-// Replace with Display trait
-// use crate::print::{
-//     print_char_expression, print_equals_arg, print_gre, print_predicate, print_string_var,
-// };
 use either::Either;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;

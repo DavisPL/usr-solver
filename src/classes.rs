@@ -1,4 +1,8 @@
-#![allow(dead_code)]
+//!
+//! Type definitions -
+//! Main GenRegex class and subclasses
+//!
+
 use either::Either;
 use std::cmp::Ordering;
 use std::rc::Rc;

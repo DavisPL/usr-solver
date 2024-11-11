@@ -1,10 +1,9 @@
-/*
-    Display implementations for pretty printing
-*/
+//!
+//! Display implementations for pretty printing
+//!
 
 use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
 use std::fmt::{self, Display};
-use std::rc::Rc;
 
 impl Display for CharExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -103,43 +102,3 @@ impl Display for GenRegex {
         }
     }
 }
-
-/*
-    Helper print functions
-
-    NB:
-    This is to preserve backward compatibility with the previous implementation;
-    these directly call the Display implementations above.
-
-    These can probably be removed if you want to just directly print using, e.g.
-
-        format!("{}", genregex)
-
-    if you want to get the string representation of the object, directly equivalent to the below, or
-
-        print!("{}", genregex)
-
-    if you want to print it to stdout.
-*/
-
-pub fn print_gre(genregex: &Rc<GenRegex>) -> String {
-    // Use Display on GenRegex
-    format!("{}", genregex)
-}
-
-// Unused
-
-// pub fn print_predicate(pred: &Rc<Predicate>) -> String {
-//     // Use Display on Predicate
-//     format!("{}", pred)
-// }
-
-// pub fn print_char_expression(char_expr: &Rc<CharExpression>) -> String {
-//     // Use Display on CharExpression
-//     format!("{}", char_expr)
-// }
-
-// pub fn print_string_var(string_var: &Rc<StringVar>) -> String {
-//     // Use Display on StringVar
-//     format!("{}", string_var)
-// }
