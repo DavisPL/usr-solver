@@ -11,6 +11,7 @@ mod brzozowski;
 mod classes;
 mod predicate_evaluation;
 mod print;
+mod smt;
 
 use antimirov::matching;
 use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};

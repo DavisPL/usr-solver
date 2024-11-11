@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 either = "1.6"
 disjoint-sets = "0.4.2"
-
+lexpr = "0.2.7"
