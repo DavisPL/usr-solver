@@ -13,9 +13,8 @@ mod predicate_evaluation;
 mod print;
 mod smt;
 
-use antimirov::matching;
-use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
-use either::Either;
+use brzozowski::matching;
+use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar, MaybeCharExpression};
 use std::rc::Rc;
 
 fn main() {
@@ -30,11 +29,11 @@ fn main() {
 
     // TODO: Unused code?
     let _predicate = Predicate::Equals(
-        Either::Left(Rc::new(CharExpression::Literal(String::from("a")))), // First argument wrapped in Either::Left
-        Either::Right(Rc::new(StringIndex {
+        Rc::new(MaybeCharExpression::CharExpression(Rc::new(CharExpression::Literal(String::from("a"))))), 
+        Rc::new(MaybeCharExpression::StringIndex(Rc::new(StringIndex {
             var: Rc::clone(&string_var),
             index: 0,
-        })),
+        }))),
     );
     let _intersect = &Rc::new(GenRegex::Intersect(
         Rc::new(GenRegex::StringVar(Rc::clone(&string_var))),
@@ -49,12 +48,12 @@ fn main() {
         Rc::clone(stringVarGre),
     ));
     let gre3 = &Rc::new(GenRegex::Concatenation(
-        Rc::clone(char_var),
+        Rc::clone(stringVarGre),
         Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
-            String::from("a"),
+            String::from("b"),
         )))),
     ));
-    let _gre4 = &Rc::new(GenRegex::Concatenation(Rc::clone(gre3), Rc::clone(gre2)));
+    let gre4 = &Rc::new(GenRegex::Concatenation(Rc::clone(gre3), Rc::clone(gre2)));
     let gre5 = &Rc::new(GenRegex::Intersect(
         Rc::clone(gre3),
         Rc::new(GenRegex::Kleene(Rc::clone(stringVarGre))),
@@ -63,10 +62,10 @@ fn main() {
     //let complex_predicate = Rc::new(Predicate::And(vec![Rc::new(predicate), Rc::new(Predicate::False)]));
     //let gre = &Rc::new(GenRegex::IfThenElse(complex_predicate.clone(), Rc::new(GenRegex::EmptySet), Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::CharVar(String::from("c")))))));
     //println!("{}", print_predicate(&complex_predicate));
-    println!("{}", &Rc::clone(gre5));
+    println!("{}", &Rc::clone(gre4));
     //let deriv = &Rc::new(derivative(&Rc::clone(gre), &Rc::new(CharExpression::Literal(String::from("b")))));
     //println!("{}", print_predicate(&nullableProjection(&Rc::clone(deriv))));
-    let matcher = matching(&Rc::clone(gre5), String::from("ab"));
+    let matcher = matching(&Rc::clone(gre4), String::from("catcatbcatcatcatcat"));
     println!("{}", matcher);
     //println!("Hello World!");
 }

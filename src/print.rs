@@ -2,8 +2,9 @@
 //! Display implementations for pretty printing
 //!
 
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar};
+use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar, MaybeCharExpression};
 use std::fmt::{self, Display};
+
 
 impl Display for CharExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -17,6 +18,19 @@ impl Display for CharExpression {
                 } else {
                     write!(f, "{}", name)
                 }
+            }
+        }
+    }
+}
+
+impl Display for MaybeCharExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MaybeCharExpression::CharExpression(name) => {
+                write!(f, "{}", name)
+            }
+            MaybeCharExpression::StringIndex(name) => {
+                    write!(f, "{}", name)
             }
         }
     }

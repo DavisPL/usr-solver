@@ -2,9 +2,8 @@
 //! Implementation of the Brzozowski Derivative
 //!
 
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex};
+use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, MaybeCharExpression};
 use crate::predicate_evaluation::evaluateComplete;
-use either::Either;
 use std::rc::Rc;
 
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
@@ -18,30 +17,30 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
         GenRegex::EmptySet => Rc::clone(gre),
         GenRegex::CharExpression(cExpr) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
-                Either::Left(Rc::clone(cExpr)),
-                Either::Left(Rc::clone(deriv_char)),
+                Rc::new(MaybeCharExpression::CharExpression(Rc::clone(cExpr))),
+                Rc::new(MaybeCharExpression::CharExpression(Rc::clone(deriv_char))),
             )),
             empty_string(),
             empty_set(),
         ))),
         GenRegex::StringVar(sVar) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
-                Either::Right(Rc::new(StringIndex {
+                Rc::new(MaybeCharExpression::StringIndex(Rc::new(StringIndex {
                     var: Rc::clone(sVar),
                     index: 0,
-                })),
-                Either::Left(Rc::clone(deriv_char)),
+                }))),
+                Rc::new(MaybeCharExpression::CharExpression(Rc::clone(deriv_char))),
             )),
             Rc::new(GenRegex::StringSlice(Rc::clone(sVar), 1)),
             empty_set(),
         ))),
         GenRegex::StringSlice(stringVar, index) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
-                Either::Right(Rc::new(StringIndex {
+                Rc::new(MaybeCharExpression::StringIndex(Rc::new(StringIndex {
                     var: Rc::clone(stringVar),
                     index: *index,
-                })),
-                Either::Left(Rc::clone(deriv_char)),
+                }))),
+                Rc::new(MaybeCharExpression::CharExpression(Rc::clone(deriv_char))),
             )),
             Rc::new(GenRegex::StringSlice(Rc::clone(stringVar), index + 1)),
             empty_set(),
@@ -85,8 +84,8 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
             // TODO: unused?
             simplifies(&Rc::new(GenRegex::IfThenElse(
                 Rc::new(Predicate::Equals(
-                    Either::Right(Rc::clone(string_index)),
-                    Either::Left(Rc::clone(deriv_char)),
+                    Rc::new(MaybeCharExpression::StringIndex(Rc::clone(string_index))),
+                    Rc::new(MaybeCharExpression::CharExpression(Rc::clone(deriv_char))),
                 )),
                 empty_string(),
                 empty_set(),
@@ -411,7 +410,7 @@ fn simplify_if_then_else(
     };
 
     if let Predicate::Equals(left, right) = pred.as_ref() {
-        if let (Either::Left(c1), Either::Left(c2)) = (left.as_ref(), right.as_ref()) {
+        if let (MaybeCharExpression::CharExpression(c1), MaybeCharExpression::CharExpression(c2)) = (left.as_ref(), right.as_ref()) {
             if let (CharExpression::Literal(val1), CharExpression::Literal(val2)) =
                 (c1.as_ref(), c2.as_ref())
             {

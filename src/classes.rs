@@ -3,7 +3,6 @@
 //! Main GenRegex class and subclasses
 //!
 
-use either::Either;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
@@ -114,10 +113,16 @@ pub enum Predicate {
     True,
     False,
     Equals(
-        Either<Rc<CharExpression>, Rc<StringIndex>>,
-        Either<Rc<CharExpression>, Rc<StringIndex>>,
+        Rc<MaybeCharExpression>,
+        Rc<MaybeCharExpression>
     ),
     EqualLength(Rc<StringVar>, i32),
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+pub enum MaybeCharExpression {
+    CharExpression(Rc<CharExpression>),
+    StringIndex(Rc<StringIndex>)
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
