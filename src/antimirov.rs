@@ -212,7 +212,6 @@ fn parse_string_vars(
         if !value_copy.is_empty() {
             let string_var = Rc::new(get_string_var(key).expect("expected string var"));
             let str_var = Rc::new(GenRegex::StringVar(string_var));
-            println!("{}", value_copy[0].clone());
             return_vals.insert(str_var, value_copy[0].clone());
         } else {
             let string_var = Rc::new(get_string_var(key).expect("expected string var"));
@@ -437,17 +436,11 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
                         .difference(&q_sub.1)
                         .cloned()
                         .collect::<BTreeSet<_>>();
-                    for sub in subDiff {
-                        println!("p-q {}", sub.1);
-                    }
                     let subDiff2 = &q_sub
                         .1
                         .difference(&p_sub.1)
                         .cloned()
                         .collect::<BTreeSet<_>>();
-                    for sub in subDiff2 {
-                        println!("q-p{}", sub.1);
-                    }
                     let merged = merge(p_sub.1.union(&q_sub.1).cloned().collect::<BTreeSet<_>>());
                     if merged.is_empty() {
                         continue;
@@ -519,7 +512,6 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
             if !p_nullable.is_empty() {
                 for sub in p_nullable {
                     let temp = sub_in(right, &sub);
-                    println!("nullable check {}", temp);
                     let deriv = derivative(&temp, deriv_char);
                     let mut derivatives = HashSet::new();
                     if deriv.is_empty() {
@@ -527,7 +519,6 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
                     }
                     for elem in deriv {
                         let elem_term = elem.0;
-                        println!("{}", elem_term);
                         let elem_subs = elem.1;
                         let elem_subs_final =
                             merge(elem_subs.union(&sub).cloned().collect::<BTreeSet<_>>());
@@ -622,8 +613,30 @@ fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<GenRegex, &Rc<GenRegex>>) -> 
     }
 }
 
+pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: BTreeSet<GenRegex>) -> bool{
+    if visited.contains(expr){
+        return false;
+    }else{
+        visited.insert(expr.as_ref().clone());
+    }
+    if nullable(expr).is_empty(){
+        let new_name = "f".to_owned() + &index.to_string();
+        let c_var = Rc::new(CharExpression::CharVar(String::from(new_name)));
+        let deriv = derivative(expr, &c_var);
+        if deriv.is_empty(){
+            return false
+        }
+        index += 1;
+        for elem in deriv{
+            if satisfiable(&elem.0, index, visited.clone()){
+                return true;
+            }
+        }
+        return false;
+    }
+    return true;
+}
 pub fn matching(expr: &Rc<GenRegex>, proposed: String) -> bool {
-    println!("{}", expr);
     if proposed.is_empty() {
         return !nullable(expr).is_empty();
     }
@@ -631,9 +644,6 @@ pub fn matching(expr: &Rc<GenRegex>, proposed: String) -> bool {
     let deriv = derivative(expr, &literal);
     if deriv.is_empty() {
         return false;
-    }
-    for elem in &deriv {
-        println!("deriv {} {}", elem.0, proposed);
     }
     for elem in deriv {
         if matching(&elem.0, String::from(&proposed[1..])) {
@@ -679,8 +689,6 @@ pub fn nullable(gre: &Rc<GenRegex>) -> BTreeSet<GenRegexPairSet> {
         GenRegex::Intersect(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
             let right_null = nullable(&Rc::clone(side2));
-            println!("{}", left_null.len());
-            println!("{}", right_null.len());
             let mut retSet = BTreeSet::new();
             for left_elem in &left_null {
                 for right_elem in &right_null {
