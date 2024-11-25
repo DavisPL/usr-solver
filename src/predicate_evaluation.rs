@@ -247,8 +247,8 @@ fn evaluate(
                 let leftId;
                 let rightId;
                 if let Predicate::Equals(left, right) = p.as_ref() {
-                    leftId = id_map[&left];
-                    rightId = id_map[&right];
+                    leftId = id_map[left];
+                    rightId = id_map[right];
                     /*match (left.as_ref(), right.as_ref()) {
                         (MaybeCharExpression::StringIndex(str_ind_1), MaybeCharExpression::StringIndex(str_ind_2)) => {
                             let mut index_str = format!(
@@ -328,8 +328,8 @@ fn evaluate(
                     let leftId;
                     let rightId;
                     if let Predicate::Equals(left, right) = inner.as_ref() {
-                        leftId = id_map[&left];
-                        rightId = id_map[&right];
+                        leftId = id_map[left];
+                        rightId = id_map[right];
                         if leftId == rightId {
                             return Rc::new(Predicate::False);
                         }

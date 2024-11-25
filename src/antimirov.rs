@@ -2,11 +2,12 @@
 //! Implementation of the Antimirov Derivative
 //!
 
-use crate::classes::{CharExpression, GenRegex, StringVar};
+use crate::classes::{CharExpression, GenRegex, StringVar, Predicate, MaybeCharExpression};
 use disjoint_sets::UnionFind;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use crate::brzozowski;
 
 /*
     Some placeholder functions and types
@@ -262,8 +263,8 @@ fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
     for sub in &char_set {
         let index_str_1 = &sub.0;
         let index_str_2 = &sub.1;
-        let leftId = id_map[&index_str_1];
-        let rightId = id_map[&index_str_2];
+        let leftId = id_map[index_str_1];
+        let rightId = id_map[index_str_2];
         if let (Some(value1), Some(value2)) =
             (canonical_map.get(&leftId), canonical_map.get(&rightId))
         {
@@ -431,16 +432,6 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
 
             for p_sub in p_deriv {
                 for q_sub in &q_deriv {
-                    let subDiff = &p_sub
-                        .1
-                        .difference(&q_sub.1)
-                        .cloned()
-                        .collect::<BTreeSet<_>>();
-                    let subDiff2 = &q_sub
-                        .1
-                        .difference(&p_sub.1)
-                        .cloned()
-                        .collect::<BTreeSet<_>>();
                     let merged = merge(p_sub.1.union(&q_sub.1).cloned().collect::<BTreeSet<_>>());
                     if merged.is_empty() {
                         continue;
@@ -551,7 +542,45 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> OuterS
 
             term1
         }
-        _ => HashSet::new(),
+        GenRegex::Complement(_) =>{
+            let term =  brzozowski::derivative(gre, deriv_char);
+            let subs = BTreeSet::new();
+            let mut ret = HashSet::new();
+            ret.insert((term, subs));
+            ret
+            
+        }
+        GenRegex::StringIndex(_) =>{
+            let term =  brzozowski::derivative(gre, deriv_char);
+            let subs = BTreeSet::new();
+            let mut ret = HashSet::new();
+            ret.insert((term, subs));
+            ret
+            
+        }
+        GenRegex::StringSlice(_, _) =>{
+            let term =  brzozowski::derivative(gre, deriv_char);
+            let  subs = BTreeSet::new();
+            let mut ret = HashSet::new();
+            ret.insert((term, subs));
+            ret
+            
+        }
+        GenRegex::IfThenElse(pred, p, q) => {
+            let deriv_p = derivative(p, deriv_char);
+            let deriv_q = derivative(q, deriv_char);
+            let mut ret = HashSet::new();
+            for elem in deriv_p{
+                let term = (Rc::new(GenRegex::IfThenElse(pred.clone(), elem.0, Rc::new(GenRegex::EmptySet))), elem.1);
+                ret.insert(term);
+            }
+            for elem in deriv_q{
+                let term = (Rc::new(GenRegex::IfThenElse(pred.clone(), Rc::new(GenRegex::EmptySet), elem.0)), elem.1);
+                ret.insert(term);
+            }
+            ret
+
+        }
     }
 }
 
@@ -575,7 +604,7 @@ fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<GenRegex, &Rc<GenRegex>>) -> 
     match expr.as_ref() {
         GenRegex::StringVar(_) => {
             let key = expr;
-            match sub.get(&key) {
+            match sub.get(key) {
                 Some(value) => Rc::clone(value),
                 None => Rc::clone(expr),
             }
@@ -583,7 +612,7 @@ fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<GenRegex, &Rc<GenRegex>>) -> 
         GenRegex::CharExpression(c_expr) => match c_expr.as_ref() {
             CharExpression::CharVar(_) => {
                 let key = expr;
-                match sub.get(&key) {
+                match sub.get(key) {
                     Some(value) => Rc::clone(value),
                     None => Rc::clone(expr),
                 }
@@ -621,7 +650,7 @@ pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: BTreeSet<Ge
     }
     if nullable(expr).is_empty(){
         let new_name = "f".to_owned() + &index.to_string();
-        let c_var = Rc::new(CharExpression::CharVar(String::from(new_name)));
+        let c_var = Rc::new(CharExpression::CharVar(new_name));
         let deriv = derivative(expr, &c_var);
         if deriv.is_empty(){
             return false
@@ -634,7 +663,7 @@ pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: BTreeSet<Ge
         }
         return false;
     }
-    return true;
+    true
 }
 pub fn matching(expr: &Rc<GenRegex>, proposed: String) -> bool {
     if proposed.is_empty() {
@@ -660,7 +689,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> BTreeSet<GenRegexPairSet> {
         ))))
     };
     match gre.as_ref() {
-        GenRegex::EmptySet => BTreeSet::new(),
+        GenRegex::EmptySet | GenRegex::StringIndex(..) => BTreeSet::new(),
         GenRegex::CharExpression(cExpr) => match cExpr.as_ref() {
             CharExpression::CharVar(_name) => BTreeSet::new(),
             CharExpression::Literal(value) => {
@@ -721,9 +750,212 @@ pub fn nullable(gre: &Rc<GenRegex>) -> BTreeSet<GenRegexPairSet> {
             ret.insert(BTreeSet::new());
             ret
         }
+        GenRegex::StringSlice(string_var, index)=>{
+                let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                let length = *index as usize;
+                let mut results = BTreeSet::new();
+                generate_combinations(&alphabet, length, Vec::new(), &mut results, string_var, None, false);
+                results
+        }
         _ => BTreeSet::new(),
     }
 }
+
+fn s_from_p(pred: &Rc<Predicate>) -> BTreeSet<GenRegexPairSet>{
+    match pred.as_ref() {
+        Predicate::True =>{
+            let mut ret = BTreeSet::new();
+            ret.insert(BTreeSet::new());
+            ret
+
+        }
+        Predicate::False =>{
+            BTreeSet::new()
+        }
+        Predicate::EqualLength(s_var, index)=>{
+                let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                let length = *index as usize;
+                let mut results = BTreeSet::new();
+                generate_combinations(&alphabet, length, Vec::new(), &mut results, s_var, None, false);
+                results
+
+        }
+        Predicate::Equals(maybe_1, maybe_2)=> match (maybe_1.as_ref(), maybe_2.as_ref()){
+            (MaybeCharExpression::CharExpression(c_expr_1), MaybeCharExpression::CharExpression(c_expr_2)) => match (c_expr_1.as_ref(), c_expr_2.as_ref()) {
+                (CharExpression::Literal(val_1), CharExpression::Literal(val_2)) =>{
+                    if val_1 == val_2{
+                        let mut ret = BTreeSet::new();
+                        ret.insert(BTreeSet::new());
+                        ret
+                    }else{
+                        BTreeSet::new()
+                    }
+
+                },
+                (CharExpression::Literal(_), CharExpression::CharVar(_)) =>{
+                    let mut sub = BTreeSet::new();
+                    sub.insert((Rc::new(GenRegex::CharExpression(Rc::clone(c_expr_1))), Rc::new(GenRegex::CharExpression(Rc::clone(c_expr_2)))));
+                    let mut ret = BTreeSet::new();
+                    ret.insert(sub);
+                    ret
+                }
+                _ =>{
+                    let mut sub = BTreeSet::new();
+                    sub.insert((Rc::new(GenRegex::CharExpression(Rc::clone(c_expr_1))), Rc::new(GenRegex::CharExpression(Rc::clone(c_expr_2)))));
+                    //sub.insert((maybe_1, maybe_2));
+                    let mut ret = BTreeSet::new();
+                    ret.insert(sub);
+                    ret
+                }
+            }
+            (MaybeCharExpression::StringIndex(s_ind), MaybeCharExpression::CharExpression(c_expr)) =>{
+                    let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                    let length = s_ind.index as usize;
+                    let mut results = BTreeSet::new();
+                    generate_combinations(&alphabet, length, Vec::new(), &mut results, &s_ind.var, Some(c_expr.as_ref().clone()), true);
+                    results
+
+
+            }
+            (MaybeCharExpression::CharExpression(c_expr), MaybeCharExpression::StringIndex(s_ind)) =>{
+                    let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                    let length = s_ind.index as usize;
+                    let mut results = BTreeSet::new();
+                    generate_combinations(&alphabet, length, Vec::new(), &mut results, &s_ind.var, Some(c_expr.as_ref().clone()), true);
+                    results
+
+
+            }
+            (MaybeCharExpression::StringIndex(s_ind_1), MaybeCharExpression::StringIndex(s_ind_2)) =>{
+                    let alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                    let length = s_ind_1.index as usize;
+                    let mut results_1 = BTreeSet::new();
+                    let mut results_2 = BTreeSet::new();
+                    let c_var = Rc::new(CharExpression::CharVar("f".to_string()));
+                    generate_combinations(&alphabet, length, Vec::new(), &mut results_1, &s_ind_1.var, Some(c_var.as_ref().clone()), true);
+                    generate_combinations(&alphabet, length, Vec::new(), &mut results_2, &s_ind_2.var, Some(c_var.as_ref().clone()), true);
+                    let mut results = BTreeSet::new();
+                    for elem in results_1{
+                        for elem_2 in &results_2{
+                            results.insert(elem.union(&elem_2).cloned().collect());
+                        }
+                    }
+                    results
+                
+            }
+        }
+        Predicate::And(preds) => {
+            let mut results = BTreeSet::new();
+            union_substitutions(preds, 0, BTreeSet::new(), &mut results);
+            let mut final_res = BTreeSet::new();
+            for res in results{
+                let ret_elem = merge(res.clone());
+                if !ret_elem.is_empty() {
+                    final_res.insert(ret_elem);
+                }
+
+            }
+            final_res
+
+        }
+        Predicate::Or(preds) => {
+            let mut results = BTreeSet::new();
+            for p in preds{
+                let temp = s_from_p(p);
+                results = results.union(&temp).cloned().collect();
+            }
+            results
+
+        }
+        _ => {BTreeSet::new()}
+
+    
+}
+}
+fn union_substitutions(
+    predicates: &Vec<Rc<Predicate>>, // Predicates each yielding a set of substitutions
+    current_index: usize,  // Current predicate being processed
+    current_union: GenRegexPairSet, // Current set of substitutions being formed
+    results: &mut BTreeSet<GenRegexPairSet>, // Store the resulting substitutions (not sets)
+) {
+    // Base case: If we've processed all predicates, add the union to results
+    if current_index == predicates.len() {
+            results.insert(current_union);
+        return;
+    }
+
+    // Recursive case: Process the sets for the current predicate
+    let sets = s_from_p(&predicates[current_index]);
+
+    // For each set of substitutions in the current predicate's result
+    for set in sets {
+        // Union the current set of substitutions with the ongoing union
+        let mut new_union = current_union.clone();
+        new_union = new_union.union(&set).cloned().collect();
+
+        // Recur with the next predicate
+        union_substitutions(predicates, current_index + 1, new_union, results);
+    }
+}
+
+fn generate_combinations(
+    alphabet: &[char],
+    length: usize,
+    current: Vec<char>,
+    results: &mut BTreeSet<GenRegexPairSet>,
+    string_var: &Rc<StringVar>,
+    end_char: Option<CharExpression>,       // New parameter to specify a last character
+    append_variable: bool          // New flag to append the variable at the end
+) {
+    // Base case: If the current length equals the target length (minus 1 if adding end_char).
+    let target_length = if end_char.is_some() { length - 1 } else { length };
+
+    if current.len() == target_length {
+        let mut regex = build_concatenation(&current);
+
+        // If there's an end_char, append it to the regex.
+        if let Some(last_char) = end_char {
+            let last_regex = GenRegex::CharExpression(Rc::new(last_char));
+            regex = GenRegex::Concatenation(Rc::new(regex), Rc::new(last_regex));
+        }
+
+        // If append_variable is true, add `string_var` as the final concatenation element.
+        if append_variable {
+            let string_var_regex = GenRegex::StringVar(string_var.clone());
+            regex = GenRegex::Concatenation(Rc::new(regex), Rc::new(string_var_regex));
+        }
+
+        // Add the generated pattern as a substitution pair.
+        let mut new_sub = BTreeSet::new();
+        new_sub.insert((Rc::new(GenRegex::StringVar(string_var.clone())), Rc::new(regex)));
+        results.insert(new_sub);
+        return;
+    }
+
+    // Recursively add each character from the alphabet to the current combination.
+    for &ch in alphabet {
+        let mut new_current = current.clone();
+        new_current.push(ch);
+        generate_combinations(alphabet, length, new_current, results, string_var, end_char.clone(), append_variable);
+    }
+}
+
+fn build_concatenation(chars: &[char]) -> GenRegex {
+    let mut iter = chars.iter();
+    let first = iter.next().expect("Expected at least one character");
+
+    // Start with the first character as a GenRegex::CharExpression
+    let mut regex = GenRegex::CharExpression(Rc::new(CharExpression::Literal(first.to_string())));
+    
+    // Chain each subsequent character as a concatenation
+    for &ch in iter {
+        let next_regex = GenRegex::CharExpression(Rc::new(CharExpression::Literal(ch.to_string())));
+        regex = GenRegex::Concatenation(Rc::new(regex), Rc::new(next_regex));
+    }
+    regex
+}
+
+
 fn assign_unique_ids(
     substitutions: GenRegexPairSet,
     id_map: &mut HashMap<GenRegex, i32>,

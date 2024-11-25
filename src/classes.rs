@@ -99,6 +99,28 @@ impl Ord for GenRegex {
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub enum Subs {
+    EmptySub,
+    Sub(Rc<Pair>),
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub enum Pair {
+    Combined(Rc<Pair>, Rc<Pair>),
+    To(Rc<StringVar>, Rc<SubExpr>),
+    MapTo(Rc<CharExpression>, Rc<CharExpression>)
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub enum SubExpr {
+    Combined(Rc<CharExpression>, Rc<SubExpr>),
+    EmptyString,
+    StringVar(Rc<StringVar>),
+}
+
+
+
 impl PartialOrd for GenRegex {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
