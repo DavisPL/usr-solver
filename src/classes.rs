@@ -21,6 +21,86 @@ pub enum GenRegex {
     StringIndex(Rc<StringIndex>),
 }
 
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub enum Subs {
+    EmptySub,
+    Sub(Rc<Pair>)
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub enum Pair {
+    Combined(Rc<Pair>, Rc<Pair>),
+    StringTo(Rc<StringVar>, Rc<SubExpr>),
+    CharTo(Rc<CharExpression>, Rc<CharExpression>)
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub enum SubExpr {
+    Combined(Rc<CharExpression>, Rc<SubExpr>),
+    EmptyString,
+    StringVar(Rc<StringVar>),
+}
+
+
+
+
+#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+pub enum Predicate {
+    And(Vec<Rc<Predicate>>),
+    Or(Vec<Rc<Predicate>>),
+    Not(Rc<Predicate>),
+    True,
+    False,
+    Equals(
+        Rc<MaybeCharExpression>,
+        Rc<MaybeCharExpression>
+    ),
+    EqualLength(Rc<StringVar>, i32),
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+pub enum MaybeCharExpression {
+    CharExpression(Rc<CharExpression>),
+    StringIndex(Rc<StringIndex>)
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+pub enum CharExpression {
+    CharVar(String),
+    Literal(String),
+}
+
+/*#[derive(PartialEq, Eq, Hash, Clone)] // Deriving PartialEq, Eq, and Hash
+pub enum StringObject{
+    StringSlice(Rc<StringVar>, i32),
+    StringVar(Rc<StringVar>)
+}*/
+
+#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+pub struct StringVar {
+    pub name: String,
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+pub struct StringIndex {
+    pub var: Rc<StringVar>,
+    pub index: i32,
+}
+
+
+
+
+
+
+
+
+impl PartialOrd for GenRegex {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Ord for GenRegex {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
@@ -97,75 +177,4 @@ impl Ord for GenRegex {
             (GenRegex::StringIndex(a), GenRegex::StringIndex(b)) => a.cmp(b),
         }
     }
-}
-
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub enum Subs {
-    EmptySub,
-    Sub(Rc<Pair>),
-}
-
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub enum Pair {
-    Combined(Rc<Pair>, Rc<Pair>),
-    To(Rc<StringVar>, Rc<SubExpr>),
-    MapTo(Rc<CharExpression>, Rc<CharExpression>)
-}
-
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub enum SubExpr {
-    Combined(Rc<CharExpression>, Rc<SubExpr>),
-    EmptyString,
-    StringVar(Rc<StringVar>),
-}
-
-
-
-impl PartialOrd for GenRegex {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
-pub enum Predicate {
-    And(Vec<Rc<Predicate>>),
-    Or(Vec<Rc<Predicate>>),
-    Not(Rc<Predicate>),
-    True,
-    False,
-    Equals(
-        Rc<MaybeCharExpression>,
-        Rc<MaybeCharExpression>
-    ),
-    EqualLength(Rc<StringVar>, i32),
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
-pub enum MaybeCharExpression {
-    CharExpression(Rc<CharExpression>),
-    StringIndex(Rc<StringIndex>)
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
-pub enum CharExpression {
-    CharVar(String),
-    Literal(String),
-}
-
-/*#[derive(PartialEq, Eq, Hash, Clone)] // Deriving PartialEq, Eq, and Hash
-pub enum StringObject{
-    StringSlice(Rc<StringVar>, i32),
-    StringVar(Rc<StringVar>)
-}*/
-
-#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-pub struct StringVar {
-    pub name: String,
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-pub struct StringIndex {
-    pub var: Rc<StringVar>,
-    pub index: i32,
 }

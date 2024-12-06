@@ -2,7 +2,7 @@
 //! Implementation of the Antimirov Derivative
 //!
 
-use crate::classes::{CharExpression, GenRegex, StringVar, Predicate, MaybeCharExpression};
+use crate::classes::{CharExpression, GenRegex, StringVar, Predicate, MaybeCharExpression, SubExpr, Subs};
 use disjoint_sets::UnionFind;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
@@ -223,8 +223,124 @@ fn parse_string_vars(
     (return_vals, truncate)
 }
 
-fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
-    if substitutions.is_empty() {
+fn index_sub_expr(subexpr: Rc<SubExpr>, index: i32) -> Rc<SubExpr>{
+    match subexpr.as_ref(){
+        SubExpr::EmptyString => subexpr,
+        SubExpr::StringVar(_) =>{
+            if index == 0{
+                return subexpr;
+            }
+            else{
+                return Rc::new(SubExpr::EmptyString);
+            }
+        },
+        SubExpr::Combined(left, right)=>{
+            if index == 0{
+                return Rc::new(SubExpr::Combined(left.clone(), Rc::new(SubExpr::EmptyString)));
+            }else{
+                return index_sub_expr(right.clone(), index-1);
+            }
+        }
+    }
+}
+
+fn merge(substitutions: Rc<Subs>) -> Subs {
+    let (mut str_eq_class, mut char_eq_class) = build_str_char_eq_class(Rc::clone(&substitutions)); //TODO: implement this function
+    for (var, mut eq_exprs) in str_eq_class{
+        let mut ind = 0;
+        while eq_exprs.len() != 0{
+            let mut union_set: HashSet<SubExpr> = HashSet::new();
+            let mut i = 0;
+            while i < eq_exprs.len(){
+                let curr_sub_expr = eq_exprs[i];
+                let temp = index_sub_expr(Rc::new(curr_sub_expr), ind);
+                let length_flag = false;
+                if let SubExpr::EmptyString = temp{
+                    for j in 0..eq_exprs.len() {
+                        if i != j{
+                            let r_prime_expr = eq_exprs[j];
+                            let temp_r_prime = index_sub_expr(Rc::new(curr_sub_expr), ind);
+                            if let SubExpr::EmptyString = temp_2{
+                                continue
+                            }else if let SubExpr::StringVar(_) = temp{
+                                continue
+                            }else{
+                                //TODO: RETURN BOTTOM
+                                //return 
+                            }
+                        }
+                    }
+                    eq_exprs = vec![curr_sub_expr];
+                    length_flag = true;
+                    break;
+                }else if let SubExpr::StringVar(_) = temp{
+                    eq_exprs.remove(i)
+                }else{
+                    union_set.insert(temp);
+                    i+=1;
+                }
+                ind += 1;
+            }
+            if length_flag{
+                break;
+            }
+
+        }
+        //TODO: Union everything together here
+        //union_over_set(union_set)
+
+    }
+    let mut combined_expr: Option<Rc<Pair>> = None;
+
+    for (var, eq_exprs) in str_eq_class{
+        let new_pair = Rc::new(Pair::StringTo(var.clone(), Rc::new(eq_exprs[0])));
+        if let Some(existing) = &combined_expr {
+            combined_expr = Some(Rc::new(Pair::Combined(existing.clone(), new_pair)));
+        } else {
+            combined_expr = Some(new_pair);
+        }
+    }
+    let mut string_subs = if let Some(expr) = combined_expr {
+        Subs::Sub(expr)
+    } else {
+        Subs::EmptySub
+    };
+
+    for(var, eq_exprs) in char_eq_class{
+        //TODO: Union
+    }
+    for var in char_eq_class.keys(){
+        if x != union_find.find(x){
+            let new_pair = Rc::new(Pair::CharTo(var.clone(), Rc::new(union_find.find(x)));
+            if let Some(existing) = &combined_expr {
+                combined_expr = Some(Rc::new(Pair::Combined(existing.clone(), new_pair)));
+            } else {
+                combined_expr = Some(new_pair);
+            }
+    
+        }
+    }
+    let char_subs = if let Some(expr) = combined_expr {
+        Subs::Sub(expr)
+    } else {
+        Subs::EmptySub
+    };
+    
+    string_subs = sub_in(strings_subs, char_subs); //TODO: implement sub_in
+
+    if let Sub(string_pair) = string_subs{
+        if let Sub(char_pair) = char_subs{
+            return Rc::new(Subs::Sub(Rc::new(Pair::Combined(Rc::clone(string_pair), Rc::clone(char_pair)))));
+        }else{
+            return Rc::clone(string_subs);
+        }
+    }else{
+        return Rc::clone(char_subs);
+    }
+    
+
+
+    /*if substitutions.is_empty() {
         let t_gre = Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
             "".to_string(),
         ))));
@@ -355,7 +471,7 @@ fn merge(substitutions: GenRegexPairSet) -> GenRegexPairSet {
     for item in final_subs.iter() {
         final_set.insert((item.0.clone(), item.1.clone())); // Insert items directly without collect()
     }
-    final_set
+    final_set*/
 
     //
 }
