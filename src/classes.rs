@@ -21,6 +21,10 @@ pub enum GenRegex {
     StringIndex(Rc<StringIndex>),
 }
 
+pub enum MergeResult {
+    Subs(Subs),
+    Bottom
+}
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub enum Subs {
