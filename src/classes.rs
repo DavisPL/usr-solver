@@ -6,7 +6,7 @@
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
     EmptySet,
     CharExpression(Rc<CharExpression>),
@@ -26,30 +26,111 @@ pub enum MergeResult {
     Bottom
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Subs {
     EmptySub,
     Sub(Rc<Pair>)
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Pair {
     Combined(Rc<Pair>, Rc<Pair>),
     StringTo(Rc<StringVar>, Rc<SubExpr>),
     CharTo(Rc<CharExpression>, Rc<CharExpression>)
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum SubExpr {
     Combined(Rc<CharExpression>, Rc<SubExpr>),
     EmptyString,
     StringVar(Rc<StringVar>),
 }
 
+/*
+    TODO fix: use the following for SubExpr and Subs
+*/
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SubExpr2 {
+    head: Vec<CharExpression>,
+    tail_is_string_var: bool
+}
 
+// impl Into<GenRegex> for SubExpr2 {
 
-#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+// }
+
+impl SubExpr2 {
+    fn to_gen_regex(&self, tail_var: &StringVar) -> GenRegex {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct AnySub {
+    string_to: HashMap<StringVar, Vec<SubExpr2>>
+    char_to: HashMap<CharVar, Vec<CharExpression>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SimpleSub {
+    string_to: HashMap<StringVar, SubExpr2>,
+    char_to: HashMap<CharVar, CharExpression>,
+}
+
+impl SimpleSub {
+    fn substitute_in_regex(&self, g: GenRegex) -> GenRegex {
+        unimplemented!()
+    }
+}
+
+use std::collections::HashMap;
+use std::ops::Index;
+use std::ops::IndexMut;
+
+// l[3] -- 3rd elem of list
+// class MyList
+// m: MyList
+// m[5] -- define what it means to get the 5th element of MyList
+
+// https://doc.rust-lang.org/std/ops/trait.Index.html
+impl Index<&StringVar> for SimpleSub {
+    type Output = SubExpr2;
+
+    fn index(&self, index: &StringVar) -> &Self::Output {
+        unimplemented!()
+    }
+}
+
+impl IndexMut<&StringVar> for SimpleSub {
+    fn index_mut(&mut self, index: &StringVar) -> &mut Self::Output {
+        unimplemented!()
+    }
+}
+
+impl Index<usize> for SubExpr2 {
+    type Output = Option<CharExpression>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        unimplemented!()
+    }
+}
+
+// f: SimpleSub
+// w: String var (w1, w2, w3)
+// f[w] <- get the subexpr
+
+// f1 + f2 <- merge two simple subs
+// f1 - f2 <- sub subtractions
+// impl Add<SimpleSub> for SimpleSub {
+//     //
+// }
+
+// merge_subs()
+
+// Option<SimpleSub> - simple sub or \bottom
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum Predicate {
     And(Vec<Rc<Predicate>>),
     Or(Vec<Rc<Predicate>>),
@@ -63,41 +144,55 @@ pub enum Predicate {
     EqualLength(Rc<StringVar>, i32),
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum MaybeCharExpression {
     CharExpression(Rc<CharExpression>),
     StringIndex(Rc<StringIndex>)
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum CharExpression {
-    CharVar(String),
+    CharVar(String), // change to CharVar
     Literal(String),
 }
 
-/*#[derive(PartialEq, Eq, Hash, Clone)] // Deriving PartialEq, Eq, and Hash
+/*#[derive(Debug, PartialEq, Eq, Hash, Clone)] // Deriving PartialEq, Eq, and Hash
 pub enum StringObject{
     StringSlice(Rc<StringVar>, i32),
     StringVar(Rc<StringVar>)
 }*/
 
-#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct StringVar {
     pub name: String,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+// TODO
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+pub struct CharVar {
+    pub name: String,
+}
+
+// pub struct StringVar {
+//     name: String,
+// }
+// impl StringVar {
+//     pub fn new(s: String) -> Self {
+//         Self(name)
+//     }
+//     pub fn from_integer(i: usize) -> Self {
+//         Self(format!("w{}", i))
+//     }
+//     pub fn get_name(&self) -> &str {
+//         &self.name
+//     }
+// }
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct StringIndex {
     pub var: Rc<StringVar>,
     pub index: i32,
 }
-
-
-
-
-
-
-
 
 impl PartialOrd for GenRegex {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
