@@ -2,9 +2,9 @@
 //! Implementation of the Antimirov Derivative
 //!
 
-use crate::classes::{CharExpression, GenRegex, StringVar, Predicate, MaybeCharExpression, SubExpr, Subs, MergeResult};
-use crate::classes::Pair;
-use crate::classes::Subs::Sub;
+use crate::classes::{CharExpression, GenRegex, StringVar, Predicate, MaybeCharExpression, SubExpr, MergeResult, AnySub, SimpleSub};
+//use crate::classes::Pair;
+//use crate::classes::Subs::Sub;
 use disjoint_sets::UnionFind;
 use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
@@ -226,135 +226,162 @@ fn parse_string_vars(
 }
 
 
-fn union_over_set(union_set: HashSet<Rc<SubExpr>>, expr_to_id: HashMap<SubExpr, i32>, id_to_expr: HashMap<i32, SubExpr>, canonical_map: HashSet<Rc<SubExpr>, Rc<SubExpr>>){
-    let mut prev: std::option::Option<Rc<GenRegex>> = None;
+fn union_over_set(
+    union_find: &mut UnionFind<usize>, 
+    union_set: &HashSet<Rc<CharExpression>>, 
+    expr_to_id: &mut HashMap<Rc<CharExpression>, usize>, 
+    id_to_expr: &mut HashMap<usize, Rc<CharExpression>>, 
+    canonical_map: &mut HashMap<Rc<CharExpression>, Rc<CharExpression>>
+) -> bool {
+    let mut prev: std::option::Option<Rc<CharExpression>> = None;
+
     for element in union_set{
+        if matches!(element.as_ref(), CharExpression::Literal(_)){
+            canonical_map.insert(element.clone(), element.clone());
+        }
+
         if let Some(prev_exists) = prev {
             let mut prev_id = 0;
             let mut curr_id = 0;
-            if expr_to_id.contains_key(prev_exists){
-                prev_id = expr_to_id[prev_exists];
+            if expr_to_id.contains_key(&prev_exists){
+                prev_id = expr_to_id[&prev_exists];
             }else{
                 prev_id = expr_to_id.len();
-                expr_to_id[prev_exists] = prev_id;
-                id_to_expr[prev_id] = prev_exists;
+                expr_to_id.insert(prev_exists.clone(), prev_id);
+                id_to_expr.insert(prev_id, prev_exists.clone());
             }
-            if expr_to_id.contains_key(element){
-                curr_id = expr_to_id[element];
+            if expr_to_id.contains_key(element.as_ref()){
+                curr_id = expr_to_id[element.as_ref()];
             }else{
                 curr_id = expr_to_id.len();
-                expr_to_id[element] = curr_id;
-                id_to_expr[curr_id] = element;
+                expr_to_id.insert(element.clone(), curr_id);
+                //expr_to_id[element.as_ref()] = curr_id;
+                id_to_expr.insert(curr_id, element.clone());
             }// By this point in the code we should have the ID for the 2 elements we are unioning
+            if canonical_map.contains_key(&prev_exists) && canonical_map.contains_key(element.as_ref()){
+                if canonical_map[&prev_exists] != canonical_map[element.as_ref()]{
+                    return false;
+                }
+            }
+            union_find.union(prev_id, curr_id);
+            if canonical_map.contains_key(element.as_ref()){
+                canonical_map.insert(prev_exists, canonical_map[element.as_ref()].clone());
+            }else if canonical_map.contains_key(&prev_exists){
+                canonical_map.insert(element.clone(), canonical_map[&prev_exists].clone());
+            }
 
         } 
+        prev = Some(element.clone())
     }
+    return true;
 }
-fn index_sub_expr(subexpr: Rc<SubExpr>, index: i32) -> Rc<SubExpr>{
-    match subexpr.as_ref(){
-        SubExpr::EmptyString => subexpr,
-        SubExpr::StringVar(_) =>{
-            if index == 0{
-                return subexpr;
-            }
-            else{
-                return Rc::new(SubExpr::EmptyString);
-            }
-        },
-        SubExpr::Combined(left, right)=>{
-            if index == 0{
-                return Rc::new(SubExpr::Combined(left.clone(), Rc::new(SubExpr::EmptyString)));
-            }else{
-                return index_sub_expr(right.clone(), index-1);
+fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
+    /*let mut char_vars: HashSet<CharExpression> = HashSet::new();
+    for sub in substitutions.get_str_map().values(){
+        for sub_expr in sub{
+            for c_expr in sub_expr.get_head(){
+                char_vars.insert(c_expr);
             }
         }
+
     }
+    for c_exprs in substitutions.get_char_map(){
+        for c in c_exprs{
+            char_vars.insert(c_expr);
+        }
+    }
+    return char_vars.len();*/
+    let mut count: usize = 0;
+    for sub in substitutions.get_str_map().values(){
+        for sub_expr in sub{
+            count += sub_expr.get_head().len();
+        }
+
+    }
+    for c_exprs in substitutions.get_char_map().values(){
+        count += c_exprs.len();
+    }
+    return count;
 }
 
-fn merge(substitutions: Rc<Subs>) -> MergeResult {
-    let (mut str_eq_class, mut char_eq_class) = build_str_char_eq_class(Rc::clone(&substitutions)); //TODO: implement this function
+fn merge(substitutions: Rc<AnySub>) -> MergeResult {
+    let mut str_eq_class = substitutions.get_str_map();
+    let mut char_eq_class = substitutions.get_char_map();
+
+    //let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
+    let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
+    let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
+    let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
+    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions));
+
     for (var, mut eq_exprs) in str_eq_class{
         let mut ind = 0;
         while eq_exprs.len() != 0{
             let length_flag = false;
-            let mut union_set: HashSet<Rc<SubExpr>> = HashSet::new();
+            let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
             let mut i = 0;
             while i < eq_exprs.len(){
                 let curr_sub_expr = eq_exprs[i];
-                let temp = index_sub_expr(Rc::new(curr_sub_expr), ind);
-                if let SubExpr::EmptyString = temp.as_ref(){
+                let temp = curr_sub_expr[ind];
+                if let Some(c_expr) = temp.as_ref(){
+                    union_set.insert(temp);
+                    i+=1;
+                }else if curr_sub_expr.get_tail(){
+                    eq_exprs.remove(i);
+                }else{
                     for j in 0..eq_exprs.len() {
                         if i != j{
                             let r_prime_expr = eq_exprs[j];
-                            let temp_r_prime = index_sub_expr(Rc::new(curr_sub_expr), ind);
-                            if let SubExpr::EmptyString = temp_r_prime.as_ref() {
-                                continue;
-                            } else if let SubExpr::StringVar(_) = temp_r_prime.as_ref() {
-                                continue;
-                            } else {
+                            let temp_r_prime = r_prime_expr[ind];
+                            if let Some(c_expr_2) = temp_r_prime.as_ref(){
                                 return MergeResult::Bottom;
+                            }else{
+                                continue;
                             }
                         }
                     }
-                    eq_exprs = vec![curr_sub_expr];
+                    eq_exprs = &vec![curr_sub_expr];
                     length_flag = true;
                     break;
-                }else if let SubExpr::StringVar(_) = temp.as_ref(){
-                    eq_exprs.remove(i)
-                }else{
-                    union_set.insert(temp);
-                    i+=1;
                 }
                 ind += 1;
             }
             if length_flag{
                 break;
             }
-
-        }
-        //TODO: Union everything together here
-        //union_over_set(union_set)
-
-    }
-    let mut combined_expr: Option<Rc<Pair>> = None;
-
-    for (var, eq_exprs) in str_eq_class{
-        let new_pair = Rc::new(Pair::StringTo(var.clone(), Rc::new(eq_exprs[0])));
-        if let Some(existing) = &combined_expr {
-            combined_expr = Some(Rc::new(Pair::Combined(existing.clone(), new_pair)));
-        } else {
-            combined_expr = Some(new_pair);
+            if !union_over_set(&mut union_find, &union_set, &mut expr_to_id, &mut id_to_expr, &mut canonical_map){
+                return MergeResult::Bottom;
+            } //TODO: Union everything together here (add in union_find element)
         }
     }
-    let mut string_subs = if let Some(expr) = combined_expr {
-        Subs::Sub(expr)
-    } else {
-        Subs::EmptySub
-    };
-
     for(var, eq_exprs) in char_eq_class{
+        let mut u_set: HashSet<_> = eq_exprs.into_iter()
+        .map(|expr| Rc::new((*expr).clone())) // Dereference `expr` (&&CharExpression) and clone
+        .collect();
+        u_set.insert(Rc::new(CharExpression::CharVar(var.clone())));
+        if !union_over_set(&mut union_find, &u_set, &mut expr_to_id, &mut id_to_expr, &mut canonical_map){
+            return MergeResult::Bottom;
+        }
         //TODO: Union
     }
     for var in char_eq_class.keys(){
-        if var != union_find.find(var){
-            let new_pair = Rc::new(Pair::CharTo(var.clone(), Rc::new(union_find.find(var))));
-            if let Some(existing) = &combined_expr {
-                combined_expr = Some(Rc::new(Pair::Combined(existing.clone(), new_pair)));
-            } else {
-                combined_expr = Some(new_pair);
-            }
-    
+        let id_var = expr_to_id[&Rc::new(CharExpression::CharVar(var.clone()))];
+        let found_expr = *id_to_expr[&union_find.find(id_var)];
+        if CharExpression::CharVar(var.clone()) != found_expr{
+            combined_expr.set_char_var(var.clone(), found_expr);
         }
     }
-    let char_subs = if let Some(expr) = combined_expr {
-        Subs::Sub(expr)
-    } else {
-        Subs::EmptySub
-    };
-    
-    string_subs = sub_in(string_subs, char_subs); //TODO: implement sub_in
 
-    if let Sub(string_pair) = string_subs{
+    let string_subs = sub_in(string_subs, char_subs); //TODO: implement sub_in
+                                                      //
+    let mut combined_expr: SimpleSub;
+    for (var, eq_exprs) in str_eq_class{
+        combined_expr.set_string_var(var.clone(), eq_exprs[0]);
+    }
+    return MergeResult::SimpleSub(combined_expr);
+    
+
+    /*if let Sub(string_pair) = string_subs{
         if let Sub(char_pair) = char_subs{
             return MergeResult::Subs(Subs::Sub(Rc::new(Pair::Combined(Rc::clone(&string_pair), Rc::clone(&char_pair)))));
         }else{
@@ -362,7 +389,7 @@ fn merge(substitutions: Rc<Subs>) -> MergeResult {
         }
     }else{
         return MergeResult::Subs(char_subs);
-    }
+    }*/
     
 
 

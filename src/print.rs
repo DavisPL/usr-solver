@@ -2,9 +2,15 @@
 //! Display implementations for pretty printing
 //!
 
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar, MaybeCharExpression};
+use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar, MaybeCharExpression, CharVar};
 use std::fmt::{self, Display};
 
+
+impl Display for CharVar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "char({})", self.name)
+    }
+}
 
 impl Display for CharExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

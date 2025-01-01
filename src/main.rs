@@ -22,7 +22,7 @@ fn main() {
         name: String::from("w0"),
     });
     let char_var = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::CharVar(
-        String::from("c1"),
+        classes::CharVar { name: String::from("c1") }
     ))));
 
     //let char_expr = CharExpression::StringIndex(string_var, 0);

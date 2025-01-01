@@ -22,11 +22,11 @@ pub enum GenRegex {
 }
 
 pub enum MergeResult {
-    Subs(Subs),
+    SimpleSub(SimpleSub),
     Bottom
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+/*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Subs {
     EmptySub,
     Sub(Rc<Pair>)
@@ -37,45 +37,96 @@ pub enum Pair {
     Combined(Rc<Pair>, Rc<Pair>),
     StringTo(Rc<StringVar>, Rc<SubExpr>),
     CharTo(Rc<CharExpression>, Rc<CharExpression>)
-}
+}*/
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+/*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum SubExpr {
     Combined(Rc<CharExpression>, Rc<SubExpr>),
     EmptyString,
     StringVar(Rc<StringVar>),
-}
+}*/
 
 /*
     TODO fix: use the following for SubExpr and Subs
 */
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SubExpr2 {
+#[derive(Debug, PartialEq, Eq, Clone, Hash)] 
+pub struct SubExpr { 
     head: Vec<CharExpression>,
     tail_is_string_var: bool
 }
 
+impl Index<usize> for SubExpr {
+    type Output = Option<&CharExpression>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index < self.head.len(){
+            return Some(&self.head[index]);
+        }else  {
+            return &None
+        }
+        //unimplemented!()
+    }
+}
+
+impl Index<&StringVar> for SimpleSub {
+    type Output = SubExpr;
+
+    fn index(&self, index: &StringVar) -> &Self::Output {
+        unimplemented!()
+    }
+}
 // impl Into<GenRegex> for SubExpr2 {
 
 // }
 
-impl SubExpr2 {
+impl SubExpr {
     fn to_gen_regex(&self, tail_var: &StringVar) -> GenRegex {
         unimplemented!()
+    }
+    pub fn get_head(&self) -> &Vec<CharExpression>{
+        &self.head
+    }
+    pub fn get_tail(&self) -> bool{
+        self.tail_is_string_var
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AnySub {
-    string_to: HashMap<StringVar, Vec<SubExpr2>>
+    string_to: HashMap<StringVar, Vec<SubExpr>>,
     char_to: HashMap<CharVar, Vec<CharExpression>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SimpleSub {
-    string_to: HashMap<StringVar, SubExpr2>,
+    string_to: HashMap<StringVar, SubExpr>,
     char_to: HashMap<CharVar, CharExpression>,
+}
+
+impl AnySub{
+    pub fn get_str_map(&self) -> &HashMap<StringVar, Vec<SubExpr>> {
+        &self.string_to
+    }
+    pub fn get_char_map(&self) -> &HashMap<CharVar, Vec<CharExpression>> {
+        &self.char_to
+    }
+
+}
+impl SimpleSub {
+    pub fn get_string_var(&self, key: &StringVar) -> Option<&SubExpr> {
+        self.string_to.get(key)
+    }
+
+    pub fn get_char_var(&self, key: &CharVar) -> Option<&CharExpression> {
+        self.char_to.get(key)
+    }
+    pub fn set_string_var(&mut self, key: StringVar, value: SubExpr) {
+        self.string_to.insert(key, value);
+    }
+
+    pub fn set_char_var(&mut self, key: CharVar, value: CharExpression) {
+        self.char_to.insert(key, value);
+    }
 }
 
 impl SimpleSub {
@@ -94,13 +145,6 @@ use std::ops::IndexMut;
 // m[5] -- define what it means to get the 5th element of MyList
 
 // https://doc.rust-lang.org/std/ops/trait.Index.html
-impl Index<&StringVar> for SimpleSub {
-    type Output = SubExpr2;
-
-    fn index(&self, index: &StringVar) -> &Self::Output {
-        unimplemented!()
-    }
-}
 
 impl IndexMut<&StringVar> for SimpleSub {
     fn index_mut(&mut self, index: &StringVar) -> &mut Self::Output {
@@ -108,13 +152,6 @@ impl IndexMut<&StringVar> for SimpleSub {
     }
 }
 
-impl Index<usize> for SubExpr2 {
-    type Output = Option<CharExpression>;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        unimplemented!()
-    }
-}
 
 // f: SimpleSub
 // w: String var (w1, w2, w3)
@@ -152,7 +189,7 @@ pub enum MaybeCharExpression {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum CharExpression {
-    CharVar(String), // change to CharVar
+    CharVar(CharVar), // change to CharVar
     Literal(String),
 }
 
@@ -194,7 +231,7 @@ pub struct StringIndex {
     pub index: i32,
 }
 
-impl PartialOrd for GenRegex {
+/*impl PartialOrd for GenRegex {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -276,4 +313,4 @@ impl Ord for GenRegex {
             (GenRegex::StringIndex(a), GenRegex::StringIndex(b)) => a.cmp(b),
         }
     }
-}
+}*/
