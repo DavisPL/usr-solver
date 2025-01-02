@@ -51,7 +51,7 @@ pub enum SubExpr {
 /*
     TODO fix: use the following for SubExpr and Subs
 */
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash )]
 pub struct SubExpr { 
     head: Vec<CharExpression>,
     tail_is_string_var: bool
@@ -72,19 +72,17 @@ impl AntimirovDerivativeElement{
     }
 }
 
-
-
-
 impl Index<usize> for SubExpr {
-    type Output = Option<&CharExpression>;
+    type Output = CharExpression;
 
     fn index(&self, index: usize) -> &Self::Output {
-        if index < self.head.len(){
-            return Some(&self.head[index]);
-        }else  {
-            return &None
-        }
-        //unimplemented!()
+        return &self.head[index];
+        /*if index < self.head.len() {
+            &Some(self.head[index])
+        } else {
+            // Return a reference to None when the index is out of bounds.
+            &None
+        }*/
     }
 }
 
@@ -106,8 +104,15 @@ impl SubExpr {
     pub fn get_head(&self) -> &Vec<CharExpression>{
         &self.head
     }
+    pub fn get_mut_head(&mut self) -> &mut Vec<CharExpression> {
+        &mut self.head
+    }
     pub fn get_tail(&self) -> bool{
         self.tail_is_string_var
+    }
+    
+    pub fn head_length(&self) -> usize{
+        self.head.len()
     }
 }
 
@@ -118,7 +123,7 @@ pub struct AnySub {
 }
 
 //#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone )]
 pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
