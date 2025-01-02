@@ -558,7 +558,7 @@ fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<GenRegex, &Rc<GenRegex>>) -> 
     }
 }
 
-pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: BTreeSet<GenRegex>) -> bool{
+pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: HashSet<GenRegex>) -> bool{
     if visited.contains(expr){
         return false;
     }else{
@@ -566,14 +566,14 @@ pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: BTreeSet<Ge
     }
     if nullable(expr).is_empty(){
         let new_name = "f".to_owned() + &index.to_string();
-        let c_var = Rc::new(CharExpression::CharVar(new_name));
+        let c_var = Rc::new(CharExpression::CharVar(CharVar{new_name}));
         let deriv = derivative(expr, &c_var);
         if deriv.is_empty(){
             return false
         }
         index += 1;
         for elem in deriv{
-            if satisfiable(&elem.0, index, visited.clone()){
+            if satisfiable(&elem.get_expr(), index, visited.clone()){
                 return true;
             }
         }
