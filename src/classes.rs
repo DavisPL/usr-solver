@@ -5,6 +5,7 @@
 
 use std::cmp::Ordering;
 use std::rc::Rc;
+use std::collections::BTreeMap;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
@@ -21,6 +22,7 @@ pub enum GenRegex {
     StringIndex(Rc<StringIndex>),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MergeResult {
     SimpleSub(SimpleSub),
     Bottom
@@ -49,11 +51,20 @@ pub enum SubExpr {
 /*
     TODO fix: use the following for SubExpr and Subs
 */
-#[derive(Debug, PartialEq, Eq, Clone, Hash)] 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct SubExpr { 
     head: Vec<CharExpression>,
     tail_is_string_var: bool
 }
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub struct AntimirovDerivativeElement{
+    deriv_expression: Rc<GenRegex>,
+    subs: MergeResult
+}
+
+
+
 
 impl Index<usize> for SubExpr {
     type Output = Option<&CharExpression>;
@@ -91,23 +102,25 @@ impl SubExpr {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub struct AnySub {
-    string_to: HashMap<StringVar, Vec<SubExpr>>,
-    char_to: HashMap<CharVar, Vec<CharExpression>>,
+    string_to: BTreeMap<StringVar, Vec<SubExpr>>,
+    char_to: BTreeMap<CharVar, Vec<CharExpression>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+//#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct SimpleSub {
-    string_to: HashMap<StringVar, SubExpr>,
-    char_to: HashMap<CharVar, CharExpression>,
+    string_to: BTreeMap<StringVar, SubExpr>,
+    char_to: BTreeMap<CharVar, CharExpression>,
 }
+
 
 impl AnySub{
-    pub fn get_str_map(&self) -> &HashMap<StringVar, Vec<SubExpr>> {
+    pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {
         &self.string_to
     }
-    pub fn get_char_map(&self) -> &HashMap<CharVar, Vec<CharExpression>> {
+    pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
         &self.char_to
     }
 
@@ -126,6 +139,12 @@ impl SimpleSub {
 
     pub fn set_char_var(&mut self, key: CharVar, value: CharExpression) {
         self.char_to.insert(key, value);
+    }
+    pub fn new() -> Self {
+        SimpleSub {
+            string_to: BTreeMap::new(), // Empty HashMap
+            char_to: BTreeMap::new(),   // Empty HashMap
+        }
     }
 }
 
