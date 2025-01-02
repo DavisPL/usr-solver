@@ -57,10 +57,19 @@ pub struct SubExpr {
     tail_is_string_var: bool
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct AntimirovDerivativeElement{
     deriv_expression: Rc<GenRegex>,
     subs: MergeResult
+}
+
+impl AntimirovDerivativeElement{
+    pub fn get_expr(&self) -> &Rc<GenRegex> {
+        &self.deriv_expression
+    }
+    pub fn get_subs(&self) -> &MergeResult {
+        &self.subs
+    }
 }
 
 
