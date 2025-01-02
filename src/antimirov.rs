@@ -529,20 +529,43 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
     }
 }
 
-fn sub_in(expr: &Rc<GenRegex>, substitution: &GenRegexPairSet) -> Rc<GenRegex> {
-    if substitution.is_empty() {
-        return Rc::clone(expr); // Return a clone of the Rc, as Rc handles reference counting
+fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
+    if substitution.get_str_map().is_empty() && substitution.get_char_map().is_empty() {
+        return expr.clone(); // Returns a clone of expr.
     }
-
-    // Create a HashMap for substitutions
-    let mut subs: HashMap<GenRegex, &Rc<GenRegex>> = HashMap::new();
-
-    // Populate the HashMap with substitutions
-    for sub in substitution.iter() {
-        let key = &sub.0; // Assuming this converts GenRegex to String
-        subs.insert(key.as_ref().clone(), &sub.1); // Insert the key-value pair into the HashMap
+    match expr.as_ref(){
+        GenRegex::EmptySet => Rc::clone(expr),
+        GenRegex::CharExpression(char_expr)=>{
+            match char_expr.as_ref() {
+                CharExpression::CharVar(char_var) => {
+                    match substitution.get_char_var(char_var){
+                        Some(value) => Rc::new(GenRegex::CharExpression(Rc::new(value.clone()))),
+                        None => expr.clone(),
+                    }
+                },
+                CharExpression::Literal(_) => expr.clone(),
+            }
+        },
+        GenRegex::StringVar(string_var) => todo!(),
+        GenRegex::StringIndex(string_index) => todo!(),
+        GenRegex::StringSlice(string_var, _) => todo!(),
+        GenRegex::Union(gen_regex1, gen_regex2) => {
+            Rc::new(GenRegex::Union(sub_in(gen_regex1,substitution), sub_in(gen_regex2,substitution)))
+        },
+        GenRegex::Intersect(gen_regex1, gen_regex2) => {
+            Rc::new(GenRegex::Intersect(sub_in(gen_regex1,substitution), sub_in(gen_regex2,substitution)))
+        },
+        GenRegex::Concatenation(gen_regex1, gen_regex2) => {
+            Rc::new(GenRegex::Concatenation(sub_in(gen_regex1,substitution), sub_in(gen_regex2,substitution)))
+        },
+        GenRegex::Kleene(gen_regex) => {
+            Rc::new(GenRegex::Kleene(sub_in(gen_regex,substitution)))
+        },
+        GenRegex::Complement(gen_regex) => {
+            Rc::new(GenRegex::Complement(sub_in(gen_regex,substitution)))
+        },
+        GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => todo!(),
     }
-    sub_in_helper(expr, subs)
 }
 
 fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<GenRegex, &Rc<GenRegex>>) -> Rc<GenRegex> {
