@@ -57,10 +57,19 @@ pub struct SubExpr {
     tail_is_string_var: bool
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct AntimirovDerivativeElement{
     deriv_expression: Rc<GenRegex>,
     subs: MergeResult
+}
+
+impl AntimirovDerivativeElement{
+    pub fn get_expr(&self) -> &Rc<GenRegex> {
+        &self.deriv_expression
+    }
+    pub fn get_subs(&self) -> &MergeResult {
+        &self.subs
+    }
 }
 
 
@@ -109,7 +118,7 @@ pub struct AnySub {
 }
 
 //#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
@@ -150,6 +159,41 @@ impl SimpleSub {
         SimpleSub {
             string_to: BTreeMap::new(), // Empty HashMap
             char_to: BTreeMap::new(),   // Empty HashMap
+        }
+    }
+    pub fn union(self, other: SimpleSub) -> AnySub {
+        let mut combined_string_to: BTreeMap<StringVar, Vec<SubExpr>> = BTreeMap::new();
+        let mut combined_char_to: BTreeMap<CharVar, Vec<CharExpression>> = BTreeMap::new();
+
+        for (key, value) in self.string_to {
+            combined_string_to
+                .entry(key)
+                .or_insert_with(Vec::new)
+                .push(value);
+        }
+        for (key, value) in other.string_to {
+            combined_string_to
+                .entry(key)
+                .or_insert_with(Vec::new)
+                .push(value);
+        }
+
+        for (key, value) in self.char_to {
+            combined_char_to
+                .entry(key)
+                .or_insert_with(Vec::new)
+                .push(value);
+        }
+        for (key, value) in other.char_to {
+            combined_char_to
+                .entry(key)
+                .or_insert_with(Vec::new)
+                .push(value);
+        }
+
+        AnySub {
+            string_to: combined_string_to,
+            char_to: combined_char_to,
         }
     }
 }
