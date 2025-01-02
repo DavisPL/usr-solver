@@ -100,8 +100,31 @@ impl Index<&StringVar> for SimpleSub {
 // }
 
 impl SubExpr {
-    fn to_gen_regex(&self, tail_var: &StringVar) -> GenRegex {
-        unimplemented!()
+    fn to_gen_regex(&self, tail_var: &StringVar) -> Rc<GenRegex> {
+        let head=Self::to_gen_regex_helper(self.get_head());
+        if self.get_tail(){
+            Rc::new(GenRegex::Concatenation(head, Rc::new(GenRegex::StringVar(Rc::new(tail_var.clone())))))
+        }
+        else{
+            head
+        }
+    }
+    fn to_gen_regex_helper(head: &Vec<CharExpression>)-> Rc<GenRegex>{
+        let split=head.split_first();
+        match split {
+            Some((first, rest)) => {
+                let retVal=Rc::new(GenRegex::CharExpression(Rc::new(first.clone())));
+                if rest.to_vec().len()==1{
+                    return retVal;
+                }
+                else{
+                    return Rc::new(GenRegex::Concatenation(retVal,Self::to_gen_regex_helper(&rest.to_vec())));
+                }
+            },
+            None => {
+                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(String::from("")))))
+            },
+        }
     }
     pub fn get_head(&self) -> &Vec<CharExpression>{
         &self.head
