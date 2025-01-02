@@ -140,6 +140,12 @@ impl AnySub{
 
 }
 impl SimpleSub {
+    pub fn get_str_map(&self) -> &BTreeMap<StringVar, SubExpr> {
+        &self.string_to
+    }
+    pub fn get_char_map(&self) -> &BTreeMap<CharVar, CharExpression> {
+        &self.char_to
+    }
     pub fn get_string_var(&self, key: &StringVar) -> Option<&SubExpr> {
         self.string_to.get(key)
     }
