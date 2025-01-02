@@ -480,7 +480,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
                         let curr = AntimirovDerivativeElement{
                             deriv_expression: Rc::new(GenRegex::Concatenation(
                                 *sub.get_expr(),
-                                Rc::new(sub_in(gre.as_ref(), s_sub)),
+                                sub_in(gre, s_sub),
                             )),
                             subs: MergeResult::SimpleSub(*s_sub)
                         };
@@ -493,25 +493,14 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
 
             term1
         }
-        GenRegex::Complement(_) =>{
+        _ =>{
             unimplemented!();
             
-        }
-        GenRegex::StringIndex(_) =>{
-            unimplemented!();
-            
-        }
-        GenRegex::StringSlice(_, _) =>{
-            unimplemented!();
-            
-        }
-        GenRegex::IfThenElse(pred, p, q) => {
-            unimplemented!();
         }
     }
 }
 
-fn sub_in(expr: &GenRegex, substitution: &SimpleSub) -> GenRegex {
+fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     if substitution.is_empty() {
         return Rc::clone(expr); // Return a clone of the Rc, as Rc handles reference counting
     }
@@ -636,7 +625,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::StringVar(s_var) => {
             let mut subs = HashSet::new();
             let mut string_to = BTreeMap::new();
-            string_to.insert(s_var, empty_subexpr());
+            string_to.insert(s_var.as_ref().clone(), empty_subexpr());
             let string_sub = SimpleSub{
                 string_to,
                 char_to: BTreeMap::new()
@@ -653,13 +642,16 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::Intersect(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
             let right_null = nullable(&Rc::clone(side2));
-            let mut retSet = BTreeSet::new();
+            let mut retSet = HashSet::new();
             for left_elem in &left_null {
                 for right_elem in &right_null {
-                    let unionLR: BTreeSet<_> = left_elem.union(right_elem).cloned().collect();
-                    let ret = merge(unionLR.clone());
-                    if !ret.is_empty() {
-                        retSet.insert(ret);
+                    let unionLR: AnySub = left_elem.union(*right_elem);
+                    let ret = merge(Rc::new(unionLR));
+                    match ret {
+                        MergeResult::SimpleSub(simple_sub)=>{
+                            retSet.insert(simple_sub);
+                        },
+                        _=>{}
                     }
                 }
             }
@@ -668,13 +660,16 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::Concatenation(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
             let right_null = nullable(&Rc::clone(side2));
-            let mut retSet = BTreeSet::new();
+            let mut retSet = HashSet::new();
             for left_elem in &left_null {
                 for right_elem in &right_null {
-                    let unionLR: BTreeSet<_> = left_elem.union(right_elem).cloned().collect();
-                    let ret = merge(unionLR.clone());
-                    if !ret.is_empty() {
-                        retSet.insert(ret);
+                    let unionLR: AnySub = left_elem.union(*right_elem);
+                    let ret = merge(Rc::new(unionLR));
+                    match ret {
+                        MergeResult::SimpleSub(simple_sub)=>{
+                            retSet.insert(simple_sub);
+                        },
+                        _=>{}
                     }
                 }
             }
