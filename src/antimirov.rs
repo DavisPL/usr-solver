@@ -283,6 +283,9 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
     
 }
 
+fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>)->MergeResult{
+    todo!()
+}
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSet<AntimirovDerivativeElement> {
     let empty_string = || {
         Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
@@ -517,7 +520,14 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
                 CharExpression::Literal(_) => expr.clone(),
             }
         },
-        GenRegex::StringVar(string_var) => todo!(),
+        GenRegex::StringVar(string_var) => {
+            match substitution.get_string_var(string_var){
+                Some(value) => {
+                    value.to_gen_regex(string_var)
+                },
+                None => expr.clone(),
+            }
+        },
         GenRegex::StringIndex(string_index) => todo!(),
         GenRegex::StringSlice(string_var, _) => todo!(),
         GenRegex::Union(gen_regex1, gen_regex2) => {
@@ -536,48 +546,6 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
             Rc::new(GenRegex::Complement(sub_in(gen_regex,substitution)))
         },
         GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => todo!(),
-    }
-}
-
-fn sub_in_helper(expr: &Rc<GenRegex>, sub: HashMap<GenRegex, &Rc<GenRegex>>) -> Rc<GenRegex> {
-    match expr.as_ref() {
-        GenRegex::StringVar(_) => {
-            let key = expr;
-            match sub.get(key) {
-                Some(value) => Rc::clone(value),
-                None => Rc::clone(expr),
-            }
-        }
-        GenRegex::CharExpression(c_expr) => match c_expr.as_ref() {
-            CharExpression::CharVar(_) => {
-                let key = expr;
-                match sub.get(key) {
-                    Some(value) => Rc::clone(value),
-                    None => Rc::clone(expr),
-                }
-            }
-            CharExpression::Literal(_) => Rc::clone(expr),
-        },
-        GenRegex::Intersect(left, right) => {
-            let leftSub = sub_in_helper(left, sub.clone());
-            let rightSub = sub_in_helper(right, sub);
-            Rc::new(GenRegex::Intersect(leftSub, rightSub))
-        }
-        GenRegex::Concatenation(left, right) => {
-            let leftSub = sub_in_helper(left, sub.clone());
-            let rightSub = sub_in_helper(right, sub);
-            Rc::new(GenRegex::Concatenation(leftSub, rightSub))
-        }
-        GenRegex::Union(left, right) => {
-            let leftSub = sub_in_helper(left, sub.clone());
-            let rightSub = sub_in_helper(right, sub);
-            Rc::new(GenRegex::Union(leftSub, rightSub))
-        }
-        GenRegex::Kleene(inner) => {
-            let innerSub = sub_in_helper(inner, sub);
-            Rc::new(GenRegex::Kleene(innerSub))
-        }
-        _ => Rc::clone(expr),
     }
 }
 

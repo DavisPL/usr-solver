@@ -100,7 +100,7 @@ impl Index<&StringVar> for SimpleSub {
 // }
 
 impl SubExpr {
-    fn to_gen_regex(&self, tail_var: &StringVar) -> Rc<GenRegex> {
+    pub fn to_gen_regex(&self, tail_var: &StringVar) -> Rc<GenRegex> {
         let head=Self::to_gen_regex_helper(self.get_head());
         if self.get_tail(){
             Rc::new(GenRegex::Concatenation(head, Rc::new(GenRegex::StringVar(Rc::new(tail_var.clone())))))
