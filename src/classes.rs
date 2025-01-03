@@ -3,9 +3,10 @@
 //! Main GenRegex class and subclasses
 //!
 
-use std::cmp::Ordering;
 use std::rc::Rc;
 use std::collections::BTreeMap;
+use std::ops::Index;
+use std::ops::IndexMut;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
@@ -70,13 +71,19 @@ impl AntimirovDerivativeElement{
     pub fn get_subs(&self) -> &MergeResult {
         &self.subs
     }
+    pub fn new(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> Self {
+        AntimirovDerivativeElement {
+            deriv_expression,
+            subs,
+        }
+    }
 }
 
 impl Index<usize> for SubExpr {
     type Output = CharExpression;
 
     fn index(&self, index: usize) -> &Self::Output {
-        return &self.head[index];
+        &self.head[index]
         /*if index < self.head.len() {
             &Some(self.head[index])
         } else {
@@ -114,6 +121,24 @@ impl SubExpr {
     pub fn head_length(&self) -> usize{
         self.head.len()
     }
+    pub fn set_head(&mut self, new_head: Vec<CharExpression>) {
+        self.head = new_head;
+    }
+    pub fn empty() -> Self {
+        SubExpr {
+            head: Vec::new(),
+            tail_is_string_var: false
+        }
+    }
+    pub fn new(head: Vec<CharExpression>, tail_is_string_var: bool) -> Self {
+        SubExpr {
+            head,
+            tail_is_string_var,
+        }
+    }
+    
+
+    
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -160,7 +185,7 @@ impl SimpleSub {
     pub fn set_char_var(&mut self, key: CharVar, value: CharExpression) {
         self.char_to.insert(key, value);
     }
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         SimpleSub {
             string_to: BTreeMap::new(), // Empty HashMap
             char_to: BTreeMap::new(),   // Empty HashMap
@@ -201,6 +226,12 @@ impl SimpleSub {
             char_to: combined_char_to,
         }
     }
+    pub fn new(string_to: BTreeMap<StringVar, SubExpr>, char_to: BTreeMap<CharVar, CharExpression>) -> Self {
+        SimpleSub {
+            string_to,
+            char_to,
+        }
+    }
 }
 
 impl SimpleSub {
@@ -209,9 +240,6 @@ impl SimpleSub {
     }
 }
 
-use std::collections::HashMap;
-use std::ops::Index;
-use std::ops::IndexMut;
 
 // l[3] -- 3rd elem of list
 // class MyList
