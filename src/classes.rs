@@ -3,9 +3,10 @@
 //! Main GenRegex class and subclasses
 //!
 
-use std::cmp::Ordering;
 use std::rc::Rc;
 use std::collections::BTreeMap;
+use std::ops::Index;
+use std::ops::IndexMut;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
@@ -51,7 +52,7 @@ pub enum SubExpr {
 /*
     TODO fix: use the following for SubExpr and Subs
 */
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash )]
 pub struct SubExpr { 
     head: Vec<CharExpression>,
     tail_is_string_var: bool
@@ -70,21 +71,25 @@ impl AntimirovDerivativeElement{
     pub fn get_subs(&self) -> &MergeResult {
         &self.subs
     }
+    pub fn new(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> Self {
+        AntimirovDerivativeElement {
+            deriv_expression,
+            subs,
+        }
+    }
 }
 
-
-
-
 impl Index<usize> for SubExpr {
-    type Output = Option<&CharExpression>;
+    type Output = CharExpression;
 
     fn index(&self, index: usize) -> &Self::Output {
-        if index < self.head.len(){
-            return Some(&self.head[index]);
-        }else  {
-            return &None
-        }
-        //unimplemented!()
+        &self.head[index]
+        /*if index < self.head.len() {
+            &Some(self.head[index])
+        } else {
+            // Return a reference to None when the index is out of bounds.
+            &None
+        }*/
     }
 }
 
@@ -129,9 +134,34 @@ impl SubExpr {
     pub fn get_head(&self) -> &Vec<CharExpression>{
         &self.head
     }
+    pub fn get_mut_head(&mut self) -> &mut Vec<CharExpression> {
+        &mut self.head
+    }
     pub fn get_tail(&self) -> bool{
         self.tail_is_string_var
     }
+    
+    pub fn head_length(&self) -> usize{
+        self.head.len()
+    }
+    pub fn set_head(&mut self, new_head: Vec<CharExpression>) {
+        self.head = new_head;
+    }
+    pub fn empty() -> Self {
+        SubExpr {
+            head: Vec::new(),
+            tail_is_string_var: false
+        }
+    }
+    pub fn new(head: Vec<CharExpression>, tail_is_string_var: bool) -> Self {
+        SubExpr {
+            head,
+            tail_is_string_var,
+        }
+    }
+    
+
+    
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -141,7 +171,7 @@ pub struct AnySub {
 }
 
 //#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone )]
 pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
@@ -178,7 +208,7 @@ impl SimpleSub {
     pub fn set_char_var(&mut self, key: CharVar, value: CharExpression) {
         self.char_to.insert(key, value);
     }
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         SimpleSub {
             string_to: BTreeMap::new(), // Empty HashMap
             char_to: BTreeMap::new(),   // Empty HashMap
@@ -219,6 +249,12 @@ impl SimpleSub {
             char_to: combined_char_to,
         }
     }
+    pub fn new(string_to: BTreeMap<StringVar, SubExpr>, char_to: BTreeMap<CharVar, CharExpression>) -> Self {
+        SimpleSub {
+            string_to,
+            char_to,
+        }
+    }
 }
 
 impl SimpleSub {
@@ -227,9 +263,6 @@ impl SimpleSub {
     }
 }
 
-use std::collections::HashMap;
-use std::ops::Index;
-use std::ops::IndexMut;
 
 // l[3] -- 3rd elem of list
 // class MyList

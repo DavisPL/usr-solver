@@ -2,9 +2,51 @@
 //! Display implementations for pretty printing
 //!
 
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar, MaybeCharExpression, CharVar};
+use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar, MaybeCharExpression, CharVar, AntimirovDerivativeElement, SimpleSub, SubExpr, MergeResult};
 use std::fmt::{self, Display};
 
+impl Display for SubExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for val in self.get_head() {
+            write!(f, "{}", val)?; 
+        }
+        write!(f, "{}", self.get_tail())
+
+    }
+}
+impl fmt::Display for MergeResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MergeResult::Bottom => write!(f, "\\bot"),  
+            MergeResult::SimpleSub(s) => write!(f, "{}", s),  
+        }
+    }
+}
+
+impl Display for SimpleSub {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "string_to: {{ ")?;
+        for (key, value) in self.get_str_map() {
+            write!(f, "{} => {}, ", key, value)?; 
+        }
+        write!(f, "}}\n")?;
+
+        write!(f, "char_to: {{ ")?;
+        for (key, value) in self.get_char_map() {
+            write!(f, "{} => {}, ", key, value)?; 
+        }
+        write!(f, "}}")?;
+        
+        Ok(())
+    }
+}
+
+
+impl Display for AntimirovDerivativeElement{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>)-> fmt::Result{
+        write!(f, "({}, {})", self.get_expr(), self.get_subs())
+    }
+}
 
 impl Display for CharVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
