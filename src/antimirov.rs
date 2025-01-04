@@ -372,13 +372,41 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
             side1_deriv.union(&side2_deriv).cloned().collect()
         }
         GenRegex::Intersect(left, right) => {
-            /*let p_deriv = derivative(left, deriv_char);
+            let p_deriv = derivative(left, deriv_char);
             let q_deriv = derivative(right, deriv_char);
-            let mut term1 = HashSet::new();
+            let mut retSet = HashSet::new();
 
             for p_sub in p_deriv {
                 for q_sub in &q_deriv {
-                    let merged = merge(p_sub.1.union(&q_sub.1).cloned().collect::<BTreeSet<_>>());
+                    match (p_sub.get_subs(), q_sub.get_subs()){
+                        (MergeResult::SimpleSub(left_elem), MergeResult::SimpleSub(right_elem))=>{
+                            let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
+                            let ret = merge(Rc::new(unionLR));
+                            match ret {
+                                MergeResult::SimpleSub(_)=>{
+                                    let left_minus_right = sub_difference(Rc::new(left_elem.clone()), Rc::new(right_elem.clone()));
+                                    let right_minus_left = sub_difference(Rc::new(right_elem.clone()), Rc::new(left_elem.clone()));
+                                    match (left_minus_right, right_minus_left) {
+                                        (MergeResult::SimpleSub(l_minus_r), MergeResult::SimpleSub(r_minus_l))=>{
+                                            let p_prime_sub = sub_in(p_sub.get_expr(), &l_minus_r);
+                                            let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
+                                            let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
+                                            let term = AntimirovDerivativeElement::new(
+                                                final_expr,
+                                                ret
+                                            );
+                                            retSet.insert(term);
+                                        }
+                                        _ =>{}
+                                    }
+                                },
+                                _=>{}
+                            }
+                        }
+                        _ =>{}
+                    }
+
+                    /*let merged = merge(p_sub.1.union(&q_sub.1).cloned().collect::<BTreeSet<_>>());
                     if merged.is_empty() {
                         continue;
                     }
@@ -401,77 +429,92 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
 
                     //if curr.1.len() == 0 {
                     //   continue;
-                    //}
+                    //}*/
                 }
             }
 
-            term1*/
-            unimplemented!();
+            retSet 
+                //unimplemented!();
         }
         GenRegex::Concatenation(left, right) => {
-            /*let left_deriv = derivative(left, deriv_char);
-            //let right_deriv = derivative(right, deriv_char);
+            let left_deriv = derivative(left, deriv_char);
+            let right_deriv = derivative(right, deriv_char);
 
-            // Create term1 set
-            let mut term1 = HashSet::new();
-            if !left_deriv.is_empty() {
-                for sub in left_deriv {
-                    if let GenRegex::CharExpression(c_expr) = sub.0.as_ref() {
-                        if let CharExpression::Literal(lit) = c_expr.as_ref() {
-                            //                    if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
-                            if lit.is_empty() {
-                                let curr = (sub_in(right, &sub.1.clone()), sub.1.clone());
-                                term1.insert(curr);
-                            } else {
-                                let curr = (
-                                    Rc::new(GenRegex::Concatenation(
-                                        sub.0.clone(),
-                                        sub_in(right, &sub.1.clone()),
-                                    )),
-                                    sub.1.clone(),
-                                );
-                                term1.insert(curr);
+            let mut retSet = HashSet::new();
+            for sub in left_deriv {
+                match sub.get_subs(){
+                    MergeResult::SimpleSub(simple_sub)=>{
+                        if let GenRegex::CharExpression(c_expr) = sub.get_expr().as_ref() {
+                            if let CharExpression::Literal(lit) = c_expr.as_ref() {
+                                //                    if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
+                                if lit.is_empty() {
+                                    let curr = AntimirovDerivativeElement::new(
+                                        sub_in(right, &simple_sub), sub.get_subs().clone()
+                                    );
+                                    retSet.insert(curr);
+                                } else {
+                                    let curr = AntimirovDerivativeElement::new(
+                                        Rc::new(GenRegex::Concatenation(
+                                            sub.get_expr().clone(),
+                                            sub_in(right, &simple_sub),
+                                        )),
+                                        sub.get_subs().clone(),
+                                    );
+                                    retSet.insert(curr);
+                                }
                             }
+                        } else {
+                            let curr = AntimirovDerivativeElement::new(
+                                Rc::new(GenRegex::Concatenation(
+                                    sub.get_expr().clone(),
+                                    sub_in(right, simple_sub),
+                                )),
+                                sub.get_subs().clone(),
+                            );
+                            retSet.insert(curr);
                         }
-                    } else {
-                        let curr = (
-                            Rc::new(GenRegex::Concatenation(
-                                sub.0.clone(),
-                                sub_in(right, &sub.1.clone()),
-                            )),
-                            sub.1.clone(),
-                        );
-                        term1.insert(curr);
+
                     }
+                    _=>{}
                 }
             }
 
             let p_nullable = nullable(left);
-            if !p_nullable.is_empty() {
-                for sub in p_nullable {
-                    let temp = sub_in(right, &sub);
-                    let deriv = derivative(&temp, deriv_char);
-                    let mut derivatives = HashSet::new();
-                    if deriv.is_empty() {
-                        continue;
-                    }
-                    for elem in deriv {
-                        let elem_term = elem.0;
-                        let elem_subs = elem.1;
-                        let elem_subs_final =
-                            merge(elem_subs.union(&sub).cloned().collect::<BTreeSet<_>>());
-
-                        if elem_subs_final.is_empty() {
-                            continue;
+            for n_sub in p_nullable {
+                for q_sub in &right_deriv {
+                    match (q_sub.get_subs()){
+                        (MergeResult::SimpleSub(right_elem))=>{
+                            let unionLR: AnySub = n_sub.clone().union(right_elem.clone());
+                            let ret = merge(Rc::new(unionLR));
+                            match ret {
+                                MergeResult::SimpleSub(_)=>{
+                                    let right_minus_left = sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone()));
+                                    match (right_minus_left) {
+                                        ( MergeResult::SimpleSub(r_minus_l))=>{
+                                            let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
+                                            let term = AntimirovDerivativeElement::new(
+                                                q_prime_sub,
+                                                ret
+                                            );
+                                            retSet.insert(term);
+                                        }
+                                        _ =>{}
+                                    }
+                                },
+                                _=>{}
+                            }
                         }
-                        derivatives.insert((elem_term, elem_subs_final));
+                        _ =>{}
                     }
-                    term1 = term1.union(&derivatives).cloned().collect();
+
+
+
+
                 }
             }
 
-            term1*/
-            unimplemented!();
+            retSet
+            //unimplemented!();
         }
         GenRegex::Kleene(expr) => {
             let p_deriv = derivative(expr, deriv_char);

@@ -15,6 +15,7 @@ mod smt;
 
 use antimirov::matching;
 use antimirov::derivative;
+use antimirov::nullable;
 use classes::{CharExpression, GenRegex, Predicate, StringIndex, StringVar, MaybeCharExpression};
 use std::rc::Rc;
 
@@ -27,14 +28,16 @@ fn main() {
     ))));
 
     //let char_expr = CharExpression::StringIndex(string_var, 0);
-    let gre = &Rc::new(GenRegex::StringVar(string_var));
+    let gre1 = &Rc::new(GenRegex::StringVar(string_var.clone()));
+    let gre2 = &Rc::new(GenRegex::StringVar(string_var.clone()));
+    let gre = &Rc::new(GenRegex::Concatenation(Rc::clone(gre1), Rc::clone(gre2)));
 
 
     //let complex_predicate = Rc::new(Predicate::And(vec![Rc::new(predicate), Rc::new(Predicate::False)]));
     //let gre = &Rc::new(GenRegex::IfThenElse(complex_predicate.clone(), Rc::new(GenRegex::EmptySet), Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::CharVar(String::from("c")))))));
     //println!("{}", print_predicate(&complex_predicate));
     //println!("{}", &Rc::clone(gre4));
-    let deriv = derivative(&Rc::clone(gre), &Rc::new(CharExpression::Literal(String::from("b"))));
+    let deriv = nullable(&Rc::clone(gre));
     for elem in deriv{
         println!("{}", elem);
     }
