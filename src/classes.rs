@@ -194,6 +194,12 @@ impl SimpleSub {
     pub fn get_char_map(&self) -> &BTreeMap<CharVar, CharExpression> {
         &self.char_to
     }
+    pub fn remove_char_map(&mut self, key: &CharVar)->Option<CharExpression>{
+        self.char_to.remove(key)
+    }
+    pub fn remove_str_map(&mut self, key: &StringVar)->Option<SubExpr>{
+        self.string_to.remove(key)
+    }
     pub fn get_string_var(&self, key: &StringVar) -> Option<&SubExpr> {
         self.string_to.get(key)
     }

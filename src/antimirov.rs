@@ -2,6 +2,7 @@
 //! Implementation of the Antimirov Derivative
 //!
 
+use crate::classes::StringIndex;
 use crate::classes::{CharExpression, GenRegex, StringVar, Predicate, MaybeCharExpression, SubExpr, MergeResult, AnySub, SimpleSub, AntimirovDerivativeElement, CharVar};
 //use crate::classes::Pair;
 //use crate::classes::Subs::Sub;
@@ -286,7 +287,21 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
 }
 
 fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>)->MergeResult{
-    todo!()
+    if let MergeResult::SimpleSub(result)=merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone()))){
+        let mut retsub=sub2.as_ref().clone();
+        for (char_var,_) in result.get_char_map(){
+            retsub.remove_char_map(char_var);
+        }
+        for (string_var,sub_expr1) in result.get_str_map(){
+            if let Some(sub_expr2)=retsub.get_string_var(string_var){
+                todo!()
+            }
+        }
+        return MergeResult::SimpleSub(retsub);
+    }
+    else{
+        MergeResult::Bottom
+    }
 }
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSet<AntimirovDerivativeElement> {
     let empty_string = || {
@@ -571,7 +586,26 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
                 None => expr.clone(),
             }
         },
-        GenRegex::StringIndex(string_index) => todo!(),
+        GenRegex::StringIndex(string_index) => {
+            match substitution.get_string_var(&string_index.var){
+                Some(value) => {
+                    let index=string_index.index as usize;
+                    let length=value.get_head().len();
+                    if index < length{
+                        Rc::new(GenRegex::CharExpression(Rc::new(value.get_head()[index].clone())))
+                    }
+                    else{
+                        if value.get_tail(){
+                            Rc::new(GenRegex::StringIndex(Rc::new(StringIndex{var: string_index.var.clone(), index:((index-length+1) as i32)})))
+                        }
+                        else{
+                            Rc::new(GenRegex::EmptySet)
+                        }
+                    }
+                },
+                None => expr.clone(),
+            }
+        },
         GenRegex::StringSlice(string_var, _) => todo!(),
         GenRegex::Union(gen_regex1, gen_regex2) => {
             Rc::new(GenRegex::Union(sub_in(gen_regex1,substitution), sub_in(gen_regex2,substitution)))
