@@ -147,6 +147,9 @@ impl SubExpr {
     pub fn set_head(&mut self, new_head: Vec<CharExpression>) {
         self.head = new_head;
     }
+    pub fn is_empty(&self)-> bool{
+        self.head.len()==0 && self.tail_is_string_var
+    }
     pub fn empty() -> Self {
         SubExpr {
             head: Vec::new(),

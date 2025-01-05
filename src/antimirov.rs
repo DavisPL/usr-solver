@@ -303,6 +303,21 @@ fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>)->MergeResult{
         MergeResult::Bottom
     }
 }
+fn sub_expr_match(sub_expr1: &mut SubExpr, sub_expr2: &mut SubExpr, str_var: &StringVar)->Option<(HashSet<(CharVar,CharExpression)>,Option<(StringVar,SubExpr)>)>{
+    if sub_expr1.is_empty() && sub_expr2.is_empty(){
+        return Some((HashSet::new(),None))
+    }
+    else if sub_expr1.head_length()==0 && sub_expr1.get_tail(){
+        todo!()
+    }
+    else if sub_expr2.head_length()==0 && sub_expr2.get_tail(){
+        todo!()
+    }
+    else if sub_expr1.is_empty() || sub_expr2.is_empty() {
+        return None;
+    }
+    todo!()
+}
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSet<AntimirovDerivativeElement> {
     let empty_string = || {
         Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
