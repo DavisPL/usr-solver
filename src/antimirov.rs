@@ -294,7 +294,13 @@ fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>)->MergeResult{
         }
         for (string_var,sub_expr1) in result.get_str_map(){
             if let Some(sub_expr2)=retsub.get_string_var(string_var){
-                todo!()
+                if let Some(mut sub)=sub_expr_match(&sub_expr1, &sub_expr2, string_var){
+                    retsub.get_char_map_mut().append(&mut sub.get_char_map_mut());
+                    retsub.get_str_map_mut().append(&mut sub.get_str_map_mut());
+                }
+                else{
+                    return MergeResult::Bottom;
+                }
             }
         }
         return MergeResult::SimpleSub(retsub);
@@ -303,20 +309,37 @@ fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>)->MergeResult{
         MergeResult::Bottom
     }
 }
-fn sub_expr_match(sub_expr1: &mut SubExpr, sub_expr2: &mut SubExpr, str_var: &StringVar)->Option<(HashSet<(CharVar,CharExpression)>,Option<(StringVar,SubExpr)>)>{
+fn sub_expr_match(sub_expr1: &SubExpr, sub_expr2: &SubExpr, str_var: &StringVar)->Option<SimpleSub>{
+    let mut retval=SimpleSub::empty();
     if sub_expr1.is_empty() && sub_expr2.is_empty(){
-        return Some((HashSet::new(),None))
+        return Some(retval);
     }
     else if sub_expr1.head_length()==0 && sub_expr1.get_tail(){
-        todo!()
+        retval.set_string_var(str_var.clone(), sub_expr2.clone());
+        return Some(retval);
     }
     else if sub_expr2.head_length()==0 && sub_expr2.get_tail(){
-        todo!()
+        retval.set_string_var(str_var.clone(), sub_expr1.clone());
+        return Some(retval);
     }
     else if sub_expr1.is_empty() || sub_expr2.is_empty() {
         return None;
     }
-    todo!()
+    let trunc_sub_expr1=SubExpr::new(sub_expr1.get_head()[1..].to_vec(), sub_expr1.get_tail());
+    let trunc_sub_expr2=SubExpr::new(sub_expr2.get_head()[1..].to_vec(), sub_expr2.get_tail());
+    match sub_expr_match(&trunc_sub_expr1, &trunc_sub_expr2, str_var){
+        Some(val)=> retval=val,
+        None=> return None
+    }
+    let head1=&sub_expr1.get_head()[0];
+    let head2=&sub_expr2.get_head()[0];
+    if let CharExpression::CharVar(key)=head1{
+        retval.set_char_var(key.clone(), head2.clone());
+    }
+    else if let CharExpression::CharVar(key)=head2{
+        retval.set_char_var(key.clone(), head1.clone());
+    }
+    return Some(retval);
 }
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSet<AntimirovDerivativeElement> {
     let empty_string = || {
