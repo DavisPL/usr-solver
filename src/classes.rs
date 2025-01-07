@@ -148,7 +148,7 @@ impl SubExpr {
         self.head = new_head;
     }
     pub fn is_empty(&self)-> bool{
-        self.head.len()==0 && self.tail_is_string_var
+        self.head.len()==0 
     }
     pub fn empty() -> Self {
         SubExpr {

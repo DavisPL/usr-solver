@@ -125,14 +125,14 @@ fn union_over_set(
             if expr_to_id.contains_key(&prev_exists){
                 prev_id = expr_to_id[&prev_exists];
             }else{
-                prev_id = expr_to_id.len();
+                prev_id = expr_to_id.len()+1;
                 expr_to_id.insert(prev_exists.clone(), prev_id);
                 id_to_expr.insert(prev_id, prev_exists.clone());
             }
             if expr_to_id.contains_key(element.as_ref()){
                 curr_id = expr_to_id[element.as_ref()];
             }else{
-                curr_id = expr_to_id.len();
+                curr_id = expr_to_id.len()+1;
                 expr_to_id.insert(element.clone(), curr_id);
                 //expr_to_id[element.as_ref()] = curr_id;
                 id_to_expr.insert(curr_id, element.clone());
@@ -189,11 +189,11 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
     let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
     let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
     let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
-    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions));
+    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions)+2);
 
     for (_,  eq_exprs) in &mut str_eq_class{
         let mut ind = 0;
-        while eq_exprs.len() != 0{
+        while eq_exprs.len() > 1{
             let mut length_flag = false;
             let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
             let mut i = 0;
@@ -203,7 +203,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
                     let temp = &curr_sub_expr[ind];
                     union_set.insert(Rc::new(temp.clone()));
                     i+=1;
-                }else if curr_sub_expr.get_tail(){
+                }else if curr_sub_expr.get_tail() && eq_exprs.len() > 1{
                     eq_exprs.remove(i);
                 }else{
                     for j in 0..eq_exprs.len() {
@@ -441,6 +441,9 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
                                     let right_minus_left = sub_difference(Rc::new(right_elem.clone()), Rc::new(left_elem.clone()));
                                     match (left_minus_right, right_minus_left) {
                                         (MergeResult::SimpleSub(l_minus_r), MergeResult::SimpleSub(r_minus_l))=>{
+                                            println!("{}", left_elem);
+                                            println!("{}", right_elem);
+                                            println!("{} lmr", l_minus_r);
                                             let p_prime_sub = sub_in(p_sub.get_expr(), &l_minus_r);
                                             let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
                                             let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
@@ -665,6 +668,7 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
 }
 
 pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: HashSet<GenRegex>) -> bool{
+    println!("satcheck");
     if visited.contains(expr){
         return false;
     }else{
@@ -679,6 +683,7 @@ pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: HashSet<Gen
         }
         index += 1;
         for elem in deriv{
+            println!("elem {} {}", elem, index);
             if satisfiable(&elem.get_expr(), index, visited.clone()){
                 return true;
             }

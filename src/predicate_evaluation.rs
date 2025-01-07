@@ -3,6 +3,9 @@
 //!
 
 // Better to fix and remove, allowing for now
+// TODO: maybe replace and and or with only a left and a right, would need to rewrite DNF
+// conversion and iteration but not too bad?
+//
 #![allow(non_snake_case)]
 
 use crate::classes::{CharExpression, Predicate, StringVar, MaybeCharExpression, StringIndex};
@@ -88,82 +91,6 @@ fn assign_unique_ids(predicate: &Predicate, id_map: &mut HashMap<MaybeCharExpres
                     *next_id += 1;
                     id
                 });
-            /*(MaybeCharExpression::StringIndex(_), MaybeCharExpression::StringIndex(_)) => {
-                /*let mut index_str = format!(
-                    "StringIndex(var: {}, index: {})",
-                    str_ind_1.var.name, str_ind_1.index
-                );*/
-                id_map.entry(left.as_ref().clone()).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-                id_map.entry(right.as_ref().clone()).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-            }
-            (MaybeCharExpression::CharExpression(char_expr_1), MaybeCharExpression::StringIndex(str_ind_2)) => {
-                let index_str = format!(
-                    "StringIndex(var: {}, index: {})",
-                    str_ind_2.var.name, str_ind_2.index
-                );
-                id_map.entry(left.as_ref()).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-                let expr_str = match char_expr_1.as_ref() {
-                    CharExpression::CharVar(name) => format!("CharVar({})", name),
-                    CharExpression::Literal(value) => format!("Literal({})", value),
-                };
-                id_map.entry(expr_str).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-            }
-            (MaybeCharExpression::StringIndex(str_ind_2), MaybeCharExpression::CharExpression(char_expr_1)) => {
-                let index_str = format!(
-                    "StringIndex(var: {}, index: {})",
-                    str_ind_2.var.name, str_ind_2.index
-                );
-                id_map.entry(index_str).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-                let expr_str = match char_expr_1.as_ref() {
-                    CharExpression::CharVar(name) => format!("CharVar({})", name),
-                    CharExpression::Literal(value) => format!("Literal({})", value),
-                };
-                id_map.entry(expr_str).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-            }
-            (MaybeCharExpression::CharExpression(char_expr_1), MaybeCharExpression::CharExpression(char_expr_2)) => {
-                let mut expr_str = match char_expr_1.as_ref() {
-                    CharExpression::CharVar(name) => format!("CharVar({})", name),
-                    CharExpression::Literal(value) => format!("Literal({})", value),
-                };
-                id_map.entry(expr_str).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-                expr_str = match char_expr_2.as_ref() {
-                    CharExpression::CharVar(name) => format!("CharVar({})", name),
-                    CharExpression::Literal(value) => format!("Literal({})", value),
-                };
-                id_map.entry(expr_str).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-            }*/
         },
         Predicate::And(predicates) | Predicate::Or(predicates) => {
             // Recurse down for each sub-predicate in `And` or `Or` lists
@@ -172,17 +99,8 @@ fn assign_unique_ids(predicate: &Predicate, id_map: &mut HashMap<MaybeCharExpres
             }
         }
         Predicate::Not(sub_predicate) => {
-            // Recurse down for single `Not` sub-predicate
             assign_unique_ids(sub_predicate, id_map, next_id);
         }
-        /*Predicate::EqualLength(var, _) => {
-            let var_str = format!("StringVar({})", var.name);
-            id_map.entry(var_str).or_insert_with(|| {
-                let id = *next_id;
-                *next_id += 1;
-                id
-            });
-        }*/
         _ => {}
     }
 }
@@ -247,59 +165,32 @@ fn evaluate(
                 let leftId;
                 let rightId;
                 if let Predicate::Equals(left, right) = p.as_ref() {
+                    
                     leftId = id_map[left];
                     rightId = id_map[right];
-                    /*match (left.as_ref(), right.as_ref()) {
-                        (MaybeCharExpression::StringIndex(str_ind_1), MaybeCharExpression::StringIndex(str_ind_2)) => {
-                            let mut index_str = format!(
-                                "StringIndex(var: {}, index: {})",
-                                str_ind_1.var.name, str_ind_1.index
-                            );
-                            leftId = id_map[&index_str];
-                            index_str = format!(
-                                "StringIndex(var: {}, index: {})",
-                                str_ind_2.var.name, str_ind_2.index
-                            );
-                            rightId = id_map[&index_str];
+                    match left.as_ref() {
+                        MaybeCharExpression::CharExpression(c_expr) =>{
+                            match c_expr.as_ref(){
+                                CharExpression::Literal(_) =>{
+                                    map.insert(leftId, leftId);
+                                }
+                                _=>{}
+                            }
                         }
-                        (MaybeCharExpression::CharExpression(char_expr_1), MaybeCharExpression::StringIndex(str_ind_2)) => {
-                            let index_str = format!(
-                                "StringIndex(var: {}, index: {})",
-                                str_ind_2.var.name, str_ind_2.index
-                            );
-                            leftId = id_map[&index_str];
-                            let expr_str = match char_expr_1.as_ref() {
-                                CharExpression::CharVar(name) => format!("CharVar({})", name),
-                                CharExpression::Literal(value) => format!("Literal({})", value),
-                            };
-                            rightId = id_map[&expr_str];
+                        _=>{}
+                    }
+                    match right.as_ref() {
+                        MaybeCharExpression::CharExpression(c_expr) =>{
+                            match c_expr.as_ref(){
+                                CharExpression::Literal(_) =>{
+                                    map.insert(rightId, rightId);
+                                }
+                                _=>{}
+                            }
                         }
-                        (MaybeCharExpression::StringIndex(str_ind_2), MaybeCharExpression::CharExpression(char_expr_1)) => {
-                            let index_str = format!(
-                                "StringIndex(var: {}, index: {})",
-                                str_ind_2.var.name, str_ind_2.index
-                            );
-                            let expr_str = match char_expr_1.as_ref() {
-                                CharExpression::CharVar(name) => format!("CharVar({})", name),
-                                CharExpression::Literal(value) => format!("Literal({})", value),
-                            };
-                            leftId = id_map[&index_str];
-                            rightId = id_map[&expr_str];
-                        }
-                        (MaybeCharExpression::CharExpression(char_expr_1), MaybeCharExpression::CharExpression(char_expr_2)) => {
-                            let mut expr_str = match char_expr_1.as_ref() {
-                                CharExpression::CharVar(name) => format!("CharVar({})", name),
-                                CharExpression::Literal(value) => format!("Literal({})", value),
-                            };
-                            leftId = id_map[&expr_str];
-                            expr_str = match char_expr_2.as_ref() {
-                                CharExpression::CharVar(name) => format!("CharVar({})", name),
-                                CharExpression::Literal(value) => format!("Literal({})", value),
-                            };
-                            rightId = id_map[&expr_str];
-                        }
-                    }*/
-                    if leftId == rightId {
+                        _=>{}
+                    }
+                    if leftId != rightId {
                         final_preds.push(p);
                     }
                     if let (Some(value1), Some(value2)) = (map.get(&leftId), map.get(&rightId)) {
@@ -322,12 +213,12 @@ fn evaluate(
                 }
             }
             let cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
-            println!("hello there");
             for not_pred in not_equality_preds {
                 if let Predicate::Not(inner) = &*not_pred {
                     let leftId;
                     let rightId;
-                    if let Predicate::Equals(left, right) = inner.as_ref() {
+                    if let Predicate::Equals(left, right) = inner.as_ref() { //Think this needs to
+                                                                             //be redone?
                         leftId = id_map[left];
                         rightId = id_map[right];
                         if leftId == rightId {
@@ -343,7 +234,7 @@ fn evaluate(
                         for (key, value) in id_map.iter() {
                             if is_string_index(&Rc::new(key.clone())){
                             //if key.starts_with("StringIndex") {
-                                let str_ind = get_string_index(&Rc::new(key.clone())).expect("string ind");
+                                let str_ind = get_string_index(&Rc::new(key.clone())).expect("string ind"); //Maybe should rewrite? TODO: check clarity of predicate evaluation
                                 if str_ind.var.name == var_name.name.clone() && str_ind.index >= *length && union_find.find(*value as usize) != *value as usize{
                                     flag = true;
                                     break;
