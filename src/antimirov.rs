@@ -288,12 +288,12 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
 
 fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>)->MergeResult{
     if let MergeResult::SimpleSub(result)=merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone()))){
-        let mut retsub=sub2.as_ref().clone();
+        let mut retsub=SimpleSub::empty();
         for (char_var,_) in result.get_char_map(){
             retsub.remove_char_map(char_var);
         }
         for (string_var,sub_expr1) in result.get_str_map(){
-            if let Some(sub_expr2)=retsub.get_string_var(string_var){
+            if let Some(sub_expr2)=sub2.get_string_var(string_var){
                 if let Some(mut sub)=sub_expr_match(&sub_expr1, &sub_expr2, string_var){
                     retsub.get_char_map_mut().append(&mut sub.get_char_map_mut());
                     retsub.get_str_map_mut().append(&mut sub.get_str_map_mut());
@@ -444,6 +444,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
                                             println!("{}", left_elem);
                                             println!("{}", right_elem);
                                             println!("{} lmr", l_minus_r);
+                                            println!("{} rml", r_minus_l);
                                             let p_prime_sub = sub_in(p_sub.get_expr(), &l_minus_r);
                                             let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
                                             let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
