@@ -85,6 +85,7 @@ impl SmtParser {
             // Cases we care about
             Value::Null => self.parse_empty(),
             Value::Cons(c) => self.parse_cons(c),
+            Value::Symbol(s) => self.parse_symbol(s),
 
             // Cases we don't understand yet
             Value::Nil => Err(SmtParseError::Unrecognized("Nil S-expression".to_string())),
@@ -102,10 +103,6 @@ impl SmtParser {
             ))),
             Value::String(s) => Err(SmtParseError::Unrecognized(format!(
                 "Found unrecognized SMTLib string: {}",
-                s
-            ))),
-            Value::Symbol(s) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib symbol: {}",
                 s
             ))),
             Value::Keyword(k) => Err(SmtParseError::Unrecognized(format!(
@@ -159,6 +156,13 @@ impl SmtParser {
         //     _ => Err(Error::Unrecognized("Unrecognized SMTLib command".to_string())),
         // }
     }
+
+    pub fn parse_symbol(&self, s: &str) -> Result<GenRegex, SmtParseError> {
+        eprintln!("TODO: Implement parse_symbol");
+        Err(SmtParseError::Unimplemented(
+            "Symbol S-expression".to_string(),
+        ))
+    }
 }
 
 /*
@@ -208,5 +212,8 @@ mod tests {
         println!("{}", smt_string);
         let v = lexpr::from_str(smt_string).unwrap();
         println!("{:?}", v);
+
+        // Uncomment to view output
+        // assert!(false);
     }
 }
