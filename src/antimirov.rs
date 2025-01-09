@@ -437,14 +437,14 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> HashSe
                             let ret = merge(Rc::new(unionLR));
                             match ret {
                                 MergeResult::SimpleSub(_)=>{
-                                    let left_minus_right = sub_difference(Rc::new(left_elem.clone()), Rc::new(right_elem.clone()));
+                                    let left_minus_right = sub_difference(Rc::new(left_elem.clone()), Rc::new(right_elem.clone())); //TODO: fix sub_diff
                                     let right_minus_left = sub_difference(Rc::new(right_elem.clone()), Rc::new(left_elem.clone()));
+                                    println!("{} right", right_elem);
+                                    println!("{} left", left_elem);
+                                    println!("{} left-minus-right", left_minus_right);
+                                    println!("{} right-minus-left", right_minus_left);
                                     match (left_minus_right, right_minus_left) {
                                         (MergeResult::SimpleSub(l_minus_r), MergeResult::SimpleSub(r_minus_l))=>{
-                                            println!("{}", left_elem);
-                                            println!("{}", right_elem);
-                                            println!("{} lmr", l_minus_r);
-                                            println!("{} rml", r_minus_l);
                                             let p_prime_sub = sub_in(p_sub.get_expr(), &l_minus_r);
                                             let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
                                             let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
@@ -668,8 +668,12 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     }
 }
 
-pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: HashSet<GenRegex>) -> bool{
-    println!("satcheck");
+pub fn satisfiable(expr: &Rc<GenRegex>) -> bool{
+    let mut ind = 0;
+    return satisfiable_helper(expr, ind, HashSet::new());
+}
+pub fn satisfiable_helper(expr: &Rc<GenRegex>, mut index: i32, mut visited: HashSet<GenRegex>) -> bool{
+    println!("{}", expr);
     if visited.contains(expr){
         return false;
     }else{
@@ -684,8 +688,7 @@ pub fn satisfiable(expr: &Rc<GenRegex>, mut index: i32, mut visited: HashSet<Gen
         }
         index += 1;
         for elem in deriv{
-            println!("elem {} {}", elem, index);
-            if satisfiable(&elem.get_expr(), index, visited.clone()){
+            if satisfiable_helper(&elem.get_expr(), index, visited.clone()){
                 return true;
             }
         }

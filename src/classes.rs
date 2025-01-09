@@ -49,9 +49,6 @@ pub enum SubExpr {
     StringVar(Rc<StringVar>),
 }*/
 
-/*
-    TODO fix: use the following for SubExpr and Subs
-*/
 #[derive(Debug, PartialEq, Eq, Clone, Hash )]
 pub struct SubExpr { 
     head: Vec<CharExpression>,
@@ -311,6 +308,10 @@ impl IndexMut<&StringVar> for SimpleSub {
 pub enum Predicate {
     And(Vec<Rc<Predicate>>),
     Or(Vec<Rc<Predicate>>),
+    /*Rewrite ideas TODO, would require rewriting DNF conversion for predicate evaluation
+     * And(Rc<Predicate>, Rc<Predicate>),
+     * Or(Rc<Predicate>, Rc<Predicate>),
+     */
     Not(Rc<Predicate>),
     True,
     False,

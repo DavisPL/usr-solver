@@ -2,9 +2,78 @@
 //! Implementation of the Brzozowski Derivative
 //!
 
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, MaybeCharExpression};
+use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, MaybeCharExpression, CharVar};
 use crate::predicate_evaluation::evaluateComplete;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+
+pub fn satisfiable_helper(gre: &Rc<GenRegex>, mut index: i32, visited: &mut HashSet<Rc<GenRegex>>)->bool{
+    //let mut expr;
+    match gre.as_ref(){
+        GenRegex::IfThenElse(pred, left, right)=>{
+            let mut temp_left = left.clone();
+            let mut temp_right = right.clone();
+            if visited.contains(left){
+                temp_left = Rc::new(GenRegex::EmptySet);
+            }
+            if visited.contains(right){
+                temp_right = Rc::new(GenRegex::EmptySet);
+            }
+            let expr = &simplifies(&Rc::new(GenRegex::IfThenElse(pred.clone(), temp_left, temp_right)));
+            if matches!(nullableProjection(expr).as_ref(), Predicate::False){
+                let new_name = "f".to_owned() + &index.to_string();
+                let c_var = Rc::new(CharExpression::CharVar(CharVar{name: new_name}));
+                let deriv = simplifies(&derivative(expr, &c_var));
+                index += 1;
+                return satisfiable_helper(&deriv, index, visited);
+            }
+            true
+
+        }
+        GenRegex::Union(left, right)=>{
+            let mut temp_left = left.clone();
+            let mut temp_right = right.clone();
+            if visited.contains(left){
+                temp_left = Rc::new(GenRegex::EmptySet);
+                
+            }
+            if visited.contains(right){
+                temp_right = Rc::new(GenRegex::EmptySet);
+            }
+            let expr = &simplifies(&Rc::new(GenRegex::Union(temp_left, temp_right)));
+            if matches!(nullableProjection(expr).as_ref(), Predicate::False){
+                let new_name = "f".to_owned() + &index.to_string();
+                let c_var = Rc::new(CharExpression::CharVar(CharVar{name: new_name}));
+                let deriv = simplifies(&derivative(expr, &c_var));
+                index += 1;
+                return satisfiable_helper(&deriv, index, visited);
+            }
+            true
+        }
+        GenRegex::EmptySet=>{return false;}
+        _ =>{
+            if visited.contains(gre){
+                return false;
+            }else{
+                visited.insert(gre.clone());
+            }
+            let expr = &simplifies(gre);
+            if matches!(nullableProjection(expr).as_ref(), Predicate::False){
+                let new_name = "f".to_owned() + &index.to_string();
+                let c_var = Rc::new(CharExpression::CharVar(CharVar{name: new_name}));
+                let deriv = simplifies(&derivative(expr, &c_var));
+                index += 1;
+                return satisfiable_helper(&deriv, index, visited);
+            }
+            true
+        }
+    }
+
+}
+pub fn satisfiable(gre: &Rc<GenRegex>) -> bool{
+    let mut ind = 0;
+    satisfiable_helper(gre, ind, &mut HashSet::new())
+}
 
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
     let empty_string = || {
@@ -186,6 +255,7 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
                         Rc::clone(&false_proj),
                     ])),
                 ])),
+                //TODO: in rewrite, would make this only a left and a right
             }
         }
 
@@ -196,7 +266,8 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
             match (left_proj.as_ref(), right_proj.as_ref()) {
                 (Predicate::False, _) => Rc::clone(&right_proj),
                 (_, Predicate::False) => Rc::clone(&left_proj),
-                _ => Rc::new(Predicate::Or(vec![left_proj, right_proj])),
+                _ => Rc::new(Predicate::Or(vec![left_proj, right_proj])), //Rewrite as left and
+                                                                          //right
             }
         }
 
@@ -219,12 +290,10 @@ pub fn nullableProjection(gre: &Rc<GenRegex>) -> Rc<Predicate> {
     let nullableGre = &nullable(gre);
     let mut nullablePredicates = nullableProjectionHelper(nullableGre);
     nullablePredicates = evaluateComplete(&nullablePredicates);
-    //println!("{}", print_predicate(&nullablePredicates));
     nullablePredicates
 }
 
 pub fn matching(gre: &Rc<GenRegex>, proposed: String) -> bool {
-    println!("{}", proposed);
     let expr = &simplifies(gre);
     if proposed.is_empty() {
         return !matches!(nullableProjection(expr).as_ref(), Predicate::False);
@@ -419,6 +488,18 @@ fn simplify_if_then_else(
                 } else {
                     simplified_false
                 };
+            }
+            else if let(CharExpression::Literal(val1), CharExpression::CharVar(_)) = (c1.as_ref(), c2.as_ref()){
+                if val1.is_empty(){
+                    return simplified_false;
+
+                }
+            }
+            else if let(CharExpression::CharVar(_), CharExpression::Literal(val1)) = (c1.as_ref(), c2.as_ref()){
+                if val1.is_empty(){
+                    return simplified_false;
+
+                }
             }
         }
     }
