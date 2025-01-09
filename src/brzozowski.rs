@@ -2,65 +2,77 @@
 //! Implementation of the Brzozowski Derivative
 //!
 
-use crate::classes::{CharExpression, GenRegex, Predicate, StringIndex, MaybeCharExpression, CharVar};
+#![allow(unused_variables)]
+
+use crate::classes::{
+    CharExpression, CharVar, GenRegex, MaybeCharExpression, Predicate, StringIndex,
+};
 use crate::predicate_evaluation::evaluateComplete;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-pub fn satisfiable_helper(gre: &Rc<GenRegex>, mut index: i32, visited: &mut HashSet<Rc<GenRegex>>)->bool{
+pub fn satisfiable_helper(
+    gre: &Rc<GenRegex>,
+    mut index: i32,
+    visited: &mut HashSet<Rc<GenRegex>>,
+) -> bool {
     //let mut expr;
-    match gre.as_ref(){
-        GenRegex::IfThenElse(pred, left, right)=>{
+    match gre.as_ref() {
+        GenRegex::IfThenElse(pred, left, right) => {
             let mut temp_left = left.clone();
             let mut temp_right = right.clone();
-            if visited.contains(left){
+            if visited.contains(left) {
                 temp_left = Rc::new(GenRegex::EmptySet);
             }
-            if visited.contains(right){
+            if visited.contains(right) {
                 temp_right = Rc::new(GenRegex::EmptySet);
             }
-            let expr = &simplifies(&Rc::new(GenRegex::IfThenElse(pred.clone(), temp_left, temp_right)));
-            if matches!(nullableProjection(expr).as_ref(), Predicate::False){
+            let expr = &simplifies(&Rc::new(GenRegex::IfThenElse(
+                pred.clone(),
+                temp_left,
+                temp_right,
+            )));
+            if matches!(nullableProjection(expr).as_ref(), Predicate::False) {
                 let new_name = "f".to_owned() + &index.to_string();
-                let c_var = Rc::new(CharExpression::CharVar(CharVar{name: new_name}));
+                let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
                 let deriv = simplifies(&derivative(expr, &c_var));
                 index += 1;
                 return satisfiable_helper(&deriv, index, visited);
             }
             true
-
         }
-        GenRegex::Union(left, right)=>{
+        GenRegex::Union(left, right) => {
             let mut temp_left = left.clone();
             let mut temp_right = right.clone();
-            if visited.contains(left){
+            if visited.contains(left) {
                 temp_left = Rc::new(GenRegex::EmptySet);
-                
             }
-            if visited.contains(right){
+            if visited.contains(right) {
                 temp_right = Rc::new(GenRegex::EmptySet);
             }
             let expr = &simplifies(&Rc::new(GenRegex::Union(temp_left, temp_right)));
-            if matches!(nullableProjection(expr).as_ref(), Predicate::False){
+            if matches!(nullableProjection(expr).as_ref(), Predicate::False) {
                 let new_name = "f".to_owned() + &index.to_string();
-                let c_var = Rc::new(CharExpression::CharVar(CharVar{name: new_name}));
+                let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
                 let deriv = simplifies(&derivative(expr, &c_var));
                 index += 1;
                 return satisfiable_helper(&deriv, index, visited);
             }
             true
         }
-        GenRegex::EmptySet=>{return false;}
-        _ =>{
-            if visited.contains(gre){
+        GenRegex::EmptySet => {
+            return false;
+        }
+        _ => {
+            if visited.contains(gre) {
                 return false;
-            }else{
+            } else {
                 visited.insert(gre.clone());
             }
             let expr = &simplifies(gre);
-            if matches!(nullableProjection(expr).as_ref(), Predicate::False){
+            if matches!(nullableProjection(expr).as_ref(), Predicate::False) {
                 let new_name = "f".to_owned() + &index.to_string();
-                let c_var = Rc::new(CharExpression::CharVar(CharVar{name: new_name}));
+                let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
                 let deriv = simplifies(&derivative(expr, &c_var));
                 index += 1;
                 return satisfiable_helper(&deriv, index, visited);
@@ -68,9 +80,8 @@ pub fn satisfiable_helper(gre: &Rc<GenRegex>, mut index: i32, visited: &mut Hash
             true
         }
     }
-
 }
-pub fn satisfiable(gre: &Rc<GenRegex>) -> bool{
+pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
     let mut ind = 0;
     satisfiable_helper(gre, ind, &mut HashSet::new())
 }
@@ -479,7 +490,9 @@ fn simplify_if_then_else(
     };
 
     if let Predicate::Equals(left, right) = pred.as_ref() {
-        if let (MaybeCharExpression::CharExpression(c1), MaybeCharExpression::CharExpression(c2)) = (left.as_ref(), right.as_ref()) {
+        if let (MaybeCharExpression::CharExpression(c1), MaybeCharExpression::CharExpression(c2)) =
+            (left.as_ref(), right.as_ref())
+        {
             if let (CharExpression::Literal(val1), CharExpression::Literal(val2)) =
                 (c1.as_ref(), c2.as_ref())
             {
@@ -488,17 +501,17 @@ fn simplify_if_then_else(
                 } else {
                     simplified_false
                 };
-            }
-            else if let(CharExpression::Literal(val1), CharExpression::CharVar(_)) = (c1.as_ref(), c2.as_ref()){
-                if val1.is_empty(){
+            } else if let (CharExpression::Literal(val1), CharExpression::CharVar(_)) =
+                (c1.as_ref(), c2.as_ref())
+            {
+                if val1.is_empty() {
                     return simplified_false;
-
                 }
-            }
-            else if let(CharExpression::CharVar(_), CharExpression::Literal(val1)) = (c1.as_ref(), c2.as_ref()){
-                if val1.is_empty(){
+            } else if let (CharExpression::CharVar(_), CharExpression::Literal(val1)) =
+                (c1.as_ref(), c2.as_ref())
+            {
+                if val1.is_empty() {
                     return simplified_false;
-
                 }
             }
         }

@@ -157,7 +157,7 @@ impl SmtParser {
         // }
     }
 
-    pub fn parse_symbol(&self, s: &str) -> Result<GenRegex, SmtParseError> {
+    pub fn parse_symbol(&self, _s: &str) -> Result<GenRegex, SmtParseError> {
         eprintln!("TODO: Implement parse_symbol");
         Err(SmtParseError::Unimplemented(
             "Symbol S-expression".to_string(),

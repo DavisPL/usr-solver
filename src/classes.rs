@@ -3,10 +3,10 @@
 //! Main GenRegex class and subclasses
 //!
 
-use std::rc::Rc;
 use std::collections::BTreeMap;
 use std::ops::Index;
 use std::ops::IndexMut;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
@@ -26,7 +26,7 @@ pub enum GenRegex {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MergeResult {
     SimpleSub(SimpleSub),
-    Bottom
+    Bottom,
 }
 
 /*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -49,19 +49,19 @@ pub enum SubExpr {
     StringVar(Rc<StringVar>),
 }*/
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash )]
-pub struct SubExpr { 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct SubExpr {
     head: Vec<CharExpression>,
-    tail_is_string_var: bool
+    tail_is_string_var: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct AntimirovDerivativeElement{
+pub struct AntimirovDerivativeElement {
     deriv_expression: Rc<GenRegex>,
-    subs: MergeResult
+    subs: MergeResult,
 }
 
-impl AntimirovDerivativeElement{
+impl AntimirovDerivativeElement {
     pub fn get_expr(&self) -> &Rc<GenRegex> {
         &self.deriv_expression
     }
@@ -93,7 +93,7 @@ impl Index<usize> for SubExpr {
 impl Index<&StringVar> for SimpleSub {
     type Output = SubExpr;
 
-    fn index(&self, index: &StringVar) -> &Self::Output {
+    fn index(&self, _index: &StringVar) -> &Self::Output {
         unimplemented!()
     }
 }
@@ -103,54 +103,58 @@ impl Index<&StringVar> for SimpleSub {
 
 impl SubExpr {
     pub fn to_gen_regex(&self, tail_var: &StringVar) -> Rc<GenRegex> {
-        let head=Self::to_gen_regex_helper(self.get_head());
-        if self.get_tail(){
-            Rc::new(GenRegex::Concatenation(head, Rc::new(GenRegex::StringVar(Rc::new(tail_var.clone())))))
-        }
-        else{
+        let head = Self::to_gen_regex_helper(self.get_head());
+        if self.get_tail() {
+            Rc::new(GenRegex::Concatenation(
+                head,
+                Rc::new(GenRegex::StringVar(Rc::new(tail_var.clone()))),
+            ))
+        } else {
             head
         }
     }
-    fn to_gen_regex_helper(head: &Vec<CharExpression>)-> Rc<GenRegex>{
-        let split=head.split_first();
+    fn to_gen_regex_helper(head: &Vec<CharExpression>) -> Rc<GenRegex> {
+        let split = head.split_first();
         match split {
             Some((first, rest)) => {
-                let retVal=Rc::new(GenRegex::CharExpression(Rc::new(first.clone())));
-                if rest.to_vec().len()==1{
+                let retVal = Rc::new(GenRegex::CharExpression(Rc::new(first.clone())));
+                if rest.to_vec().len() == 1 {
                     return retVal;
+                } else {
+                    return Rc::new(GenRegex::Concatenation(
+                        retVal,
+                        Self::to_gen_regex_helper(&rest.to_vec()),
+                    ));
                 }
-                else{
-                    return Rc::new(GenRegex::Concatenation(retVal,Self::to_gen_regex_helper(&rest.to_vec())));
-                }
-            },
-            None => {
-                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(String::from("")))))
-            },
+            }
+            None => Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+                String::from(""),
+            )))),
         }
     }
-    pub fn get_head(&self) -> &Vec<CharExpression>{
+    pub fn get_head(&self) -> &Vec<CharExpression> {
         &self.head
     }
     pub fn get_mut_head(&mut self) -> &mut Vec<CharExpression> {
         &mut self.head
     }
-    pub fn get_tail(&self) -> bool{
+    pub fn get_tail(&self) -> bool {
         self.tail_is_string_var
     }
-    
-    pub fn head_length(&self) -> usize{
+
+    pub fn head_length(&self) -> usize {
         self.head.len()
     }
     pub fn set_head(&mut self, new_head: Vec<CharExpression>) {
         self.head = new_head;
     }
-    pub fn is_empty(&self)-> bool{
-        self.head.len()==0 
+    pub fn is_empty(&self) -> bool {
+        self.head.len() == 0
     }
     pub fn empty() -> Self {
         SubExpr {
             head: Vec::new(),
-            tail_is_string_var: false
+            tail_is_string_var: false,
         }
     }
     pub fn new(head: Vec<CharExpression>, tail_is_string_var: bool) -> Self {
@@ -159,9 +163,6 @@ impl SubExpr {
             tail_is_string_var,
         }
     }
-    
-
-    
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -170,22 +171,19 @@ pub struct AnySub {
     char_to: BTreeMap<CharVar, Vec<CharExpression>>,
 }
 
-//#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Debug, Eq, PartialEq, Hash, Clone )]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
 }
 
-
-impl AnySub{
+impl AnySub {
     pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {
         &self.string_to
     }
     pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
         &self.char_to
     }
-
 }
 impl SimpleSub {
     pub fn get_str_map(&self) -> &BTreeMap<StringVar, SubExpr> {
@@ -200,10 +198,10 @@ impl SimpleSub {
     pub fn get_char_map_mut(&mut self) -> &mut BTreeMap<CharVar, CharExpression> {
         &mut self.char_to
     }
-    pub fn remove_char_map(&mut self, key: &CharVar)->Option<CharExpression>{
+    pub fn remove_char_map(&mut self, key: &CharVar) -> Option<CharExpression> {
         self.char_to.remove(key)
     }
-    pub fn remove_str_map(&mut self, key: &StringVar)->Option<SubExpr>{
+    pub fn remove_str_map(&mut self, key: &StringVar) -> Option<SubExpr> {
         self.string_to.remove(key)
     }
     pub fn get_string_var(&self, key: &StringVar) -> Option<&SubExpr> {
@@ -261,20 +259,19 @@ impl SimpleSub {
             char_to: combined_char_to,
         }
     }
-    pub fn new(string_to: BTreeMap<StringVar, SubExpr>, char_to: BTreeMap<CharVar, CharExpression>) -> Self {
-        SimpleSub {
-            string_to,
-            char_to,
-        }
+    pub fn new(
+        string_to: BTreeMap<StringVar, SubExpr>,
+        char_to: BTreeMap<CharVar, CharExpression>,
+    ) -> Self {
+        SimpleSub { string_to, char_to }
     }
 }
 
 impl SimpleSub {
-    fn substitute_in_regex(&self, g: GenRegex) -> GenRegex {
+    fn substitute_in_regex(&self, _g: GenRegex) -> GenRegex {
         unimplemented!()
     }
 }
-
 
 // l[3] -- 3rd elem of list
 // class MyList
@@ -284,11 +281,10 @@ impl SimpleSub {
 // https://doc.rust-lang.org/std/ops/trait.Index.html
 
 impl IndexMut<&StringVar> for SimpleSub {
-    fn index_mut(&mut self, index: &StringVar) -> &mut Self::Output {
+    fn index_mut(&mut self, _index: &StringVar) -> &mut Self::Output {
         unimplemented!()
     }
 }
-
 
 // f: SimpleSub
 // w: String var (w1, w2, w3)
@@ -315,17 +311,14 @@ pub enum Predicate {
     Not(Rc<Predicate>),
     True,
     False,
-    Equals(
-        Rc<MaybeCharExpression>,
-        Rc<MaybeCharExpression>
-    ),
+    Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
     EqualLength(Rc<StringVar>, i32),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum MaybeCharExpression {
     CharExpression(Rc<CharExpression>),
-    StringIndex(Rc<StringIndex>)
+    StringIndex(Rc<StringIndex>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]

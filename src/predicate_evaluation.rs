@@ -8,32 +8,27 @@
 //
 #![allow(non_snake_case)]
 
-use crate::classes::{CharExpression, Predicate, StringVar, MaybeCharExpression, StringIndex};
+use crate::classes::{CharExpression, MaybeCharExpression, Predicate, StringIndex, StringVar};
 use disjoint_sets::UnionFind;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-
 fn is_char_var(mce: &Rc<MaybeCharExpression>) -> bool {
-    if let MaybeCharExpression::CharExpression(c_expr) = mce.as_ref(){
+    if let MaybeCharExpression::CharExpression(c_expr) = mce.as_ref() {
         match c_expr.as_ref() {
-            CharExpression::Literal(_) =>{
-                false
-            }
-            CharExpression::CharVar(_) =>{
-                true
-            }
+            CharExpression::Literal(_) => false,
+            CharExpression::CharVar(_) => true,
         }
-    }else{
+    } else {
         false
     }
 }
 
 fn get_char_var(mce: &Rc<MaybeCharExpression>) -> Option<CharExpression> {
     if is_char_var(mce) {
-        if let MaybeCharExpression::CharExpression(c_expr) = mce.as_ref(){
+        if let MaybeCharExpression::CharExpression(c_expr) = mce.as_ref() {
             Some(c_expr.as_ref().clone())
-        }else{
+        } else {
             None
         }
         //let name = &self.0[5..self.0.len() - 1];
@@ -44,18 +39,18 @@ fn get_char_var(mce: &Rc<MaybeCharExpression>) -> Option<CharExpression> {
 }
 
 fn is_string_index(mce: &Rc<MaybeCharExpression>) -> bool {
-    if let MaybeCharExpression::StringIndex(_) = mce.as_ref(){
+    if let MaybeCharExpression::StringIndex(_) = mce.as_ref() {
         true
-    }else{
+    } else {
         false
     }
 }
 
 fn get_string_index(mce: &Rc<MaybeCharExpression>) -> Option<StringIndex> {
     if is_string_index(mce) {
-        if let MaybeCharExpression::StringIndex(s_var) = mce.as_ref(){
+        if let MaybeCharExpression::StringIndex(s_var) = mce.as_ref() {
             Some(s_var.as_ref().clone())
-        }else{
+        } else {
             None
         }
     } else {
@@ -78,20 +73,24 @@ pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
     }
 }
 
-fn assign_unique_ids(predicate: &Predicate, id_map: &mut HashMap<MaybeCharExpression, i32>, next_id: &mut i32) {
+fn assign_unique_ids(
+    predicate: &Predicate,
+    id_map: &mut HashMap<MaybeCharExpression, i32>,
+    next_id: &mut i32,
+) {
     match predicate {
         Predicate::Equals(left, right) => {
-                id_map.entry(left.as_ref().clone()).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-                id_map.entry(right.as_ref().clone()).or_insert_with(|| {
-                    let id = *next_id;
-                    *next_id += 1;
-                    id
-                });
-        },
+            id_map.entry(left.as_ref().clone()).or_insert_with(|| {
+                let id = *next_id;
+                *next_id += 1;
+                id
+            });
+            id_map.entry(right.as_ref().clone()).or_insert_with(|| {
+                let id = *next_id;
+                *next_id += 1;
+                id
+            });
+        }
         Predicate::And(predicates) | Predicate::Or(predicates) => {
             // Recurse down for each sub-predicate in `And` or `Or` lists
             for sub_predicate in predicates {
@@ -165,30 +164,25 @@ fn evaluate(
                 let leftId;
                 let rightId;
                 if let Predicate::Equals(left, right) = p.as_ref() {
-                    
                     leftId = id_map[left];
                     rightId = id_map[right];
                     match left.as_ref() {
-                        MaybeCharExpression::CharExpression(c_expr) =>{
-                            match c_expr.as_ref(){
-                                CharExpression::Literal(_) =>{
-                                    map.insert(leftId, leftId);
-                                }
-                                _=>{}
+                        MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
+                            CharExpression::Literal(_) => {
+                                map.insert(leftId, leftId);
                             }
-                        }
-                        _=>{}
+                            _ => {}
+                        },
+                        _ => {}
                     }
                     match right.as_ref() {
-                        MaybeCharExpression::CharExpression(c_expr) =>{
-                            match c_expr.as_ref(){
-                                CharExpression::Literal(_) =>{
-                                    map.insert(rightId, rightId);
-                                }
-                                _=>{}
+                        MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
+                            CharExpression::Literal(_) => {
+                                map.insert(rightId, rightId);
                             }
-                        }
-                        _=>{}
+                            _ => {}
+                        },
+                        _ => {}
                     }
                     if leftId != rightId {
                         final_preds.push(p);
@@ -217,8 +211,9 @@ fn evaluate(
                 if let Predicate::Not(inner) = &*not_pred {
                     let leftId;
                     let rightId;
-                    if let Predicate::Equals(left, right) = inner.as_ref() { //Think this needs to
-                                                                             //be redone?
+                    if let Predicate::Equals(left, right) = inner.as_ref() {
+                        //Think this needs to
+                        //be redone?
                         leftId = id_map[left];
                         rightId = id_map[right];
                         if leftId == rightId {
@@ -227,15 +222,18 @@ fn evaluate(
                         if let (Some(_), Some(_)) = (map.get(&leftId), map.get(&rightId)) {
                             final_preds.push(not_pred)
                         }
-                    
                     } else if let Predicate::EqualLength(var_name, length) = &**inner {
                         //let Predicate::EqualLength(var_name, length) = &**inner;
                         let mut flag = false;
                         for (key, value) in id_map.iter() {
-                            if is_string_index(&Rc::new(key.clone())){
-                            //if key.starts_with("StringIndex") {
-                                let str_ind = get_string_index(&Rc::new(key.clone())).expect("string ind"); //Maybe should rewrite? TODO: check clarity of predicate evaluation
-                                if str_ind.var.name == var_name.name.clone() && str_ind.index >= *length && union_find.find(*value as usize) != *value as usize{
+                            if is_string_index(&Rc::new(key.clone())) {
+                                //if key.starts_with("StringIndex") {
+                                let str_ind =
+                                    get_string_index(&Rc::new(key.clone())).expect("string ind"); //Maybe should rewrite? TODO: check clarity of predicate evaluation
+                                if str_ind.var.name == var_name.name.clone()
+                                    && str_ind.index >= *length
+                                    && union_find.find(*value as usize) != *value as usize
+                                {
                                     flag = true;
                                     break;
                                 }
@@ -263,9 +261,12 @@ fn evaluate(
                     return Rc::new(Predicate::False);
                 }
                 for (key, value) in id_map.iter() {
-                    if is_string_index(&Rc::new(key.clone())){
+                    if is_string_index(&Rc::new(key.clone())) {
                         let str_ind = get_string_index(&Rc::new(key.clone())).expect("string ind");
-                        if str_ind.var.name == var_name.clone() && str_ind.index >= length && union_find.find(*value as usize) != *value as usize{
+                        if str_ind.var.name == var_name.clone()
+                            && str_ind.index >= length
+                            && union_find.find(*value as usize) != *value as usize
+                        {
                             return Rc::new(Predicate::False);
                         }
                     }
