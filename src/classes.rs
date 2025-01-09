@@ -113,18 +113,18 @@ impl SubExpr {
             head
         }
     }
-    fn to_gen_regex_helper(head: &Vec<CharExpression>) -> Rc<GenRegex> {
+    fn to_gen_regex_helper(head: &[CharExpression]) -> Rc<GenRegex> {
         let split = head.split_first();
         match split {
             Some((first, rest)) => {
                 let retVal = Rc::new(GenRegex::CharExpression(Rc::new(first.clone())));
                 if rest.to_vec().len() == 1 {
-                    return retVal;
+                    retVal
                 } else {
-                    return Rc::new(GenRegex::Concatenation(
+                    Rc::new(GenRegex::Concatenation(
                         retVal,
-                        Self::to_gen_regex_helper(&rest.to_vec()),
-                    ));
+                        Self::to_gen_regex_helper(rest),
+                    ))
                 }
             }
             None => Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
@@ -231,26 +231,26 @@ impl SimpleSub {
         for (key, value) in self.string_to {
             combined_string_to
                 .entry(key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(value);
         }
         for (key, value) in other.string_to {
             combined_string_to
                 .entry(key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(value);
         }
 
         for (key, value) in self.char_to {
             combined_char_to
                 .entry(key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(value);
         }
         for (key, value) in other.char_to {
             combined_char_to
                 .entry(key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(value);
         }
 

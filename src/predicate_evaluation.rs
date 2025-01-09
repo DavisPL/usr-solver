@@ -2,11 +2,9 @@
 //! Predicate evaluation and manipulation functions
 //!
 
-// Better to fix and remove, allowing for now
-// TODO: maybe replace and and or with only a left and a right, would need to rewrite DNF
-// conversion and iteration but not too bad?
-//
+// TODO: fix and remove
 #![allow(non_snake_case)]
+#![allow(clippy::single_match)]
 
 use crate::classes::{CharExpression, MaybeCharExpression, Predicate, StringIndex, StringVar};
 use disjoint_sets::UnionFind;
@@ -39,11 +37,7 @@ fn get_char_var(mce: &Rc<MaybeCharExpression>) -> Option<CharExpression> {
 }
 
 fn is_string_index(mce: &Rc<MaybeCharExpression>) -> bool {
-    if let MaybeCharExpression::StringIndex(_) = mce.as_ref() {
-        true
-    } else {
-        false
-    }
+    matches!(mce.as_ref(), MaybeCharExpression::StringIndex(_))
 }
 
 fn get_string_index(mce: &Rc<MaybeCharExpression>) -> Option<StringIndex> {

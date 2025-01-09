@@ -61,7 +61,7 @@ pub fn satisfiable_helper(
             true
         }
         GenRegex::EmptySet => {
-            return false;
+            false
         }
         _ => {
             if visited.contains(gre) {

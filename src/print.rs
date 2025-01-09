@@ -31,7 +31,7 @@ impl Display for SimpleSub {
         for (key, value) in self.get_str_map() {
             write!(f, "{} => {}, ", key, value)?;
         }
-        write!(f, "}}\n")?;
+        writeln!(f, "}}")?;
 
         write!(f, "char_to: {{ ")?;
         for (key, value) in self.get_char_map() {
