@@ -229,29 +229,17 @@ impl SimpleSub {
         let mut combined_char_to: BTreeMap<CharVar, Vec<CharExpression>> = BTreeMap::new();
 
         for (key, value) in self.string_to {
-            combined_string_to
-                .entry(key)
-                .or_default()
-                .push(value);
+            combined_string_to.entry(key).or_default().push(value);
         }
         for (key, value) in other.string_to {
-            combined_string_to
-                .entry(key)
-                .or_default()
-                .push(value);
+            combined_string_to.entry(key).or_default().push(value);
         }
 
         for (key, value) in self.char_to {
-            combined_char_to
-                .entry(key)
-                .or_default()
-                .push(value);
+            combined_char_to.entry(key).or_default().push(value);
         }
         for (key, value) in other.char_to {
-            combined_char_to
-                .entry(key)
-                .or_default()
-                .push(value);
+            combined_char_to.entry(key).or_default().push(value);
         }
 
         AnySub {
@@ -302,11 +290,11 @@ impl IndexMut<&StringVar> for SimpleSub {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum Predicate {
+    And(Rc<Predicate>, Rc<Predicate>),
+    Or(Rc<Predicate>, Rc<Predicate>),
+    /*Rewrite ideas TODO, would require rewriting DNF conversion for predicate evaluation
     And(Vec<Rc<Predicate>>),
     Or(Vec<Rc<Predicate>>),
-    /*Rewrite ideas TODO, would require rewriting DNF conversion for predicate evaluation
-     * And(Rc<Predicate>, Rc<Predicate>),
-     * Or(Rc<Predicate>, Rc<Predicate>),
      */
     Not(Rc<Predicate>),
     True,

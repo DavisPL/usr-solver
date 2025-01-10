@@ -54,11 +54,10 @@ fn get_string_index(mce: &Rc<MaybeCharExpression>) -> Option<StringIndex> {
 
 pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
     match pred.as_ref() {
-        Predicate::And(children) => {
+        Predicate::And(left, right) => {
             let mut flattened: Vec<Rc<Predicate>> = Vec::new();
-            for child in children {
-                flattened.push(convertToDNF(&Rc::clone(child)))
-            }
+            flattened.push(convertToDNF(&Rc::clone(left)));
+            flattened.push(convertToDNF(&Rc::clone(right)));
             flattened
         }
         _ => {
@@ -85,11 +84,10 @@ fn assign_unique_ids(
                 id
             });
         }
-        Predicate::And(predicates) | Predicate::Or(predicates) => {
+        Predicate::And(left, right) | Predicate::Or(left, right) => {
             // Recurse down for each sub-predicate in `And` or `Or` lists
-            for sub_predicate in predicates {
-                assign_unique_ids(sub_predicate, id_map, next_id);
-            }
+            assign_unique_ids(left, id_map, next_id);
+            assign_unique_ids(right, id_map, next_id);
         }
         Predicate::Not(sub_predicate) => {
             assign_unique_ids(sub_predicate, id_map, next_id);
@@ -121,7 +119,7 @@ fn evaluate(
     let alphabet: HashSet<String> = vec!["a".to_string(), "b".to_string()].into_iter().collect();
 
     match pred.as_ref() {
-        Predicate::And(_predicates) => {
+        Predicate::And(..) => {
             // TODO: Unused variable?
 
             let mut final_preds = Vec::new();
@@ -300,7 +298,7 @@ fn evaluate(
     }
 }
 
-fn distribute_ors(predicates: Vec<Rc<Predicate>>) -> Rc<Predicate> {
+fn distribute_ors(predicates: Vec<Rc<Predicate>>) -> Vec<Vec<Predicates>> {
     let mut distributed: Vec<&[Rc<Predicate>]> = Vec::with_capacity(predicates.len());
 
     for pred in &predicates {
@@ -387,7 +385,42 @@ fn cartesian_product(vectors: &[&[Rc<Predicate>]]) -> Vec<Vec<Rc<Predicate>>> {
 
     result
 }
-pub fn convertToDNF(pred: &Rc<Predicate>) -> Rc<Predicate> {
+
+pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate>{
+    match pred.as_ref() {
+        Predicate::Or(left, right) => {
+            Rc::new(Predicate::Or(internalize_all_nots(&left), internalize_all_nots(&right)))
+        }
+
+        Predicate::And(left, right) => {
+            Rc::new(Predicate::And(internalize_all_nots(&left), internalize_all_nots(&right)))
+        }
+
+        Predicate::Not(sub_pred) => match sub_pred.as_ref() {
+            Predicate::And(left, right) => {
+                Rc::new(Predicate::Or(internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(left)))), internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(right))))))
+            }
+
+            Predicate::Or(left, right) => {
+                Rc::new(Predicate::And(internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(left)))), internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(right))))))
+            }
+
+            Predicate::Not(sub) => internalize_all_nots(sub),
+
+            Predicate::True => Rc::new(Predicate::False),
+            Predicate::False => Rc::new(Predicate::True),
+
+            _ => Rc::clone(pred),
+        },
+
+        _ => Rc::clone(pred),
+    }
+
+}
+
+
+pub fn convertToDNF(pred: &Rc<Predicate>) -> Vec<Vec<Predicate>> { // Maybe Change this to a
+                                                             // Vec<Vec<Predicate>>
     fn flatten_predicates(
         preds: &[Rc<Predicate>],
         constructor: fn(Vec<Rc<Predicate>>) -> Predicate,
@@ -433,8 +466,8 @@ pub fn convertToDNF(pred: &Rc<Predicate>) -> Rc<Predicate> {
         }
 
         Predicate::Not(sub_pred) => match sub_pred.as_ref() {
-            Predicate::And(children) => {
-                let mut new_children = Vec::with_capacity(children.len());
+            Predicate::And(left, right) => {
+                //let mut new_children = Vec::with_capacity(children.len());
                 for child in children {
                     new_children.push(convertToDNF(&Rc::new(Predicate::Not(Rc::clone(child)))));
                 }

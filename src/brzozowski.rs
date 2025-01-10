@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 pub fn satisfiable_helper(
     gre: &Rc<GenRegex>,
-    mut index: i32,
+    index: &mut i32,
     visited: &mut HashSet<Rc<GenRegex>>,
 ) -> bool {
     //let mut expr;
@@ -36,7 +36,7 @@ pub fn satisfiable_helper(
                 let new_name = "f".to_owned() + &index.to_string();
                 let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
                 let deriv = simplifies(&derivative(expr, &c_var));
-                index += 1;
+                *index += 1;
                 return satisfiable_helper(&deriv, index, visited);
             }
             true
@@ -55,7 +55,7 @@ pub fn satisfiable_helper(
                 let new_name = "f".to_owned() + &index.to_string();
                 let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
                 let deriv = simplifies(&derivative(expr, &c_var));
-                index += 1;
+                *index += 1;
                 return satisfiable_helper(&deriv, index, visited);
             }
             true
@@ -74,7 +74,7 @@ pub fn satisfiable_helper(
                 let new_name = "f".to_owned() + &index.to_string();
                 let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
                 let deriv = simplifies(&derivative(expr, &c_var));
-                index += 1;
+                *index += 1;
                 return satisfiable_helper(&deriv, index, visited);
             }
             true
@@ -83,7 +83,7 @@ pub fn satisfiable_helper(
 }
 pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
     let mut ind = 0;
-    satisfiable_helper(gre, ind, &mut HashSet::new())
+    satisfiable_helper(gre, &mut ind, &mut HashSet::new())
 }
 
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
@@ -252,20 +252,20 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 
             match (true_proj.as_ref(), false_proj.as_ref()) {
                 (Predicate::False, Predicate::False) => Rc::new(Predicate::False),
-                (Predicate::False, _) => Rc::new(Predicate::And(vec![
+                (Predicate::False, _) => Rc::new(Predicate::And(
                     Rc::new(Predicate::Not(Rc::clone(pred))),
                     Rc::clone(&false_proj),
-                ])),
+                )),
                 (_, Predicate::False) => {
-                    Rc::new(Predicate::And(vec![Rc::clone(pred), Rc::clone(&true_proj)]))
+                    Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj)))
                 }
-                _ => Rc::new(Predicate::Or(vec![
-                    Rc::new(Predicate::And(vec![Rc::clone(pred), Rc::clone(&true_proj)])),
-                    Rc::new(Predicate::And(vec![
+                _ => Rc::new(Predicate::Or(
+                    Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj))),
+                    Rc::new(Predicate::And(
                         Rc::new(Predicate::Not(Rc::clone(pred))),
                         Rc::clone(&false_proj),
-                    ])),
-                ])),
+                    )),
+                )),
                 //TODO: in rewrite, would make this only a left and a right
             }
         }
@@ -277,7 +277,7 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
             match (left_proj.as_ref(), right_proj.as_ref()) {
                 (Predicate::False, _) => Rc::clone(&right_proj),
                 (_, Predicate::False) => Rc::clone(&left_proj),
-                _ => Rc::new(Predicate::Or(vec![left_proj, right_proj])), //Rewrite as left and
+                _ => Rc::new(Predicate::Or(left_proj, right_proj)), //Rewrite as left and
                                                                           //right
             }
         }
@@ -288,7 +288,7 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 
             match (left_proj.as_ref(), right_proj.as_ref()) {
                 (Predicate::False, _) | (_, Predicate::False) => Rc::new(Predicate::False),
-                _ => Rc::new(Predicate::And(vec![left_proj, right_proj])),
+                _ => Rc::new(Predicate::And(left_proj, right_proj)),
             }
         }
 
@@ -370,7 +370,7 @@ fn simplify_intersect_if_then_else(
 ) -> Rc<GenRegex> {
     match (false1.as_ref(), false2.as_ref()) {
         (GenRegex::EmptySet, GenRegex::EmptySet) => Rc::new(GenRegex::IfThenElse(
-            Rc::new(Predicate::And(vec![Rc::clone(pred1), Rc::clone(pred2)])),
+            Rc::new(Predicate::And(Rc::clone(pred1), Rc::clone(pred2))),
             Rc::new(GenRegex::Intersect(Rc::clone(true1), Rc::clone(true2))),
             Rc::clone(false1),
         )),
@@ -394,19 +394,19 @@ fn create_complex_if_then_else(
     is_first_branch: bool,
 ) -> Rc<GenRegex> {
     let inner_pred = if is_first_branch {
-        Rc::new(Predicate::And(vec![
+        Rc::new(Predicate::And(
             Rc::clone(pred2),
             Rc::new(Predicate::Not(Rc::clone(pred1))),
-        ]))
+        ))
     } else {
-        Rc::new(Predicate::And(vec![
+        Rc::new(Predicate::And(
             Rc::clone(pred1),
             Rc::new(Predicate::Not(Rc::clone(pred2))),
-        ]))
+        ))
     };
 
     Rc::new(GenRegex::IfThenElse(
-        Rc::new(Predicate::And(vec![Rc::clone(pred1), Rc::clone(pred2)])),
+        Rc::new(Predicate::And(Rc::clone(pred1), Rc::clone(pred2))),
         Rc::new(GenRegex::Intersect(Rc::clone(true1), Rc::clone(true2))),
         Rc::new(GenRegex::IfThenElse(
             inner_pred,
@@ -440,19 +440,19 @@ fn create_full_intersect_if_then_else(
     false2: &Rc<GenRegex>,
 ) -> Rc<GenRegex> {
     Rc::new(GenRegex::IfThenElse(
-        Rc::new(Predicate::And(vec![Rc::clone(pred1), Rc::clone(pred2)])),
+        Rc::new(Predicate::And(Rc::clone(pred1), Rc::clone(pred2))),
         Rc::new(GenRegex::Intersect(Rc::clone(true1), Rc::clone(true2))),
         Rc::new(GenRegex::IfThenElse(
-            Rc::new(Predicate::And(vec![
+            Rc::new(Predicate::And(
                 Rc::clone(pred1),
                 Rc::new(Predicate::Not(Rc::clone(pred2))),
-            ])),
+            )),
             Rc::new(GenRegex::Intersect(Rc::clone(false2), Rc::clone(true1))),
             Rc::new(GenRegex::IfThenElse(
-                Rc::new(Predicate::And(vec![
+                Rc::new(Predicate::And(
                     Rc::clone(pred2),
                     Rc::new(Predicate::Not(Rc::clone(pred1))),
-                ])),
+                )),
                 Rc::new(GenRegex::Intersect(Rc::clone(false1), Rc::clone(true2))),
                 Rc::new(GenRegex::EmptySet),
             )),

@@ -13,7 +13,7 @@ use crate::classes::{
 };
 //use crate::classes::Pair;
 //use crate::classes::Subs::Sub;
-use crate::brzozowski;
+//use crate::brzozowski;
 use disjoint_sets::UnionFind;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -182,6 +182,7 @@ fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
 }
 
 fn merge(substitutions: Rc<AnySub>) -> MergeResult {
+    println!("{}", substitutions);
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
 
@@ -241,12 +242,25 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
         }
     }
     let mut combined_expr: SimpleSub = SimpleSub::empty();
+    let mut char_set = HashSet::new();
     for (var, eq_exprs) in &char_eq_class {
+        let mut temp_set: HashSet<Rc<CharVar>> = eq_exprs
+            .iter()
+            .filter_map(|expr| {
+                if let CharExpression::CharVar(ref var) = *expr {
+                    Some(Rc::new(var.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
         let mut u_set: HashSet<_> = eq_exprs
             .iter()
             .map(|expr| Rc::new((expr).clone())) // Dereference `expr` (&&CharExpression) and clone
             .collect();
         u_set.insert(Rc::new(CharExpression::CharVar(var.clone())));
+        temp_set.insert(Rc::new(var.clone()));
+
         if !union_over_set(
             &mut union_find,
             &u_set,
@@ -256,13 +270,21 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
         ) {
             return MergeResult::Bottom;
         }
+        char_set = char_set.union(&temp_set).cloned().collect();
         //TODO: Union
     }
-    for var in char_eq_class.keys() {
-        let id_var = expr_to_id[&Rc::new(CharExpression::CharVar(var.clone()))];
+    for var in char_set {
+        let deref = var.as_ref();
+        let char_expression = Rc::new(CharExpression::CharVar(var.as_ref().clone()));
+        let id_var = expr_to_id[&char_expression];
         let found_expr = id_to_expr[&union_find.find(id_var)].clone();
-        if CharExpression::CharVar(var.clone()) != *found_expr {
-            combined_expr.set_char_var(var.clone(), found_expr.as_ref().clone());
+        match canonical_map.get(&char_expression) {
+            Some(value) => combined_expr.set_char_var(var.as_ref().clone(), value.as_ref().clone()),
+            None => {
+                if CharExpression::CharVar(deref.clone()) != *found_expr {
+                    combined_expr.set_char_var(deref.clone(), found_expr.as_ref().clone());
+                }
+            }
         }
     }
 
@@ -291,6 +313,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
         }
         combined_expr.set_string_var(var.clone(), eq_exprs[0].clone());
     }
+    println!("{}", combined_expr);
     MergeResult::SimpleSub(combined_expr)
 }
 
@@ -298,16 +321,15 @@ fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>) -> MergeResult {
     if let MergeResult::SimpleSub(result) =
         merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone())))
     {
-        let mut retsub = SimpleSub::empty();
-        for char_var in result.get_char_map().keys() {
+        let mut retsub = result.clone();
+        for char_var in sub2.get_char_map().keys() {
             retsub.remove_char_map(char_var);
         }
         for (string_var, sub_expr1) in result.get_str_map() {
             if let Some(sub_expr2) = sub2.get_string_var(string_var) {
+                retsub.remove_str_map(string_var);
                 if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
-                    retsub
-                        .get_char_map_mut()
-                        .append(sub.get_char_map_mut());
+                    retsub.get_char_map_mut().append(sub.get_char_map_mut());
                     retsub.get_str_map_mut().append(sub.get_str_map_mut());
                 } else {
                     return MergeResult::Bottom;
@@ -420,7 +442,9 @@ pub fn derivative(
                     match (p_sub.get_subs(), q_sub.get_subs()) {
                         (MergeResult::SimpleSub(left_elem), MergeResult::SimpleSub(right_elem)) => {
                             let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
+                            println!("Left:{} \nRight:{} \nTogether{:?}",left_elem,right_elem,unionLR);
                             let ret = merge(Rc::new(unionLR));
+                            println!("Merge: {}",ret);
                             match ret {
                                 MergeResult::SimpleSub(_) => {
                                     let left_minus_right = sub_difference(
@@ -431,10 +455,10 @@ pub fn derivative(
                                         Rc::new(right_elem.clone()),
                                         Rc::new(left_elem.clone()),
                                     );
-                                    println!("{} right", right_elem);
-                                    println!("{} left", left_elem);
-                                    println!("{} left-minus-right", left_minus_right);
-                                    println!("{} right-minus-left", right_minus_left);
+                                    println!("{} right\n", right_elem);
+                                    println!("{} left\n", left_elem);
+                                    println!("{} left-minus-right\n", left_minus_right);
+                                    println!("{} right-minus-left\n", right_minus_left);
                                     match (left_minus_right, right_minus_left) {
                                         (
                                             MergeResult::SimpleSub(l_minus_r),
@@ -621,10 +645,10 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
                             value.get_head()[index].clone(),
                         )))
                     } else if value.get_tail() {
-                            Rc::new(GenRegex::StringIndex(Rc::new(StringIndex {
-                                var: string_index.var.clone(),
-                                index: ((index - length + 1) as i32),
-                            })))
+                        Rc::new(GenRegex::StringIndex(Rc::new(StringIndex {
+                            var: string_index.var.clone(),
+                            index: ((index - length + 1) as i32),
+                        })))
                     } else {
                         Rc::new(GenRegex::EmptySet)
                     }
@@ -655,14 +679,14 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
 
 pub fn satisfiable(expr: &Rc<GenRegex>) -> bool {
     let mut ind = 0;
-    satisfiable_helper(expr, ind, HashSet::new())
+    satisfiable_helper(expr, &mut ind, HashSet::new())
 }
 pub fn satisfiable_helper(
     expr: &Rc<GenRegex>,
-    mut index: i32,
+    index: &mut i32,
     mut visited: HashSet<GenRegex>,
 ) -> bool {
-    println!("{}", expr);
+    //println!("{}", expr);
     if visited.contains(expr) {
         return false;
     } else {
@@ -675,7 +699,7 @@ pub fn satisfiable_helper(
         if deriv.is_empty() {
             return false;
         }
-        index += 1;
+        *index += 1;
         for elem in deriv {
             if satisfiable_helper(elem.get_expr(), index, visited.clone()) {
                 return true;

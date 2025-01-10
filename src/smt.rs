@@ -16,6 +16,8 @@ use std::fmt;
 pub enum SmtParseError {
     FileError(String),               // File not found
     SexprError(lexpr::parse::Error), // Error parsing S-expression
+    MissingAssertion(String),        // Missing (assert) statement in SMTLib file
+    MissingCheckSat(String),         // Missing (check-sat) statement in SMTLib file
     Unsupported(String),             // Unsupported SMTLib feature
     Unrecognized(String),            // Unrecognized SMTLib feature
     Unimplemented(String),           // Unimplemented SMTLib feature
@@ -38,6 +40,8 @@ impl fmt::Display for SmtParseError {
         match self {
             SmtParseError::FileError(s) => write!(f, "File error: {}", s),
             SmtParseError::SexprError(e) => write!(f, "S-expression error: {}", e),
+            SmtParseError::MissingAssertion(s) => write!(f, "Expected (assert) statement: {}", s),
+            SmtParseError::MissingCheckSat(s) => write!(f, "Expected (check-sat) statement: {}", s),
             SmtParseError::Unsupported(s) => write!(f, "Unsupported SMTLib feature: {}", s),
             SmtParseError::Unrecognized(s) => write!(f, "Unrecognized SMTLib feature: {}", s),
             SmtParseError::Unimplemented(s) => write!(f, "Unimplemented SMTLib feature: {}", s),
@@ -81,6 +85,20 @@ impl SmtParser {
     }
 
     pub fn parse_s_expr(&self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        /*
+            TODO: the below is wrong, what we really want is to implement this in a more top-down manner:
+
+            - First, read the list of S-expressions at the top level, looking for a list of
+            (declare-const), (assert), and (check-sat) commands (ignoring others)
+
+            - Error out if we don't see an assert or a check-sat at the end
+
+            - Store the constants in some way - probably as a state component for SmtParser
+
+            - Then, call custom parsing commands for individual syntax elements, like parse_assert, parse_intersection,
+              parse_concat, parse_union, etc.
+        */
+
         match v {
             // Cases we care about
             Value::Null => self.parse_empty(),

@@ -3,7 +3,7 @@
 //!
 
 use crate::classes::{
-    AntimirovDerivativeElement, CharExpression, CharVar, GenRegex, MaybeCharExpression,
+    AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression,
     MergeResult, Predicate, SimpleSub, StringIndex, StringVar, SubExpr,
 };
 use std::fmt::{self, Display};
@@ -22,6 +22,27 @@ impl fmt::Display for MergeResult {
             MergeResult::Bottom => write!(f, "\\bot"),
             MergeResult::SimpleSub(s) => write!(f, "{}", s),
         }
+    }
+}
+impl Display for AnySub {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ANYSUB string_to: {{ ")?;
+        for (key, value) in self.get_str_map() {
+            for v in value {
+                write!(f, "{} => {}, ", key, v)?;
+            }
+        }
+        writeln!(f, "}}")?;
+
+        write!(f, "char_to: {{ ")?;
+        for (key, value) in self.get_char_map() {
+            for v in value {
+                write!(f, "{} => {}, ", key, v)?;
+            }
+        }
+        write!(f, "}}")?;
+
+        Ok(())
     }
 }
 
@@ -100,13 +121,14 @@ impl Display for StringIndex {
 impl Display for Predicate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Predicate::And(kids) => {
-                let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "({})", parts.join(" AND "))
+            Predicate::And(left, right) => {
+                //let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
+                write!(f, "({} AND {})", left, right)
             }
-            Predicate::Or(kids) => {
-                let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "({})", parts.join(" OR "))
+            Predicate::Or(left, right) => {
+                //let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
+                write!(f, "({} AND {})", left, right)
+                //write!(f, "({})", parts.join(" OR "))
             }
             Predicate::Not(pred1) => {
                 write!(f, "NOT({})", pred1)

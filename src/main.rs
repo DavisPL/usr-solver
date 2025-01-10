@@ -9,17 +9,18 @@
 
 use std::collections::{HashMap, HashSet};
 mod antimirov;
-mod brzozowski;
+//mod brzozowski;
 mod classes;
-mod predicate_evaluation;
+//mod predicate_evaluation;
 mod print;
 mod smt;
 
 use antimirov::derivative;
 use antimirov::satisfiable;
-use brzozowski::matching;
-use brzozowski::nullable;
-use brzozowski::nullableProjection;
+//use brzozowski::matching;
+//use brzozowski::nullable;
+//use brzozowski::nullableProjection;
+use classes::CharVar;
 use classes::{CharExpression, GenRegex, MaybeCharExpression, Predicate, StringIndex, StringVar};
 use std::rc::Rc;
 
@@ -101,7 +102,14 @@ fn main() {
     println!("{} {}", test2, satisfiable(&Rc::clone(test2)));
     println!("{} {}", test3, satisfiable(&Rc::clone(test3)));
     //println!("{} {}", test4, satisfiable(&Rc::clone(test4)));*/
-    println!("{} {}", new_test, satisfiable(&Rc::clone(new_test)));
+    let boop=Rc::new(CharExpression::CharVar(CharVar{name:String::from("c1")}));
+    println!("New test:{}",new_test);
+    println!("Nullable:{:?}",antimirov::nullable(new_test).is_empty());
+    let deriv=derivative(new_test, &boop);
+    for ele in deriv{
+        println!("usr:{} subs:{}",ele.get_expr(),ele.get_subs());
+    }
+    //println!("Result:{} Bool:{}", new_test, satisfiable(&Rc::clone(new_test)));
     /*println!("{} {}", test6, satisfiable(&Rc::clone(test6)));
     println!("{} {}", test7, satisfiable(&Rc::clone(test7)));
     println!("{} {}", test8, satisfiable(&Rc::clone(test8)));
