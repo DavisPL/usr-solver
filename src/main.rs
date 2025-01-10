@@ -106,14 +106,14 @@ fn main() {
         )),
         Rc::new(Predicate::Equals(
             Rc::clone(&char_var_2.clone()),
-            Rc::clone(&literal_b_maybe),
+            Rc::clone(literal_b_maybe),
         )),
     ));
     let preds_2 = Rc::new(Predicate::And(
         Rc::clone(&preds),
         Rc::new(Predicate::Equals(
             char_var.clone(),
-            Rc::clone(&literal_a_maybe),
+            Rc::clone(literal_a_maybe),
         )),
     ));
     let if_then_else = &Rc::new(GenRegex::IfThenElse(

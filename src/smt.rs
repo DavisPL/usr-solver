@@ -2,11 +2,14 @@
 //! Parsing for SMTLib files
 //!
 
-use super::classes::GenRegex;
+use super::classes::{CharExpression, GenRegex, StringVar};
 
 use lexpr::{self, Value};
+
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
+use std::rc::Rc;
 
 /*
     Error type
@@ -16,8 +19,8 @@ use std::fmt;
 pub enum SmtParseError {
     FileError(String),               // File not found
     SexprError(lexpr::parse::Error), // Error parsing S-expression
-    MissingAssertion(String),        // Missing (assert) statement in SMTLib file
-    MissingCheckSat(String),         // Missing (check-sat) statement in SMTLib file
+    MissingAssertion(),              // Missing (assert) statement in SMTLib file
+    MissingCheckSat(),               // Missing (check-sat) statement in SMTLib file
     Unsupported(String),             // Unsupported SMTLib feature
     Unrecognized(String),            // Unrecognized SMTLib feature
     Unimplemented(String),           // Unimplemented SMTLib feature
@@ -40,8 +43,8 @@ impl fmt::Display for SmtParseError {
         match self {
             SmtParseError::FileError(s) => write!(f, "File error: {}", s),
             SmtParseError::SexprError(e) => write!(f, "S-expression error: {}", e),
-            SmtParseError::MissingAssertion(s) => write!(f, "Expected (assert) statement: {}", s),
-            SmtParseError::MissingCheckSat(s) => write!(f, "Expected (check-sat) statement: {}", s),
+            SmtParseError::MissingAssertion() => write!(f, "Expected (assert) statement"),
+            SmtParseError::MissingCheckSat() => write!(f, "Expected (check-sat) statement"),
             SmtParseError::Unsupported(s) => write!(f, "Unsupported SMTLib feature: {}", s),
             SmtParseError::Unrecognized(s) => write!(f, "Unrecognized SMTLib feature: {}", s),
             SmtParseError::Unimplemented(s) => write!(f, "Unimplemented SMTLib feature: {}", s),
@@ -66,6 +69,9 @@ fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
     // Read in the file
     let smt_string = std::fs::read_to_string(file_path)?;
 
+    // Add an opening and closoing paren
+    let smt_string = format!("(\n{}\n)", smt_string);
+
     // Parse S-expression
     let v = lexpr::from_str(&smt_string)?;
 
@@ -77,65 +83,99 @@ fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
     Main parsing interface
 */
 
-pub struct SmtParser {}
+pub struct SmtParser {
+    found_assert: bool,
+    found_check_sat: bool,
+    var_names: HashSet<String>,
+    regex_result: Option<GenRegex>,
+}
 
 impl SmtParser {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            found_assert: false,
+            found_check_sat: false,
+            var_names: HashSet::new(),
+            regex_result: None,
+        }
     }
 
-    pub fn parse_s_expr(&self, v: &Value) -> Result<GenRegex, SmtParseError> {
-        /*
-            TODO: the below is wrong, what we really want is to implement this in a more top-down manner:
+    pub fn parse_s_expr(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        // println!("called parse_s_expr with value: {:?}", v);
 
-            - First, read the list of S-expressions at the top level, looking for a list of
-            (declare-const), (assert), and (check-sat) commands (ignoring others)
-
-            - Error out if we don't see an assert or a check-sat at the end
-
-            - Store the constants in some way - probably as a state component for SmtParser
-
-            - Then, call custom parsing commands for individual syntax elements, like parse_assert, parse_intersection,
-              parse_concat, parse_union, etc.
-        */
-
-        match v {
-            // Cases we care about
-            Value::Null => self.parse_empty(),
-            Value::Cons(c) => self.parse_cons(c),
-            Value::Symbol(s) => self.parse_symbol(s),
-
-            // Cases we don't understand yet
-            Value::Nil => Err(SmtParseError::Unrecognized("Nil S-expression".to_string())),
-            Value::Bool(b) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib boolean: {}",
-                b
-            ))),
-            Value::Number(num) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib number: {}",
-                num
-            ))),
-            Value::Char(ch) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib character: {}",
-                ch
-            ))),
-            Value::String(s) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib string: {}",
-                s
-            ))),
-            Value::Keyword(k) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib keyword: {}",
-                k
-            ))),
-            Value::Bytes(b) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib bytes: {:?}",
-                b
-            ))),
-            Value::Vector(v) => Err(SmtParseError::Unrecognized(format!(
-                "Found unrecognized SMTLib vector: {:?}",
+        // Parse list of items at the top level recursively
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            // Process head
+            self.parse_head(head)?;
+            // Recurse on tail
+            self.parse_s_expr(tail)
+        } else if let Value::Null = v {
+            if !self.found_assert {
+                return Err(SmtParseError::MissingAssertion());
+            }
+            if !self.found_check_sat {
+                return Err(SmtParseError::MissingCheckSat());
+            }
+            let result = self.regex_result.take();
+            Ok(result.expect("Regex result should have been set by parser earlier!"))
+        } else {
+            Err(SmtParseError::Unrecognized(format!(
+                "Found unexpected S-expression: {:?}",
                 v
-            ))),
+            )))
         }
+    }
+
+    fn parse_head(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // 3 cases here: (declare-const), (assert), (check-sat)
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+
+            if let Value::Symbol(s) = head {
+                match s.as_ref() {
+                    "declare-const" => self.parse_declare_const(tail),
+                    "assert" => self.parse_assert(tail),
+                    "check-sat" => self.parse_check_sat(tail),
+                    _ => Err(SmtParseError::Unsupported(format!(
+                        "Unsupported SMTLib command: {}",
+                        s
+                    ))),
+                }
+            } else {
+                Err(SmtParseError::Unrecognized(format!(
+                    "Unrecognized S-expression: {:?}",
+                    head
+                )))
+            }
+        } else {
+            Err(SmtParseError::Unrecognized(format!(
+                "Unrecognized S-expression: {:?}",
+                v
+            )))
+        }
+    }
+
+    fn parse_declare_const(&self, v: &Value) -> Result<(), SmtParseError> {
+        // Add variable name to self.var_names
+
+        // TODO
+
+        Ok(())
+    }
+
+    fn parse_assert(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // Set flag
+        self.found_assert = true;
+        // Parse the regex
+        // TODO
+        unimplemented!()
+    }
+
+    fn parse_check_sat(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // Set flag
+        self.found_check_sat = true;
+        Ok(())
     }
 
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
@@ -204,6 +244,8 @@ impl SmtParser {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn s_expr_test() {
         // Basic unit test for parsing SMTLib files
@@ -233,5 +275,62 @@ mod tests {
 
         // Uncomment to view output
         // assert!(false);
+    }
+
+    #[test]
+    fn test_simple_1() {
+        // Load the file simple1.smt2
+        // Parse as s-expression
+        let smt_result = parse_smtlib_file("benchmarks/simple1.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        // Expected output
+        let expected = GenRegex::Intersect(
+            Rc::new(GenRegex::StringVar(Rc::new(StringVar {
+                name: "x".to_string(),
+            }))),
+            Rc::new(GenRegex::Concatenation(
+                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+                    "a".to_string(),
+                )))),
+                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+                    "b".to_string(),
+                )))),
+            )),
+        );
+
+        assert_eq!(gen_regex_unwrapped, expected);
+    }
+
+    #[ignore]
+    #[test]
+    fn test_simple_2() {
+        // TODO
+        unimplemented!()
+    }
+
+    #[ignore]
+    #[test]
+    fn test_simple_3() {
+        // TODO
+        unimplemented!()
+    }
+
+    #[ignore]
+    #[test]
+    fn test_date() {
+        // TODO
+        unimplemented!()
     }
 }

@@ -8,6 +8,8 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use std::rc::Rc;
 
+// TODO: replace Rc<CharExpression> with CharExpression
+// and similar for StringVar, StringIndex
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
     EmptySet,
