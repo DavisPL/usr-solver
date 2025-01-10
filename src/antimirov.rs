@@ -298,12 +298,13 @@ fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>) -> MergeResult {
     if let MergeResult::SimpleSub(result) =
         merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone())))
     {
-        let mut retsub = SimpleSub::empty();
-        for char_var in result.get_char_map().keys() {
+        let mut retsub = result.clone();
+        for char_var in sub2.get_char_map().keys() {
             retsub.remove_char_map(char_var);
         }
         for (string_var, sub_expr1) in result.get_str_map() {
             if let Some(sub_expr2) = sub2.get_string_var(string_var) {
+                retsub.remove_str_map(string_var);
                 if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
                     retsub
                         .get_char_map_mut()
@@ -420,7 +421,9 @@ pub fn derivative(
                     match (p_sub.get_subs(), q_sub.get_subs()) {
                         (MergeResult::SimpleSub(left_elem), MergeResult::SimpleSub(right_elem)) => {
                             let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
+                            println!("Left:{} \nRight:{} \nTogether{:?}",left_elem,right_elem,unionLR);
                             let ret = merge(Rc::new(unionLR));
+                            println!("Merge: {}",ret);
                             match ret {
                                 MergeResult::SimpleSub(_) => {
                                     let left_minus_right = sub_difference(
@@ -431,10 +434,10 @@ pub fn derivative(
                                         Rc::new(right_elem.clone()),
                                         Rc::new(left_elem.clone()),
                                     );
-                                    println!("{} right", right_elem);
-                                    println!("{} left", left_elem);
-                                    println!("{} left-minus-right", left_minus_right);
-                                    println!("{} right-minus-left", right_minus_left);
+                                    println!("{} right\n", right_elem);
+                                    println!("{} left\n", left_elem);
+                                    println!("{} left-minus-right\n", left_minus_right);
+                                    println!("{} right-minus-left\n", right_minus_left);
                                     match (left_minus_right, right_minus_left) {
                                         (
                                             MergeResult::SimpleSub(l_minus_r),
