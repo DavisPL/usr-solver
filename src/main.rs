@@ -17,9 +17,9 @@ mod smt;
 
 use antimirov::derivative;
 use antimirov::satisfiable;
-use brzozowski::matching;
-use brzozowski::nullable;
-use brzozowski::nullableProjection;
+//use brzozowski::matching;
+//use brzozowski::nullable;
+//use brzozowski::nullableProjection;
 use classes::CharVar;
 use classes::{CharExpression, GenRegex, MaybeCharExpression, Predicate, StringIndex, StringVar};
 use std::rc::Rc;
