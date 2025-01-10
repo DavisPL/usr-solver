@@ -9,17 +9,17 @@
 
 use std::collections::{HashMap, HashSet};
 mod antimirov;
-//mod brzozowski;
+mod brzozowski;
 mod classes;
-//mod predicate_evaluation;
+mod predicate_evaluation;
 mod print;
 mod smt;
 
-use antimirov::derivative;
-use antimirov::satisfiable;
-//use brzozowski::matching;
-//use brzozowski::nullable;
-//use brzozowski::nullableProjection;
+use brzozowski::derivative;
+use brzozowski::matching;
+use brzozowski::nullable;
+use brzozowski::nullableProjection;
+use brzozowski::satisfiable;
 use classes::CharVar;
 use classes::{CharExpression, GenRegex, MaybeCharExpression, Predicate, StringIndex, StringVar};
 use std::rc::Rc;
@@ -37,12 +37,18 @@ fn main() {
     let literal_a = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
         String::from("a"),
     ))));
+    let literal_a_maybe = &Rc::new(MaybeCharExpression::CharExpression(Rc::new(
+        CharExpression::Literal(String::from("a")),
+    )));
     let empty = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
         String::from(""),
     ))));
     let literal_b = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
         String::from("b"),
     ))));
+    let literal_b_maybe = &Rc::new(MaybeCharExpression::CharExpression(Rc::new(
+        CharExpression::Literal(String::from("b")),
+    )));
     let test1 = &Rc::new(GenRegex::Union(Rc::clone(literal_a), Rc::clone(literal_b)));
     let test2 = &Rc::new(GenRegex::Kleene(Rc::clone(literal_a)));
     let test3 = &Rc::new(GenRegex::Concatenation(
@@ -75,7 +81,53 @@ fn main() {
         Rc::clone(gre1),
         Rc::clone(literal_a),
     ));
-    let new_test = &Rc::new(GenRegex::Intersect(Rc::clone(a_w), Rc::clone(gre1)));
+    let new_test_t = &Rc::new(GenRegex::Intersect(Rc::clone(a_w), Rc::clone(w_a)));
+    let new_test = &derivative(
+        &Rc::clone(new_test_t),
+        &Rc::new(CharExpression::CharVar(classes::CharVar {
+            name: String::from("c1"),
+        })),
+    );
+
+    let char_var = Rc::new(MaybeCharExpression::CharExpression(Rc::new(
+        CharExpression::CharVar(classes::CharVar {
+            name: String::from("c1"),
+        }),
+    )));
+    let char_var_2 = Rc::new(MaybeCharExpression::CharExpression(Rc::new(
+        CharExpression::CharVar(classes::CharVar {
+            name: String::from("c2"),
+        }),
+    )));
+    let preds = Rc::new(Predicate::Or(
+        Rc::new(Predicate::Equals(
+            char_var_2.clone(),
+            Rc::clone(literal_a_maybe),
+        )),
+        Rc::new(Predicate::Equals(
+            Rc::clone(&char_var_2.clone()),
+            Rc::clone(&literal_b_maybe),
+        )),
+    ));
+    let preds_2 = Rc::new(Predicate::And(
+        Rc::clone(&preds),
+        Rc::new(Predicate::Equals(
+            char_var.clone(),
+            Rc::clone(&literal_a_maybe),
+        )),
+    ));
+    let if_then_else = &Rc::new(GenRegex::IfThenElse(
+        Rc::clone(&preds_2),
+        Rc::clone(empty),
+        Rc::clone(literal_b),
+    ));
+
+    let null_proj = nullableProjection(&Rc::clone(if_then_else));
+    for i in null_proj {
+        for j in i {
+            println!("{}", j);
+        }
+    }
     /*let literal_c = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(String::from("c")))));
 
     //let char_expr = CharExpression::StringIndex(string_var, 0);
@@ -102,13 +154,13 @@ fn main() {
     println!("{} {}", test2, satisfiable(&Rc::clone(test2)));
     println!("{} {}", test3, satisfiable(&Rc::clone(test3)));
     //println!("{} {}", test4, satisfiable(&Rc::clone(test4)));*/
-    let boop=Rc::new(CharExpression::CharVar(CharVar{name:String::from("c1")}));
+    /*    let boop=Rc::new(CharExpression::CharVar(CharVar{name:String::from("c1")}));
     println!("New test:{}",new_test);
     println!("Nullable:{:?}",antimirov::nullable(new_test).is_empty());
     let deriv=derivative(new_test, &boop);
     for ele in deriv{
         println!("usr:{} subs:{}",ele.get_expr(),ele.get_subs());
-    }
+    }*/
     //println!("Result:{} Bool:{}", new_test, satisfiable(&Rc::clone(new_test)));
     /*println!("{} {}", test6, satisfiable(&Rc::clone(test6)));
     println!("{} {}", test7, satisfiable(&Rc::clone(test7)));

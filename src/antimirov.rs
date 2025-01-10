@@ -271,7 +271,6 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
             return MergeResult::Bottom;
         }
         char_set = char_set.union(&temp_set).cloned().collect();
-        //TODO: Union
     }
     for var in char_set {
         let deref = var.as_ref();
@@ -442,9 +441,12 @@ pub fn derivative(
                     match (p_sub.get_subs(), q_sub.get_subs()) {
                         (MergeResult::SimpleSub(left_elem), MergeResult::SimpleSub(right_elem)) => {
                             let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
-                            println!("Left:{} \nRight:{} \nTogether{:?}",left_elem,right_elem,unionLR);
+                            println!(
+                                "Left:{} \nRight:{} \nTogether{:?}",
+                                left_elem, right_elem, unionLR
+                            );
                             let ret = merge(Rc::new(unionLR));
-                            println!("Merge: {}",ret);
+                            println!("Merge: {}", ret);
                             match ret {
                                 MergeResult::SimpleSub(_) => {
                                     let left_minus_right = sub_difference(

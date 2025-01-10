@@ -127,7 +127,7 @@ impl Display for Predicate {
             }
             Predicate::Or(left, right) => {
                 //let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "({} AND {})", left, right)
+                write!(f, "({} OR {})", left, right)
                 //write!(f, "({})", parts.join(" OR "))
             }
             Predicate::Not(pred1) => {

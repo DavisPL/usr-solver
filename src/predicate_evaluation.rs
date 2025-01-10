@@ -52,7 +52,7 @@ fn get_string_index(mce: &Rc<MaybeCharExpression>) -> Option<StringIndex> {
     }
 }
 
-pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
+/*pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
     match pred.as_ref() {
         Predicate::And(left, right) => {
             let mut flattened: Vec<Rc<Predicate>> = Vec::new();
@@ -64,7 +64,7 @@ pub fn flatten_and_predicates(pred: &Rc<Predicate>) -> Vec<Rc<Predicate>> {
             vec![Rc::clone(pred)]
         }
     }
-}
+}*/
 
 fn assign_unique_ids(
     predicate: &Predicate,
@@ -96,209 +96,226 @@ fn assign_unique_ids(
     }
 }
 
-pub fn evaluateComplete(pred: &Rc<Predicate>) -> Rc<Predicate> {
+pub fn evaluateComplete(pred: &Rc<Predicate>) -> Vec<Vec<Rc<Predicate>>> {
     let mut id_map: HashMap<MaybeCharExpression, i32> = HashMap::new();
-    let mut canonical_map: HashMap<i32, i32> = HashMap::new();
+    //let mut canonical_map: HashMap<i32, i32> = HashMap::new();
     let mut next_id = 1;
     assign_unique_ids(pred, &mut id_map, &mut next_id);
-    let mut uf: UnionFind<usize> = UnionFind::new((next_id) as usize);
+    //let mut uf: UnionFind<usize> = UnionFind::new((next_id) as usize);
     let predicate = convertToDNF(pred);
+    for i in &predicate {
+        for j in i {
+            println!("{} dnf", j);
+        }
+    }
     //let uf = &mut UnionFind2::new();
-    evaluate(&predicate, &mut uf, &mut id_map, &mut canonical_map)
+    evaluate(&predicate, &mut id_map /*&mut canonical_map*/)
 }
 
-fn evaluate(
-    pred: &Rc<Predicate>,
+pub fn evaluate_conjunction(
+    all_preds: &Vec<Rc<Predicate>>,
     union_find: &mut UnionFind,
     id_map: &mut HashMap<MaybeCharExpression, i32>,
     //string_map: &mut HashMap<i32, String>,
     map: &mut HashMap<i32, i32>,
-) -> Rc<Predicate> {
-    //let uf = union_find.unwrap_or_else(|| UnionFind::new());
-
+) -> Vec<Rc<Predicate>> {
     let alphabet: HashSet<String> = vec!["a".to_string(), "b".to_string()].into_iter().collect();
+    let mut final_preds = Vec::new();
+    let mut not_equality_preds = HashSet::new();
+    let mut length_preds: HashMap<String, i32> = HashMap::new();
+    let not_allowed_lengths: HashMap<String, HashSet<i32>> = HashMap::new();
+    let mut equalities = HashSet::new();
 
-    match pred.as_ref() {
-        Predicate::And(..) => {
-            // TODO: Unused variable?
-
-            let mut final_preds = Vec::new();
-            let mut not_equality_preds = HashSet::new();
-            let mut length_preds: HashMap<String, i32> = HashMap::new();
-            let not_allowed_lengths: HashMap<String, HashSet<i32>> = HashMap::new();
-            let mut equalities = HashSet::new();
-
-            let all_preds = flatten_and_predicates(pred);
-
-            for p in all_preds {
-                match p.as_ref() {
-                    Predicate::Not(_) => {
-                        not_equality_preds.insert(p);
+    for p in all_preds {
+        println!("{}", p);
+        match p.as_ref() {
+            Predicate::Not(_) => {
+                not_equality_preds.insert(p);
+            }
+            Predicate::Equals(..) => {
+                equalities.insert(p);
+            }
+            Predicate::EqualLength(var, length) => {
+                if let Some(temp) = length_preds.get(&var.name) {
+                    if *temp != *length {
+                        return vec![Rc::new(Predicate::False)];
                     }
-                    Predicate::Equals(..) => {
-                        equalities.insert(p);
-                    }
-                    Predicate::EqualLength(var, length) => {
-                        if let Some(temp) = length_preds.get(&var.name) {
-                            if *temp != *length {
-                                return Rc::new(Predicate::False);
-                            }
-                        }
-                        length_preds.insert(var.name.clone(), *length);
-                    }
-                    Predicate::False => {
-                        return Rc::new(Predicate::False);
+                }
+                length_preds.insert(var.name.clone(), *length);
+            }
+            Predicate::False => {
+                return vec![Rc::new(Predicate::False)];
+                //return Rc::new(Predicate::False);
+            }
+            _ => {}
+        }
+    }
+    for p in equalities {
+        let leftId;
+        let rightId;
+        if let Predicate::Equals(left, right) = p.as_ref() {
+            leftId = id_map[left];
+            rightId = id_map[right];
+            println!("{} {}", leftId, rightId);
+            match left.as_ref() {
+                MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
+                    CharExpression::Literal(_) => {
+                        map.insert(leftId, leftId);
                     }
                     _ => {}
-                }
+                },
+                _ => {}
             }
-            for p in equalities {
-                let leftId;
-                let rightId;
-                if let Predicate::Equals(left, right) = p.as_ref() {
-                    leftId = id_map[left];
-                    rightId = id_map[right];
-                    match left.as_ref() {
-                        MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
-                            CharExpression::Literal(_) => {
-                                map.insert(leftId, leftId);
-                            }
-                            _ => {}
-                        },
-                        _ => {}
+            match right.as_ref() {
+                MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
+                    CharExpression::Literal(_) => {
+                        map.insert(rightId, rightId);
                     }
-                    match right.as_ref() {
-                        MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
-                            CharExpression::Literal(_) => {
-                                map.insert(rightId, rightId);
-                            }
-                            _ => {}
-                        },
-                        _ => {}
-                    }
-                    if leftId != rightId {
-                        final_preds.push(p);
-                    }
-                    if let (Some(value1), Some(value2)) = (map.get(&leftId), map.get(&rightId)) {
-                        if value1 != value2 {
-                            return Rc::new(Predicate::False);
-                        } else {
-                            union_find.union(leftId as usize, rightId as usize);
-                        }
-                    } else if let Some(value1) = map.get(&leftId) {
-                        union_find.union(leftId as usize, rightId as usize);
-                        let new_canon = union_find.find(leftId as usize);
-                        map.insert(new_canon as i32, *value1);
-                    } else if let Some(value1) = map.get(&rightId) {
-                        union_find.union(leftId as usize, rightId as usize);
-                        let new_canon = union_find.find(leftId as usize);
-                        map.insert(new_canon as i32, *value1);
-                    } else {
-                        union_find.union(leftId as usize, rightId as usize);
-                    }
-                }
+                    _ => {}
+                },
+                _ => {}
             }
-            let cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
-            for not_pred in not_equality_preds {
-                if let Predicate::Not(inner) = &*not_pred {
-                    let leftId;
-                    let rightId;
-                    if let Predicate::Equals(left, right) = inner.as_ref() {
-                        //Think this needs to
-                        //be redone?
-                        leftId = id_map[left];
-                        rightId = id_map[right];
-                        if leftId == rightId {
-                            return Rc::new(Predicate::False);
-                        }
-                        if let (Some(_), Some(_)) = (map.get(&leftId), map.get(&rightId)) {
-                            final_preds.push(not_pred)
-                        }
-                    } else if let Predicate::EqualLength(var_name, length) = &**inner {
-                        //let Predicate::EqualLength(var_name, length) = &**inner;
-                        let mut flag = false;
-                        for (key, value) in id_map.iter() {
-                            if is_string_index(&Rc::new(key.clone())) {
-                                //if key.starts_with("StringIndex") {
-                                let str_ind =
-                                    get_string_index(&Rc::new(key.clone())).expect("string ind"); //Maybe should rewrite? TODO: check clarity of predicate evaluation
-                                if str_ind.var.name == var_name.name.clone()
-                                    && str_ind.index >= *length
-                                    && union_find.find(*value as usize) != *value as usize
-                                {
-                                    flag = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if flag {
-                            continue;
-                        }
-
-                        final_preds.push(not_pred);
-                    }
-                }
+            if leftId != rightId {
+                final_preds.push(p.clone());
             }
-            for (_, chars) in cant_equal_chars {
-                if alphabet.iter().all(|c| chars.contains(c)) {
-                    return Rc::new(Predicate::False);
+            let uf_left = union_find.find(leftId as usize) as i32;
+            let uf_right = union_find.find(rightId as usize) as i32;
+            if let (Some(value1), Some(value2)) = (map.get(&uf_left), map.get(&uf_right)) {
+                if value1 != value2 {
+                    return vec![Rc::new(Predicate::False)];
+                } else {
+                    union_find.union(leftId as usize, rightId as usize);
                 }
+            } else if let Some(value1) = map.get(&uf_left) {
+                union_find.union(leftId as usize, rightId as usize);
+                let new_canon = union_find.find(leftId as usize);
+                map.insert(new_canon as i32, *value1);
+            } else if let Some(value1) = map.get(&uf_right) {
+                union_find.union(leftId as usize, rightId as usize);
+                let new_canon = union_find.find(leftId as usize);
+                map.insert(new_canon as i32, *value1);
+            } else {
+                union_find.union(leftId as usize, rightId as usize);
             }
-
-            for (var_name, length) in length_preds {
-                if not_allowed_lengths
-                    .get(&var_name)
-                    .map_or(false, |lengths| lengths.contains(&length))
-                {
-                    return Rc::new(Predicate::False);
+        }
+    }
+    let cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
+    for not_pred in not_equality_preds {
+        if let Predicate::Not(inner) = not_pred.as_ref() {
+            let leftId;
+            let rightId;
+            if let Predicate::Equals(left, right) = inner.as_ref() {
+                //Think this needs to
+                //be redone?
+                leftId = id_map[left];
+                rightId = id_map[right];
+                if leftId == rightId {
+                    return vec![Rc::new(Predicate::False)];
+                    //return Rc::new(Predicate::False);
                 }
+                if let (Some(_), Some(_)) = (map.get(&leftId), map.get(&rightId)) {
+                    final_preds.push(not_pred.clone())
+                }
+            } else if let Predicate::EqualLength(var_name, length) = &**inner {
+                //let Predicate::EqualLength(var_name, length) = &**inner;
+                let mut flag = false;
                 for (key, value) in id_map.iter() {
                     if is_string_index(&Rc::new(key.clone())) {
-                        let str_ind = get_string_index(&Rc::new(key.clone())).expect("string ind");
-                        if str_ind.var.name == var_name.clone()
-                            && str_ind.index >= length
+                        //if key.starts_with("StringIndex") {
+                        let str_ind = get_string_index(&Rc::new(key.clone())).expect("string ind"); //Maybe should rewrite? TODO: check clarity of predicate evaluation
+                        if str_ind.var.name == var_name.name.clone()
+                            && str_ind.index >= *length
                             && union_find.find(*value as usize) != *value as usize
                         {
-                            return Rc::new(Predicate::False);
+                            flag = true;
+                            break;
                         }
                     }
                 }
-                let string_var = Rc::new(StringVar { name: var_name });
-                final_preds.push(Rc::new(Predicate::EqualLength(string_var, length)));
-            }
-            match final_preds.len() {
-                0 => Rc::new(Predicate::True),
-                1 => final_preds[0].clone(),
-                _ => Rc::new(Predicate::And(final_preds)),
+                if flag {
+                    continue;
+                }
+
+                final_preds.push(not_pred.clone());
             }
         }
-        Predicate::Or(predicates) => {
-            let mut final_set = Vec::new();
+    }
+    for (_, chars) in cant_equal_chars {
+        if alphabet.iter().all(|c| chars.contains(c)) {
+            return vec![Rc::new(Predicate::False)];
+        }
+    }
 
-            for p in predicates {
-                let mut canonical_map: HashMap<i32, i32> = HashMap::new();
-                let mut uf: UnionFind<usize> = UnionFind::new(id_map.len() + 1);
-                let p_eval = evaluate(&p.clone(), &mut uf, id_map, &mut canonical_map);
-                match &*p_eval {
-                    Predicate::True => return Rc::new(Predicate::True),
-                    Predicate::False => {
-                        continue;
-                    }
-                    _ => final_set.push(p_eval),
+    for (var_name, length) in length_preds {
+        if not_allowed_lengths
+            .get(&var_name)
+            .map_or(false, |lengths| lengths.contains(&length))
+        {
+            return vec![Rc::new(Predicate::False)];
+            //return Rc::new(Predicate::False);
+        }
+        for (key, value) in id_map.iter() {
+            if is_string_index(&Rc::new(key.clone())) {
+                let str_ind = get_string_index(&Rc::new(key.clone())).expect("string ind");
+                if str_ind.var.name == var_name.clone()
+                    && str_ind.index >= length
+                    && union_find.find(*value as usize) != *value as usize
+                {
+                    return vec![Rc::new(Predicate::False)];
+                    //return Rc::new(Predicate::False);
                 }
             }
+        }
+        let string_var = Rc::new(StringVar { name: var_name });
+        final_preds.push(Rc::new(Predicate::EqualLength(string_var, length)));
+    }
+    match final_preds.len() {
+        0 => vec![Rc::new(Predicate::True)],
+        //1 => vec![final_preds[0].clone(),
+        _ => final_preds,
+    }
+}
+fn evaluate(
+    pred: &Vec<Vec<Rc<Predicate>>>,
+    id_map: &mut HashMap<MaybeCharExpression, i32>,
+    //string_map: &mut HashMap<i32, String>,
+    //map: &mut HashMap<i32, i32>,
+) -> Vec<Vec<Rc<Predicate>>> {
+    //let uf = union_find.unwrap_or_else(|| UnionFind::new());
 
-            match final_set.len() {
-                0 => Rc::new(Predicate::False),
-                1 => final_set[0].clone(),
-                _ => Rc::new(Predicate::Or(final_set)),
+    let mut final_set = Vec::new();
+    for conjunct in pred {
+        let mut canonical_map: HashMap<i32, i32> = HashMap::new();
+        let mut uf: UnionFind<usize> = UnionFind::new(id_map.len() + 1);
+        let p_eval = evaluate_conjunction(&conjunct.clone(), &mut uf, id_map, &mut canonical_map);
+        if p_eval.len() == 1 {
+            match p_eval[0].as_ref() {
+                Predicate::True => {
+                    return vec![vec![Rc::new(Predicate::True)]];
+                }
+                Predicate::False => {
+                    continue;
+                }
+                _ => {}
             }
         }
-        _ => pred.clone(),
+        final_set.push(p_eval);
+        /*match &*p_eval {
+            Predicate::True => return Rc::new(Predicate::True),
+            Predicate::False => {
+                continue;
+            }
+            _ => final_set.push(p_eval),
+        }*/
+    }
+    match final_set.len() {
+        0 => vec![vec![Rc::new(Predicate::False)]],
+        //1 => final_set[0].clone(),
+        _ => final_set,
     }
 }
 
-fn distribute_ors(predicates: Vec<Rc<Predicate>>) -> Vec<Vec<Predicates>> {
+/*fn distribute_ors(predicates: Vec<Rc<Predicate>>) -> Vec<Vec<Predicate>> {
     let mut distributed: Vec<&[Rc<Predicate>]> = Vec::with_capacity(predicates.len());
 
     for pred in &predicates {
@@ -384,26 +401,30 @@ fn cartesian_product(vectors: &[&[Rc<Predicate>]]) -> Vec<Vec<Rc<Predicate>>> {
     }
 
     result
-}
+}*/
 
-pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate>{
+pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate> {
     match pred.as_ref() {
-        Predicate::Or(left, right) => {
-            Rc::new(Predicate::Or(internalize_all_nots(&left), internalize_all_nots(&right)))
-        }
+        Predicate::Or(left, right) => Rc::new(Predicate::Or(
+            internalize_all_nots(left),
+            internalize_all_nots(right),
+        )),
 
-        Predicate::And(left, right) => {
-            Rc::new(Predicate::And(internalize_all_nots(&left), internalize_all_nots(&right)))
-        }
+        Predicate::And(left, right) => Rc::new(Predicate::And(
+            internalize_all_nots(left),
+            internalize_all_nots(right),
+        )),
 
         Predicate::Not(sub_pred) => match sub_pred.as_ref() {
-            Predicate::And(left, right) => {
-                Rc::new(Predicate::Or(internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(left)))), internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(right))))))
-            }
+            Predicate::And(left, right) => Rc::new(Predicate::Or(
+                internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(left)))),
+                internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(right)))),
+            )),
 
-            Predicate::Or(left, right) => {
-                Rc::new(Predicate::And(internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(left)))), internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(right))))))
-            }
+            Predicate::Or(left, right) => Rc::new(Predicate::And(
+                internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(left)))),
+                internalize_all_nots(&Rc::new(Predicate::Not(Rc::clone(right)))),
+            )),
 
             Predicate::Not(sub) => internalize_all_nots(sub),
 
@@ -415,13 +436,38 @@ pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate>{
 
         _ => Rc::clone(pred),
     }
-
 }
 
+pub fn dnf_helper(pred: &Rc<Predicate>) -> Vec<Vec<Rc<Predicate>>> {
+    match pred.as_ref() {
+        Predicate::Or(left, right) => {
+            let mut left_dnf = dnf_helper(left);
+            let right_dnf = dnf_helper(right);
+            left_dnf.extend(right_dnf);
+            left_dnf
+            //Rc::new(Predicate::Or(flattened))
+        }
 
-pub fn convertToDNF(pred: &Rc<Predicate>) -> Vec<Vec<Predicate>> { // Maybe Change this to a
-                                                             // Vec<Vec<Predicate>>
-    fn flatten_predicates(
+        Predicate::And(left, right) => {
+            let left_dnf = dnf_helper(left);
+            let right_dnf = dnf_helper(right);
+            let mut ret: Vec<Vec<Rc<Predicate>>> = vec![];
+            for l in left_dnf {
+                for r in &right_dnf {
+                    ret.push([l.as_slice(), r.as_slice()].concat());
+                }
+            }
+            ret
+        }
+
+        _ => vec![vec![pred.clone()]],
+    }
+}
+pub fn convertToDNF(pred: &Rc<Predicate>) -> Vec<Vec<Rc<Predicate>>> {
+    // Maybe Change this to a
+    // Vec<Vec<Predicate>>
+    let internalized = internalize_all_nots(pred);
+    /*fn flatten_predicates(
         preds: &[Rc<Predicate>],
         constructor: fn(Vec<Rc<Predicate>>) -> Predicate,
     ) -> Vec<Rc<Predicate>> {
@@ -438,58 +484,6 @@ pub fn convertToDNF(pred: &Rc<Predicate>) -> Vec<Vec<Predicate>> { // Maybe Chan
             }
         }
         flattened
-    }
-
-    match pred.as_ref() {
-        Predicate::Or(children) => {
-            let mut dnf_children = Vec::with_capacity(children.len());
-
-            for child in children {
-                dnf_children.push(convertToDNF(child));
-            }
-
-            let flattened = flatten_predicates(&dnf_children, Predicate::Or);
-
-            Rc::new(Predicate::Or(flattened))
-        }
-
-        Predicate::And(children) => {
-            let mut dnf_children = Vec::with_capacity(children.len());
-
-            for child in children {
-                dnf_children.push(convertToDNF(child));
-            }
-
-            let flattened = flatten_predicates(&dnf_children, Predicate::And);
-
-            distribute_ors(flattened)
-        }
-
-        Predicate::Not(sub_pred) => match sub_pred.as_ref() {
-            Predicate::And(left, right) => {
-                //let mut new_children = Vec::with_capacity(children.len());
-                for child in children {
-                    new_children.push(convertToDNF(&Rc::new(Predicate::Not(Rc::clone(child)))));
-                }
-                Rc::new(Predicate::Or(new_children))
-            }
-
-            Predicate::Or(children) => {
-                let mut new_children = Vec::with_capacity(children.len());
-                for child in children {
-                    new_children.push(convertToDNF(&Rc::new(Predicate::Not(Rc::clone(child)))));
-                }
-                Rc::new(Predicate::And(new_children))
-            }
-
-            Predicate::Not(sub) => convertToDNF(sub),
-
-            Predicate::True => Rc::new(Predicate::False),
-            Predicate::False => Rc::new(Predicate::True),
-
-            _ => Rc::clone(pred),
-        },
-
-        _ => Rc::clone(pred),
-    }
+    }*/
+    dnf_helper(&internalized)
 }
