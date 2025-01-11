@@ -25,6 +25,25 @@ pub enum GenRegex {
     StringIndex(Rc<StringIndex>),
 }
 
+impl GenRegex {
+    fn create_emptyset() -> Rc<GenRegex> {
+        Rc::new(GenRegex::EmptySet)
+    }
+    fn create_gre_char_lit(lit: &str) -> Rc<GenRegex> {
+        let lit = Rc::new(CharExpression::Literal(lit.to_string()));
+        Rc::new(GenRegex::CharExpression(lit))
+    }
+    fn create_gre_char_var(var_name: &str) -> Rc<GenRegex> {
+        let char_var = Rc::new(CharExpression::CharVar(CharVar {
+            name: var_name.to_string(),
+        }));
+        Rc::new(GenRegex::CharExpression(char_var))
+    }
+    fn concat(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
+        Rc::new(GenRegex::Concatenation(gre1.clone(), gre2.clone()))
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MergeResult {
     SimpleSub(SimpleSub),

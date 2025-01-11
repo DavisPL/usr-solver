@@ -210,12 +210,7 @@ impl SmtParser {
             let (head, tail) = c.as_pair();
             if let Value::Symbol(s) = head {
                 match s.as_ref() {
-                    "str.in_re" => todo!(),
-                    "str.to_re" => todo!(),
-                    "re.++" => todo!(),
-                    "re.inter" => todo!(),
-                    "re.union" => todo!(),
-                    "and" => todo!(),
+                    "str.in_re" => self.parse_str_in_re(tail),
                     _ => Err(SmtParseError::Unrecognized(format!(
                         "Unrecognized S-expression: {:?}",
                         v
@@ -233,6 +228,25 @@ impl SmtParser {
                 v
             )))
         }
+    }
+
+    fn parse_str_in_re(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        //(str.in_re x R) update regex_result <- Some(x \cap R)
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            if let Value::Symbol(s) = head {
+                if self.var_names.contains(s.as_ref()) {
+                    //Create GenRegex::StringVar x
+                    todo!()
+                } else {
+                    return Err(SmtParseError::Unrecognized(format!(
+                        "Unrecognized S-expression: {:?}",
+                        v
+                    )));
+                }
+            }
+        }
+        todo!()
     }
 
     fn parse_check_sat(&mut self, v: &Value) -> Result<(), SmtParseError> {
