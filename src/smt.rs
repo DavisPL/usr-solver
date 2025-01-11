@@ -4,7 +4,7 @@
 
 use super::classes::{CharExpression, GenRegex, StringVar};
 
-use lexpr::{self, Value};
+use lexpr::{self, value, Value};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -156,20 +156,83 @@ impl SmtParser {
         }
     }
 
-    fn parse_declare_const(&self, v: &Value) -> Result<(), SmtParseError> {
+    fn parse_declare_const(&mut self, v: &Value) -> Result<(), SmtParseError> {
         // Add variable name to self.var_names
-
+        if let Value::Cons(c1) = v {
+            let (head1, tail1) = c1.as_pair();
+            if let Value::Symbol(var_name) = head1 {
+                if let Value::Cons(c2) = tail1 {
+                    let (head2, tail2) = c2.as_pair();
+                    if let Value::Symbol(var_type) = head2 {
+                        let Value::Null = tail2 else { todo!() };
+                        match var_type.as_ref() {
+                            "String" => {
+                                self.var_names.insert(var_name.to_string());
+                                Ok(())
+                            }
+                            _ => Err(SmtParseError::Unrecognized(format!(
+                                "Unrecognized S-expression: {:?}",
+                                v
+                            ))),
+                        }
+                    } else {
+                        Err(SmtParseError::Unrecognized(format!(
+                            "Unrecognized S-expression: {:?}",
+                            v
+                        )))
+                    }
+                } else {
+                    Err(SmtParseError::Unrecognized(format!(
+                        "Unrecognized S-expression: {:?}",
+                        v
+                    )))
+                }
+            } else {
+                Err(SmtParseError::Unrecognized(format!(
+                    "Unrecognized S-expression: {:?}",
+                    v
+                )))
+            }
+        } else {
+            Err(SmtParseError::Unrecognized(format!(
+                "Unrecognized S-expression: {:?}",
+                v
+            )))
+        }
         // TODO
-
-        Ok(())
     }
 
     fn parse_assert(&mut self, v: &Value) -> Result<(), SmtParseError> {
         // Set flag
         self.found_assert = true;
         // Parse the regex
-        // TODO
-        unimplemented!()
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            if let Value::Symbol(s) = head {
+                match s.as_ref() {
+                    "str.in_re" => todo!(),
+                    "str.to_re" => todo!(),
+                    "re.++" => todo!(),
+                    "re.inter" => todo!(),
+                    "re.union" => todo!(),
+                    "and" => todo!(),
+                    _ => Err(SmtParseError::Unrecognized(format!(
+                        "Unrecognized S-expression: {:?}",
+                        v
+                    ))),
+                }
+            } else {
+                Err(SmtParseError::Unrecognized(format!(
+                    "Unrecognized S-expression: {:?}",
+                    v
+                )))
+            }
+        } else {
+            Err(SmtParseError::Unrecognized(format!(
+                "Unrecognized S-expression: {:?}",
+                v
+            )))
+        }
     }
 
     fn parse_check_sat(&mut self, v: &Value) -> Result<(), SmtParseError> {
