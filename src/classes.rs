@@ -26,21 +26,42 @@ pub enum GenRegex {
 }
 
 impl GenRegex {
-    fn create_emptyset() -> Rc<GenRegex> {
+    pub fn create_emptyset() -> Rc<GenRegex> {
         Rc::new(GenRegex::EmptySet)
     }
-    fn create_gre_char_lit(lit: &str) -> Rc<GenRegex> {
+    pub fn create_gre_char_lit(lit: &str) -> Rc<GenRegex> {
         let lit = CharExpression::Literal(lit.to_string());
         Rc::new(GenRegex::CharExpression(lit))
     }
-    fn create_gre_char_var(var_name: &str) -> Rc<GenRegex> {
+    pub fn create_gre_char_var(var_name: &str) -> Rc<GenRegex> {
         let char_var = CharExpression::CharVar(CharVar {
             name: var_name.to_string(),
         });
         Rc::new(GenRegex::CharExpression(char_var))
     }
-    fn concat(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
+    pub fn create_gre_str_var(var_name: &str) -> Rc<GenRegex> {
+        let str_var = StringVar {
+            name: var_name.to_string(),
+        };
+        Rc::new(GenRegex::StringVar(str_var))
+    }
+    pub fn concat(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Concatenation(gre1.clone(), gre2.clone()))
+    }
+    pub fn union(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
+        Rc::new(GenRegex::Union(gre1.clone(), gre2.clone()))
+    }
+    pub fn str_to_re(str: &str) -> Rc<GenRegex> {
+        //Needs something better than chars() for more support
+        let mut char_list = str.chars().rev();
+        let Some(c) = char_list.next() else {
+            return GenRegex::create_gre_char_lit("");
+        };
+        let mut retval = GenRegex::create_gre_char_lit(&c.to_string());
+        for c in char_list {
+            retval = GenRegex::concat(&GenRegex::create_gre_char_lit(&c.to_string()), &retval);
+        }
+        return retval;
     }
 }
 

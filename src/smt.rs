@@ -131,7 +131,7 @@ impl SmtParser {
         // 3 cases here: (declare-const), (assert), (check-sat)
         if let Value::Cons(c) = v {
             let (head, tail) = c.as_pair();
-
+            println!("head:{:?}\ntail:{:?}", head, tail);
             if let Value::Symbol(s) = head {
                 match s.as_ref() {
                     "declare-const" => self.parse_declare_const(tail),
@@ -205,29 +205,27 @@ impl SmtParser {
     fn parse_assert(&mut self, v: &Value) -> Result<(), SmtParseError> {
         // Set flag
         self.found_assert = true;
-        // Parse the regex
+        // Parse the command
         if let Value::Cons(c) = v {
             let (head, tail) = c.as_pair();
-            if let Value::Symbol(s) = head {
-                match s.as_ref() {
-                    "str.in_re" => self.parse_str_in_re(tail),
-                    _ => Err(SmtParseError::Unrecognized(format!(
-                        "Unrecognized S-expression: {:?}",
-                        v
-                    ))),
-                }
-            } else {
-                Err(SmtParseError::Unrecognized(format!(
+            self.parse_assert_head(head)?;
+            let Value::Null = tail else {
+                return Err(SmtParseError::Unrecognized(format!(
                     "Unrecognized S-expression: {:?}",
                     v
-                )))
-            }
+                )));
+            };
+            Ok(())
         } else {
             Err(SmtParseError::Unrecognized(format!(
                 "Unrecognized S-expression: {:?}",
                 v
             )))
         }
+    }
+
+    fn parse_assert_head(&self, v: &Value) -> Result<(), SmtParseError> {
+        todo!()
     }
 
     fn parse_str_in_re(&mut self, v: &Value) -> Result<(), SmtParseError> {
@@ -237,16 +235,90 @@ impl SmtParser {
             if let Value::Symbol(s) = head {
                 if self.var_names.contains(s.as_ref()) {
                     //Create GenRegex::StringVar x
-                    todo!()
-                } else {
+                    let str_var = GenRegex::create_gre_str_var(s);
+                    let regex = self.parse_regex(tail)?;
+                    let retval = Rc::try_unwrap(GenRegex::concat(&str_var, &regex));
+                    println!("retval:{:?}", retval);
+                    if let Ok(v) = retval {
+                        self.regex_result = Some(v);
+                    } else {
+                        return Err(SmtParseError::Unrecognized(format!(
+                            "Unrecognized S-expression: {:?}",
+                            v
+                        )));
+                    }
+                    return Ok(());
+                }
+            }
+        }
+        Err(SmtParseError::Unrecognized(format!(
+            "Unrecognized S-expression: {:?}",
+            v
+        )))
+    }
+
+    fn parse_regex(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //Handles (str.to_re), (re.++), (re.inter), (re.union), (re.all), (re.*), (re.range)
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            if let Value::Symbol(s) = head {
+                return match s.as_ref() {
+                    "re.++" => self.parse_re_concat(tail),
+                    "str.to_re" => todo!(),
+                    _ => Err(SmtParseError::Unrecognized(format!(
+                        "Unrecognized S-expression: {:?}",
+                        v
+                    ))),
+                };
+            }
+        }
+        Err(SmtParseError::Unrecognized(format!(
+            "Unrecognized S-expression: {:?}",
+            v
+        )))
+    }
+
+    fn parse_re_concat(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //Syntax (re.++ regex regex)
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            let regex1 = self.parse_regex(head)?;
+            if let Value::Cons(c) = tail {
+                let (head, tail) = c.as_pair();
+                if !tail.is_null() {
                     return Err(SmtParseError::Unrecognized(format!(
                         "Unrecognized S-expression: {:?}",
                         v
                     )));
                 }
+                let regex2 = self.parse_regex(head)?;
+                return Ok(GenRegex::concat(&regex1, &regex2));
             }
         }
-        todo!()
+        Err(SmtParseError::Unrecognized(format!(
+            "Unrecognized S-expression: {:?}",
+            v
+        )))
+    }
+
+    fn parse_str_to_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //(str.to_re "String")
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            if !tail.is_null() {
+                return Err(SmtParseError::Unrecognized(format!(
+                    "Unrecognized S-expression: {:?}",
+                    v
+                )));
+            }
+            if let Value::String(s) = head {
+                return Ok(GenRegex::str_to_re(s));
+            }
+        }
+        Err(SmtParseError::Unrecognized(format!(
+            "Unrecognized S-expression: {:?}",
+            v
+        )))
     }
 
     fn parse_check_sat(&mut self, v: &Value) -> Result<(), SmtParseError> {
@@ -374,16 +446,16 @@ mod tests {
 
         // Expected output
         let expected = GenRegex::Intersect(
-            Rc::new(GenRegex::StringVar(Rc::new(StringVar {
+            Rc::new(GenRegex::StringVar(StringVar {
                 name: "x".to_string(),
-            }))),
+            })),
             Rc::new(GenRegex::Concatenation(
-                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+                Rc::new(GenRegex::CharExpression(CharExpression::Literal(
                     "a".to_string(),
-                )))),
-                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+                ))),
+                Rc::new(GenRegex::CharExpression(CharExpression::Literal(
                     "b".to_string(),
-                )))),
+                ))),
             )),
         );
 
