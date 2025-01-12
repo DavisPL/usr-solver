@@ -229,6 +229,23 @@ impl SmtParser {
             )))
         }
     }
+    fn parse_regex(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        todo!();
+    }
+    fn parse_re_union(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            let head_parsed = self.parse_regex(head)?;
+            //let head_unwrapped = head_parsed.unwrap();
+            let tail_parsed = self.parse_regex(tail)?;
+            //let tail_unwrapped = tail_parsed.unwrap();
+            let union_term = GenRegex::Union(Rc::new(head_parsed), Rc::new(tail_parsed));
+            return Ok(union_term);
+        }
+        println!("unioning {}", v);
+        todo!();
+        
+    }
 
     fn parse_str_in_re(&mut self, v: &Value) -> Result<(), SmtParseError> {
         //(str.in_re x R) update regex_result <- Some(x \cap R)
@@ -374,16 +391,16 @@ mod tests {
 
         // Expected output
         let expected = GenRegex::Intersect(
-            Rc::new(GenRegex::StringVar(Rc::new(StringVar {
+            Rc::new(GenRegex::StringVar(StringVar {
                 name: "x".to_string(),
-            }))),
+            })),
             Rc::new(GenRegex::Concatenation(
-                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+                Rc::new(GenRegex::CharExpression(CharExpression::Literal(
                     "a".to_string(),
-                )))),
-                Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+                ))),
+                Rc::new(GenRegex::CharExpression(CharExpression::Literal(
                     "b".to_string(),
-                )))),
+                ))),
             )),
         );
 

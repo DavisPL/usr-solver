@@ -103,11 +103,6 @@ pub fn evaluateComplete(pred: &Rc<Predicate>) -> Vec<Vec<Rc<Predicate>>> {
     assign_unique_ids(pred, &mut id_map, &mut next_id);
     //let mut uf: UnionFind<usize> = UnionFind::new((next_id) as usize);
     let predicate = convertToDNF(pred);
-    for i in &predicate {
-        for j in i {
-            println!("{} dnf", j);
-        }
-    }
     //let uf = &mut UnionFind2::new();
     evaluate(&predicate, &mut id_map /*&mut canonical_map*/)
 }
@@ -127,7 +122,6 @@ pub fn evaluate_conjunction(
     let mut equalities = HashSet::new();
 
     for p in all_preds {
-        println!("{}", p);
         match p.as_ref() {
             Predicate::Not(_) => {
                 not_equality_preds.insert(p);
@@ -156,7 +150,6 @@ pub fn evaluate_conjunction(
         if let Predicate::Equals(left, right) = p.as_ref() {
             leftId = id_map[left];
             rightId = id_map[right];
-            println!("{} {}", leftId, rightId);
             match left.as_ref() {
                 MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
                         map.insert(leftId, leftId);

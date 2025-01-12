@@ -123,11 +123,7 @@ fn main() {
     ));
 
     let null_proj = nullableProjection(&Rc::clone(if_then_else));
-    for i in null_proj {
-        for j in i {
-            println!("{}", j);
-        }
-    }
+    println!("{}", satisfiable(new_test_t));
     /*let literal_c = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(String::from("c")))));
 
     //let char_expr = CharExpression::StringIndex(string_var, 0);
