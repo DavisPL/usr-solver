@@ -13,16 +13,16 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
     EmptySet,
-    CharExpression(Rc<CharExpression>),
-    StringVar(Rc<StringVar>),
-    StringSlice(Rc<StringVar>, i32),
+    CharExpression(CharExpression),
+    StringVar(StringVar),
+    StringSlice(StringVar, i32),
     Union(Rc<GenRegex>, Rc<GenRegex>),
     Intersect(Rc<GenRegex>, Rc<GenRegex>),
     Concatenation(Rc<GenRegex>, Rc<GenRegex>),
     Kleene(Rc<GenRegex>),
     Complement(Rc<GenRegex>),
     IfThenElse(Rc<Predicate>, Rc<GenRegex>, Rc<GenRegex>),
-    StringIndex(Rc<StringIndex>),
+    StringIndex(StringIndex),
 }
 
 impl GenRegex {
@@ -30,13 +30,13 @@ impl GenRegex {
         Rc::new(GenRegex::EmptySet)
     }
     fn create_gre_char_lit(lit: &str) -> Rc<GenRegex> {
-        let lit = Rc::new(CharExpression::Literal(lit.to_string()));
+        let lit = CharExpression::Literal(lit.to_string());
         Rc::new(GenRegex::CharExpression(lit))
     }
     fn create_gre_char_var(var_name: &str) -> Rc<GenRegex> {
-        let char_var = Rc::new(CharExpression::CharVar(CharVar {
+        let char_var = CharExpression::CharVar(CharVar {
             name: var_name.to_string(),
-        }));
+        });
         Rc::new(GenRegex::CharExpression(char_var))
     }
     fn concat(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
@@ -128,7 +128,7 @@ impl SubExpr {
         if self.get_tail() {
             Rc::new(GenRegex::Concatenation(
                 head,
-                Rc::new(GenRegex::StringVar(Rc::new(tail_var.clone()))),
+                Rc::new(GenRegex::StringVar(tail_var.clone())),
             ))
         } else {
             head
@@ -138,7 +138,7 @@ impl SubExpr {
         let split = head.split_first();
         match split {
             Some((first, rest)) => {
-                let retVal = Rc::new(GenRegex::CharExpression(Rc::new(first.clone())));
+                let retVal = Rc::new(GenRegex::CharExpression(first.clone()));
                 if rest.to_vec().len() == 1 {
                     retVal
                 } else {
@@ -148,9 +148,9 @@ impl SubExpr {
                     ))
                 }
             }
-            None => Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+            None => Rc::new(GenRegex::CharExpression(CharExpression::Literal(
                 String::from(""),
-            )))),
+            ))),
         }
     }
     pub fn get_head(&self) -> &Vec<CharExpression> {
@@ -326,8 +326,8 @@ pub enum Predicate {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum MaybeCharExpression {
-    CharExpression(Rc<CharExpression>),
-    StringIndex(Rc<StringIndex>),
+    CharExpression(CharExpression),
+    StringIndex(StringIndex),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
@@ -370,7 +370,7 @@ pub struct CharVar {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct StringIndex {
-    pub var: Rc<StringVar>,
+    pub var: StringVar,
     pub index: i32,
 }
 

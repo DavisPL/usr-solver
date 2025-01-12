@@ -26,29 +26,29 @@ use std::rc::Rc;
 
 #[allow(unused_variables, unused_mut)]
 fn main() {
-    let string_var = Rc::new(StringVar {
+    let string_var = StringVar {
         name: String::from("w0"),
-    });
-    let char_var = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::CharVar(
+    };
+    let char_var = &Rc::new(GenRegex::CharExpression(CharExpression::CharVar(
         classes::CharVar {
             name: String::from("c1"),
         },
-    ))));
-    let literal_a = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+    )));
+    let literal_a = &Rc::new(GenRegex::CharExpression(CharExpression::Literal(
         String::from("a"),
-    ))));
-    let literal_a_maybe = &Rc::new(MaybeCharExpression::CharExpression(Rc::new(
+    )));
+    let literal_a_maybe = &Rc::new(MaybeCharExpression::CharExpression(
         CharExpression::Literal(String::from("a")),
-    )));
-    let empty = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+    ));
+    let empty = &Rc::new(GenRegex::CharExpression(CharExpression::Literal(
         String::from(""),
-    ))));
-    let literal_b = &Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
-        String::from("b"),
-    ))));
-    let literal_b_maybe = &Rc::new(MaybeCharExpression::CharExpression(Rc::new(
-        CharExpression::Literal(String::from("b")),
     )));
+    let literal_b = &Rc::new(GenRegex::CharExpression(CharExpression::Literal(
+        String::from("b"),
+    )));
+    let literal_b_maybe = &Rc::new(MaybeCharExpression::CharExpression(
+        CharExpression::Literal(String::from("b")),
+    ));
     let test1 = &Rc::new(GenRegex::Union(Rc::clone(literal_a), Rc::clone(literal_b)));
     let test2 = &Rc::new(GenRegex::Kleene(Rc::clone(literal_a)));
     let test3 = &Rc::new(GenRegex::Concatenation(
@@ -71,7 +71,7 @@ fn main() {
     let test8 = &Rc::new(GenRegex::Complement(Rc::clone(empty)));
     let test9 = &Rc::new(GenRegex::Complement(Rc::clone(astar)));
 
-    let gre1 = &Rc::new(GenRegex::StringVar(string_var.clone()));
+    let gre1 = &Rc::new(GenRegex::StringVar(string_var));
 
     let a_w = &Rc::new(GenRegex::Concatenation(
         Rc::clone(literal_a),
@@ -89,16 +89,16 @@ fn main() {
         })),
     );
 
-    let char_var = Rc::new(MaybeCharExpression::CharExpression(Rc::new(
+    let char_var = Rc::new(MaybeCharExpression::CharExpression(
         CharExpression::CharVar(classes::CharVar {
             name: String::from("c1"),
         }),
-    )));
-    let char_var_2 = Rc::new(MaybeCharExpression::CharExpression(Rc::new(
+    ));
+    let char_var_2 = Rc::new(MaybeCharExpression::CharExpression(
         CharExpression::CharVar(classes::CharVar {
             name: String::from("c2"),
         }),
-    )));
+    ));
     let preds = Rc::new(Predicate::Or(
         Rc::new(Predicate::Equals(
             char_var_2.clone(),

@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 fn is_char_var(mce: &Rc<MaybeCharExpression>) -> bool {
     if let MaybeCharExpression::CharExpression(c_expr) = mce.as_ref() {
-        match c_expr.as_ref() {
+        match c_expr {
             CharExpression::Literal(_) => false,
             CharExpression::CharVar(_) => true,
         }
@@ -25,7 +25,7 @@ fn is_char_var(mce: &Rc<MaybeCharExpression>) -> bool {
 fn get_char_var(mce: &Rc<MaybeCharExpression>) -> Option<CharExpression> {
     if is_char_var(mce) {
         if let MaybeCharExpression::CharExpression(c_expr) = mce.as_ref() {
-            Some(c_expr.as_ref().clone())
+            Some(c_expr.clone())
         } else {
             None
         }
@@ -43,7 +43,7 @@ fn is_string_index(mce: &Rc<MaybeCharExpression>) -> bool {
 fn get_string_index(mce: &Rc<MaybeCharExpression>) -> Option<StringIndex> {
     if is_string_index(mce) {
         if let MaybeCharExpression::StringIndex(s_var) = mce.as_ref() {
-            Some(s_var.as_ref().clone())
+            Some(s_var.clone())
         } else {
             None
         }
@@ -158,20 +158,14 @@ pub fn evaluate_conjunction(
             rightId = id_map[right];
             println!("{} {}", leftId, rightId);
             match left.as_ref() {
-                MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
-                    CharExpression::Literal(_) => {
+                MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
                         map.insert(leftId, leftId);
-                    }
-                    _ => {}
                 },
                 _ => {}
             }
             match right.as_ref() {
-                MaybeCharExpression::CharExpression(c_expr) => match c_expr.as_ref() {
-                    CharExpression::Literal(_) => {
+                MaybeCharExpression::CharExpression(CharExpression::Literal(_)) =>  {
                         map.insert(rightId, rightId);
-                    }
-                    _ => {}
                 },
                 _ => {}
             }

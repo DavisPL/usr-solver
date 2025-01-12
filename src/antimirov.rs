@@ -47,7 +47,7 @@ use std::rc::Rc;
 //impl GenRegexId {
 fn is_char_var(gre: &Rc<GenRegex>) -> bool {
     if let GenRegex::CharExpression(c_expr) = gre.as_ref() {
-        match c_expr.as_ref() {
+        match c_expr {
             CharExpression::Literal(_) => false,
             CharExpression::CharVar(_) => true,
         }
@@ -60,7 +60,7 @@ fn is_char_var(gre: &Rc<GenRegex>) -> bool {
 fn get_char_var(gre: &Rc<GenRegex>) -> Option<CharExpression> {
     if is_char_var(gre) {
         if let GenRegex::CharExpression(c_expr) = gre.as_ref() {
-            Some(c_expr.as_ref().clone())
+            Some(c_expr.clone())
         } else {
             None
         }
@@ -82,7 +82,7 @@ fn is_string_var(gre: &Rc<GenRegex>) -> bool {
 fn get_string_var(gre: &Rc<GenRegex>) -> Option<StringVar> {
     if is_string_var(gre) {
         if let GenRegex::StringVar(s_var) = gre.as_ref() {
-            Some(s_var.as_ref().clone())
+            Some(s_var.clone())
         } else {
             None
         }
@@ -377,9 +377,9 @@ pub fn derivative(
     deriv_char: &Rc<CharExpression>,
 ) -> HashSet<AntimirovDerivativeElement> {
     let empty_string = || {
-        Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+        Rc::new(GenRegex::CharExpression(CharExpression::Literal(
             String::new(),
-        ))))
+        )))
     };
 
     match gre.as_ref() {
@@ -387,7 +387,7 @@ pub fn derivative(
             Rc::new(GenRegex::EmptySet),
             MergeResult::Bottom,
         )]),
-        GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr.as_ref()) {
+        GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
             (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
                 if deriv_lit == literal_value {
                     HashSet::from([AntimirovDerivativeElement::new(
@@ -403,7 +403,7 @@ pub fn derivative(
             }
             (CharExpression::CharVar(d_var), CharExpression::Literal(_)) => {
                 let mut char_to = BTreeMap::new();
-                char_to.insert(d_var.clone(), c_expr.as_ref().clone());
+                char_to.insert(d_var.clone(), c_expr.clone());
                 let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
                 HashSet::from([AntimirovDerivativeElement::new(empty_string(), subs)])
             }
@@ -420,7 +420,7 @@ pub fn derivative(
             let subexpr = SubExpr::new(head, true);
 
             let mut string_to = BTreeMap::new();
-            string_to.insert(string_var.as_ref().clone(), subexpr);
+            string_to.insert(string_var.clone(), subexpr);
 
             let substitution = MergeResult::SimpleSub(SimpleSub::new(string_to, BTreeMap::new()));
 
@@ -524,7 +524,7 @@ pub fn derivative(
                 match sub.get_subs() {
                     MergeResult::SimpleSub(simple_sub) => {
                         if let GenRegex::CharExpression(c_expr) = sub.get_expr().as_ref() {
-                            if let CharExpression::Literal(lit) = c_expr.as_ref() {
+                            if let CharExpression::Literal(lit) = c_expr {
                                 //                    if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
                                 if lit.is_empty() {
                                     let curr = AntimirovDerivativeElement::new(
@@ -626,9 +626,9 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     }
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::clone(expr),
-        GenRegex::CharExpression(char_expr) => match char_expr.as_ref() {
+        GenRegex::CharExpression(char_expr) => match char_expr {
             CharExpression::CharVar(char_var) => match substitution.get_char_var(char_var) {
-                Some(value) => Rc::new(GenRegex::CharExpression(Rc::new(value.clone()))),
+                Some(value) => Rc::new(GenRegex::CharExpression(value.clone())),
                 None => expr.clone(),
             },
             CharExpression::Literal(_) => expr.clone(),
@@ -643,14 +643,14 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
                     let index = string_index.index as usize;
                     let length = value.get_head().len();
                     if index < length {
-                        Rc::new(GenRegex::CharExpression(Rc::new(
+                        Rc::new(GenRegex::CharExpression(
                             value.get_head()[index].clone(),
-                        )))
+                        ))
                     } else if value.get_tail() {
-                        Rc::new(GenRegex::StringIndex(Rc::new(StringIndex {
+                        Rc::new(GenRegex::StringIndex(StringIndex {
                             var: string_index.var.clone(),
                             index: ((index - length + 1) as i32),
-                        })))
+                        }))
                     } else {
                         Rc::new(GenRegex::EmptySet)
                     }
@@ -731,13 +731,13 @@ pub fn matching(expr: &Rc<GenRegex>, proposed: String) -> bool {
 pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     // TBD unused
     let _empty_string = || {
-        Rc::new(GenRegex::CharExpression(Rc::new(CharExpression::Literal(
+        Rc::new(GenRegex::CharExpression(CharExpression::Literal(
             String::new(),
-        ))))
+        )))
     };
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
-        GenRegex::CharExpression(cExpr) => match cExpr.as_ref() {
+        GenRegex::CharExpression(cExpr) => match cExpr {
             CharExpression::CharVar(_) => HashSet::new(),
             CharExpression::Literal(value) => {
                 if value.is_empty() {
@@ -752,7 +752,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::StringVar(s_var) => {
             let mut subs = HashSet::new();
             let mut string_to = BTreeMap::new();
-            string_to.insert(s_var.as_ref().clone(), SubExpr::empty());
+            string_to.insert(s_var.clone(), SubExpr::empty());
             let string_sub = SimpleSub::new(string_to, BTreeMap::new());
             subs.insert(string_sub);
             subs
