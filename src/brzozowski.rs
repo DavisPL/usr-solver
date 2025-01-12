@@ -11,6 +11,58 @@ use crate::predicate_evaluation::evaluateComplete;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+/*pub fn string_var_normalization(gre: &Rc<GenRegex>) -> Rc<GenRegex>{
+    match gre.as_ref(){
+        GenRegex::Union(left, right) =>{
+            Rc::new(GenRegex::Union(string_var_normalization(left), string_var_normalization(right)))
+        },
+        GenRegex::Intersect(left, right) =>{
+            Rc::new(GenRegex::Intersect(string_var_normalization(left), string_var_normalization(right)))
+        },
+        GenRegex::Concatenation(left, right) =>{
+            Rc::new(GenRegex::Concatenation(string_var_normalization(left), string_var_normalization(right)))
+        },
+        GenRegex::Kleene(inner) =>{
+             Rc::new(GenRegex::Kleene(string_var_normalization(inner)))
+        },
+        GenRegex::Complement(inner) =>{
+            Rc::new(GenRegex::Complement(string_var_normalization(inner)))
+        },
+        GenRegex::IfThenElse(pred, left, right)=>{
+            Rc::new(GenRegex::IfThenElse(Rc::clone(pred), string_var_normalization(left), string_var_normalization(right)))
+        },
+        GenRegex::StringIndex(str_ind) => {
+            Rc::new(GenRegex::StringVar(str_ind.var.clone()))
+        },
+        GenRegex::StringSlice(str_var, _) =>{
+            Rc::new(GenRegex::StringVar(str_var.clone()))
+        },
+        _ => {
+            gre.clone()
+        }
+    }
+}
+pub fn simplify_and_check_cycles(gre: &Rc<GenRegex>, visited: &mut HashSet<Rc<GenRegex>>) -> Rc<GenRegex>{
+    match gre.as_ref(){
+        GenRegex::IfThenElse(pred, left, right)=>{
+            Rc::new(GenRegex::IfThenElse(pred.clone(), simplify_and_check_cycles(left, visited), simplify_and_check_cycles(right, visited)))
+        }
+        GenRegex::Union(left, right) => {
+            Rc::new(GenRegex::Union(simplify_and_check_cycles(left, visited), simplify_and_check_cycles(right, visited)))
+        }
+        _ => {
+            let temp = string_var_normalization(gre);
+            println!("temp {}", temp);
+            if visited.contains(&temp){
+                println!("_----------------------------------------");
+                return Rc::new(GenRegex::EmptySet)
+            }
+            visited.insert(temp);
+            gre.clone()
+        }
+
+    }
+}*/
 pub fn satisfiable_helper(
     gre: &Rc<GenRegex>,
     index: &mut i32,
@@ -23,9 +75,13 @@ pub fn satisfiable_helper(
             let mut temp_right = right.clone();
             if visited.contains(left) {
                 temp_left = Rc::new(GenRegex::EmptySet);
+            } else {
+                visited.insert(left.clone());
             }
             if visited.contains(right) {
                 temp_right = Rc::new(GenRegex::EmptySet);
+            } else {
+                visited.insert(right.clone());
             }
             let expr = &simplifies(&Rc::new(GenRegex::IfThenElse(
                 pred.clone(),
@@ -79,6 +135,7 @@ pub fn satisfiable_helper(
         }
     }
 }
+
 pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
     let mut ind = 0;
     satisfiable_helper(gre, &mut ind, &mut HashSet::new())
@@ -305,7 +362,7 @@ fn nullableProjectionHelper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 pub fn nullableProjection(gre: &Rc<GenRegex>) -> Vec<Vec<Rc<Predicate>>> {
     let nullableGre = &nullable(gre);
     let nullablePredicates = nullableProjectionHelper(nullableGre);
-    println!("{}", nullablePredicates);
+    //println!("{}", nullablePredicates);
     evaluateComplete(&nullablePredicates)
     //nullablePredicatesEval
 }
@@ -484,6 +541,7 @@ fn simplify_if_then_else(
 ) -> Rc<GenRegex> {
     let simplified_true = simplifies(true_branch);
     let simplified_false = simplifies(false_branch);
+    //println!("true {}, false {}", simplified_true, simplified_false);
 
     if let (GenRegex::EmptySet, GenRegex::EmptySet) = (&*simplified_true, &*simplified_false) {
         return simplified_true;

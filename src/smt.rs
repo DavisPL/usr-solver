@@ -2,7 +2,7 @@
 //! Parsing for SMTLib files
 //!
 
-use super::classes::{CharExpression, GenRegex, StringVar};
+use super::classes::{CharExpression, CharVar, GenRegex, StringVar};
 
 use lexpr::{self, value, Value};
 
@@ -88,6 +88,7 @@ pub struct SmtParser {
     found_check_sat: bool,
     var_names: HashSet<String>,
     regex_result: Option<GenRegex>,
+    fresh_var_ind: usize,
 }
 
 impl SmtParser {
@@ -97,6 +98,7 @@ impl SmtParser {
             found_check_sat: false,
             var_names: HashSet::new(),
             regex_result: None,
+            fresh_var_ind: 0,
         }
     }
 
@@ -222,6 +224,43 @@ impl SmtParser {
                 v
             )))
         }
+    }
+    fn parse_regex(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        todo!();
+    }
+    fn parse_re_union(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            let head_parsed = self.parse_regex(head)?;
+            //let head_unwrapped = head_parsed.unwrap();
+            let tail_parsed = self.parse_regex(tail)?;
+            //let tail_unwrapped = tail_parsed.unwrap();
+            let union_term = GenRegex::Union(Rc::new(head_parsed), Rc::new(tail_parsed));
+            return Ok(union_term);
+        }
+        println!("unioning {}", v);
+        todo!();
+    }
+    fn parse_re_inter(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            let head_parsed = self.parse_regex(head)?;
+            //let head_unwrapped = head_parsed.unwrap();
+            let tail_parsed = self.parse_regex(tail)?;
+            //let tail_unwrapped = tail_parsed.unwrap();
+            let union_term = GenRegex::Intersect(Rc::new(head_parsed), Rc::new(tail_parsed));
+            return Ok(union_term);
+        }
+        println!("unioning {}", v);
+        todo!();
+    }
+
+    fn parse_re_all(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
+        let new_name = "c".to_owned() + &self.fresh_var_ind.to_string();
+        let all_term =
+            GenRegex::CharExpression(CharExpression::CharVar(CharVar { name: new_name }));
+        self.fresh_var_ind += 1;
+        Ok(all_term)
     }
 
     fn parse_assert_head(&self, v: &Value) -> Result<(), SmtParseError> {
