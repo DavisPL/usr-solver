@@ -643,9 +643,7 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
                     let index = string_index.index as usize;
                     let length = value.get_head().len();
                     if index < length {
-                        Rc::new(GenRegex::CharExpression(
-                            value.get_head()[index].clone(),
-                        ))
+                        Rc::new(GenRegex::CharExpression(value.get_head()[index].clone()))
                     } else if value.get_tail() {
                         Rc::new(GenRegex::StringIndex(StringIndex {
                             var: string_index.var.clone(),

@@ -152,14 +152,14 @@ pub fn evaluate_conjunction(
             rightId = id_map[right];
             match left.as_ref() {
                 MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
-                        map.insert(leftId, leftId);
-                },
+                    map.insert(leftId, leftId);
+                }
                 _ => {}
             }
             match right.as_ref() {
-                MaybeCharExpression::CharExpression(CharExpression::Literal(_)) =>  {
-                        map.insert(rightId, rightId);
-                },
+                MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
+                    map.insert(rightId, rightId);
+                }
                 _ => {}
             }
             if leftId != rightId {

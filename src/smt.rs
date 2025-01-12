@@ -2,7 +2,7 @@
 //! Parsing for SMTLib files
 //!
 
-use super::classes::{CharExpression, GenRegex, StringVar, CharVar};
+use super::classes::{CharExpression, CharVar, GenRegex, StringVar};
 
 use lexpr::{self, value, Value};
 
@@ -246,7 +246,6 @@ impl SmtParser {
         }
         println!("unioning {}", v);
         todo!();
-        
     }
     fn parse_re_inter(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
         if let Value::Cons(c) = v {
@@ -260,14 +259,12 @@ impl SmtParser {
         }
         println!("unioning {}", v);
         todo!();
-        
     }
 
     fn parse_re_all(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
-        let new_name = "c".to_owned()+&self.fresh_var_ind.to_string();
-        let all_term = GenRegex::CharExpression(CharExpression::CharVar(CharVar {
-            name: new_name,
-        }));
+        let new_name = "c".to_owned() + &self.fresh_var_ind.to_string();
+        let all_term =
+            GenRegex::CharExpression(CharExpression::CharVar(CharVar { name: new_name }));
         self.fresh_var_ind += 1;
         Ok(all_term)
     }
