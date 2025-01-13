@@ -48,6 +48,9 @@ impl GenRegex {
     pub fn concat(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Concatenation(gre1.clone(), gre2.clone()))
     }
+    pub fn intersect(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
+        Rc::new(GenRegex::Intersect(gre1.clone(), gre2.clone()))
+    }
     pub fn union(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Union(gre1.clone(), gre2.clone()))
     }

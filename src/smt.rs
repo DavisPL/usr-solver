@@ -133,7 +133,6 @@ impl SmtParser {
         // 3 cases here: (declare-const), (assert), (check-sat)
         if let Value::Cons(c) = v {
             let (head, tail) = c.as_pair();
-            println!("head:{:?}\ntail:{:?}", head, tail);
             if let Value::Symbol(s) = head {
                 match s.as_ref() {
                     "declare-const" => self.parse_declare_const(tail),
@@ -210,8 +209,9 @@ impl SmtParser {
         // Parse the command
         if let Value::Cons(c) = v {
             let (head, tail) = c.as_pair();
-            self.parse_assert_head(head)?;
-            let Value::Null = tail else {
+            //Assume assert takes 1 arg
+            self.parse_assert_arg(head)?;
+            if !tail.is_null() {
                 return Err(SmtParseError::Unrecognized(format!(
                     "Unrecognized S-expression: {:?}",
                     v
@@ -225,8 +225,25 @@ impl SmtParser {
             )))
         }
     }
-    fn parse_regex(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
-        todo!();
+
+    fn parse_assert_arg(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        if let Value::Cons(c) = v {
+            let (head, tail) = c.as_pair();
+            if let Value::Symbol(s) = head {
+                return match s.as_ref() {
+                    "str.in_re" => self.parse_str_in_re(tail),
+                    "and" => todo!(),
+                    _ => Err(SmtParseError::Unrecognized(format!(
+                        "Unrecognized S-expression: {:?}",
+                        v
+                    ))),
+                };
+            }
+        }
+        Err(SmtParseError::Unrecognized(format!(
+            "Unrecognized S-expression: {:?}",
+            v
+        )))
     }
     fn parse_re_union(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
         if let Value::Cons(c) = v {
@@ -235,7 +252,7 @@ impl SmtParser {
             //let head_unwrapped = head_parsed.unwrap();
             let tail_parsed = self.parse_regex(tail)?;
             //let tail_unwrapped = tail_parsed.unwrap();
-            let union_term = GenRegex::Union(Rc::new(head_parsed), Rc::new(tail_parsed));
+            let union_term = GenRegex::Union(head_parsed, tail_parsed);
             return Ok(union_term);
         }
         println!("unioning {}", v);
@@ -248,7 +265,7 @@ impl SmtParser {
             //let head_unwrapped = head_parsed.unwrap();
             let tail_parsed = self.parse_regex(tail)?;
             //let tail_unwrapped = tail_parsed.unwrap();
-            let union_term = GenRegex::Intersect(Rc::new(head_parsed), Rc::new(tail_parsed));
+            let union_term = GenRegex::Intersect(head_parsed, tail_parsed);
             return Ok(union_term);
         }
         println!("unioning {}", v);
@@ -263,10 +280,6 @@ impl SmtParser {
         Ok(all_term)
     }
 
-    fn parse_assert_head(&self, v: &Value) -> Result<(), SmtParseError> {
-        todo!()
-    }
-
     fn parse_str_in_re(&mut self, v: &Value) -> Result<(), SmtParseError> {
         //(str.in_re x R) update regex_result <- Some(x \cap R)
         if let Value::Cons(c) = v {
@@ -275,18 +288,28 @@ impl SmtParser {
                 if self.var_names.contains(s.as_ref()) {
                     //Create GenRegex::StringVar x
                     let str_var = GenRegex::create_gre_str_var(s);
-                    let regex = self.parse_regex(tail)?;
-                    let retval = Rc::try_unwrap(GenRegex::concat(&str_var, &regex));
-                    println!("retval:{:?}", retval);
-                    if let Ok(v) = retval {
-                        self.regex_result = Some(v);
-                    } else {
-                        return Err(SmtParseError::Unrecognized(format!(
-                            "Unrecognized S-expression: {:?}",
-                            v
-                        )));
+                    if let Value::Cons(c) = tail {
+                        let (head, tail) = c.as_pair();
+                        if !tail.is_null() {
+                            return Err(SmtParseError::Unrecognized(format!(
+                                "Unrecognized S-expression: {:?}",
+                                v
+                            )));
+                        }
+                        let regex = self.parse_regex(head)?;
+                        let retval = Rc::try_unwrap(GenRegex::intersect(&str_var, &regex));
+                        println!("retval:{:?}", retval);
+                        if let Ok(v) = retval {
+                            self.regex_result = Some(v);
+                        } else {
+                            return Err(SmtParseError::Unrecognized(format!(
+                                "Unrecognized S-expression: {:?}",
+                                v
+                            )));
+                        }
+                        println!("Parse Regex Done.");
+                        return Ok(());
                     }
-                    return Ok(());
                 }
             }
         }
@@ -303,7 +326,7 @@ impl SmtParser {
             if let Value::Symbol(s) = head {
                 return match s.as_ref() {
                     "re.++" => self.parse_re_concat(tail),
-                    "str.to_re" => todo!(),
+                    "str.to_re" => self.parse_str_to_re(tail),
                     _ => Err(SmtParseError::Unrecognized(format!(
                         "Unrecognized S-expression: {:?}",
                         v
