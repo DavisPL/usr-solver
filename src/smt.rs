@@ -561,8 +561,38 @@ mod tests {
     #[ignore]
     #[test]
     fn test_simple_3() {
+        let smt_result = parse_smtlib_file("benchmarks/simple2.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        // Expected output
+        let expected_str_var_x = GenRegex::StringVar(StringVar {
+                name: "x".to_string(),
+            });
+        let expected_str_var_y = GenRegex::StringVar(StringVar {
+                name: "y".to_string(),
+            });
+        let expected_intersection_1 = GenRegex::Intersect(Rc::new(expected_str_var_x), Rc::new(GenRegex::CharExpression(CharExpression::Literal("a".to_string()))));
+        let expected_intersection_2 = GenRegex::Intersect(Rc::new(expected_str_var_y), Rc::new(GenRegex::CharExpression(CharExpression::Literal("b".to_string()))));
+
+        let expected = GenRegex::Concatenation(
+            Rc::new(expected_intersection_1),
+            Rc::new(expected_intersection_2)
+        );
+
+        assert_eq!(gen_regex_unwrapped, expected);
         // TODO
-        unimplemented!()
+        //unimplemented!()
     }
 
     #[ignore]
