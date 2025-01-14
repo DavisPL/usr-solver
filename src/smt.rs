@@ -171,11 +171,17 @@ impl SmtParser {
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
         }
-        self.parse_assert_arg(assert_arg)?;
-        Ok(())
+        let result=Rc::try_unwrap(self.parse_assert_arg(assert_arg)?);
+        if let Ok(r)=result{
+            self.regex_result=Some(r);
+            Ok(())
+        }
+        else{
+            Err(SmtParseError::unrecog(assert_arg))
+        }
     }
 
-    fn parse_assert_arg(&mut self, v: &Value) -> Result<(), SmtParseError> {
+    fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Parse the command. Going to assume the command always is Cons
         let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         match cmd.as_symbol().ok_or(SmtParseError::unrecog(v))? {
@@ -185,6 +191,28 @@ impl SmtParser {
                 "Unsupported SMTLib command: {}",
                 cmd
             ))),
+        }
+    }
+
+    fn parse_str_in_re(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //Syntax (str.in_re x R)
+        let (str_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        if !tail.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        //Check str_var is in var_names
+        let str_var = str_var.as_symbol().ok_or(SmtParseError::unrecog(str_var))?;
+        if self.var_names.contains(str_var) {
+            //Construct str_var \cap R and update regex_result
+            let str_var = GenRegex::create_gre_str_var(str_var);
+            let regex = self.parse_regex(regex)?;
+            Ok(GenRegex::intersect(&str_var, &regex))
+        } else {
+            Err(SmtParseError::Unrecognized(format!(
+                "String variable not declared/found: {}",
+                str_var
+            )))
         }
     }
 
@@ -245,29 +273,6 @@ impl SmtParser {
             GenRegex::CharExpression(CharExpression::CharVar(CharVar { name: new_name }));
         self.fresh_var_ind += 1;
         Ok(all_term)
-    }
-
-    fn parse_str_in_re(&mut self, v: &Value) -> Result<(), SmtParseError> {
-        //Syntax (str.in_re x R)
-        let (str_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
-        //Check str_var is in var_names
-        let str_var = str_var.as_symbol().ok_or(SmtParseError::unrecog(str_var))?;
-        if self.var_names.contains(str_var) {
-            //Construct str_var \cap R and update regex_result
-            let str_var = GenRegex::create_gre_str_var(str_var);
-            let regex = self.parse_regex(regex)?;
-            self.regex_result = Some(GenRegex::Intersect(str_var, regex));
-            Ok(())
-        } else {
-            Err(SmtParseError::Unrecognized(format!(
-                "String variable not declared/found: {}",
-                str_var
-            )))
-        }
     }
 
     fn parse_re_concat(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
