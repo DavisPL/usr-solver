@@ -225,7 +225,7 @@ impl SmtParser {
         Ok(())
     }
 
-    fn parse_regex(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+    fn parse_regex(& self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Handles (str.to_re), (re.++), (re.inter), (re.union), (re.all), (re.*), (re.range)
         let (re_type, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
@@ -252,6 +252,7 @@ impl SmtParser {
         }
         Err(SmtParseError::unrecog(v))
     }
+
 
     fn parse_re_inter(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         if let Value::Cons(c) = v {
@@ -297,8 +298,10 @@ impl SmtParser {
                 return Ok(GenRegex::concat(&regex1, &regex2));
             }
         }
-        return Err(SmtParseError::unrecog(v));
+        Err(SmtParseError::unrecog(v))
     }
+
+
 
     fn parse_re_concat(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Syntax (re.++ R R)
