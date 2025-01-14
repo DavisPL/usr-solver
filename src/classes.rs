@@ -54,6 +54,9 @@ impl GenRegex {
     pub fn union(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Union(gre1.clone(), gre2.clone()))
     }
+    pub fn star(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
+        Rc::new(GenRegex::Kleene(gre.clone()))
+    }
     pub fn str_to_re(str: &str) -> Rc<GenRegex> {
         //Needs something better than chars() for more support
         let mut char_list = str.chars().rev();
@@ -65,6 +68,13 @@ impl GenRegex {
             retval = GenRegex::concat(&GenRegex::create_gre_char_lit(&c.to_string()), &retval);
         }
         return retval;
+    }
+    pub fn re_range(start: &char, end: &char) -> Rc<GenRegex> {
+        let mut retval = GenRegex::create_gre_char_lit(&end.to_string());
+        for c in (*start..=*end).rev().skip(1) {
+            retval = GenRegex::union(&GenRegex::create_gre_char_lit(&c.to_string()), &retval)
+        }
+        retval
     }
 }
 
