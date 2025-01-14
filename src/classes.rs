@@ -13,6 +13,7 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
     EmptySet,
+    Sigma,
     CharExpression(CharExpression),
     StringVar(StringVar),
     StringSlice(StringVar, i32),

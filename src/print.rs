@@ -155,6 +155,9 @@ impl Display for GenRegex {
             GenRegex::EmptySet => {
                 write!(f, "EMPTY")
             }
+            GenRegex::Sigma=>{
+                write!(f, ".")
+            }
             GenRegex::CharExpression(char_expr) => {
                 // Use Display on char_expr
                 write!(f, "{}", char_expr)
