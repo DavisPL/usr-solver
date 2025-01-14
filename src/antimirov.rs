@@ -387,6 +387,10 @@ pub fn derivative(
             Rc::new(GenRegex::EmptySet),
             MergeResult::Bottom,
         )]),
+        GenRegex::Sigma=> HashSet::from([AntimirovDerivativeElement::new(
+            empty_string(),
+            MergeResult::SimpleSub(SimpleSub::empty()),
+        )]),
         GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
             (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
                 if deriv_lit == literal_value {
@@ -736,6 +740,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     };
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
+        GenRegex::Sigma=>HashSet::new(),
         GenRegex::CharExpression(cExpr) => match cExpr {
             CharExpression::CharVar(_) => HashSet::new(),
             CharExpression::Literal(value) => {
