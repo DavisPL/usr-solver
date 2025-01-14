@@ -226,7 +226,7 @@ impl SmtParser {
         Ok(())
     }
 
-    fn parse_regex(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+    fn parse_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Handles (str.to_re), (re.++), (re.inter), (re.union), (re.all), (re.*), (re.range)
         let (re_type, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
@@ -234,14 +234,14 @@ impl SmtParser {
             "re.++" => self.parse_re_concat(tail),
             "re.union" => self.parse_re_union(tail),
             "re.*" => todo!(),
-            "re.inter" => todo!(),
-            "re.all" => todo!(),
+            "re.inter" => self.parse_re_inter(tail),
+            "re.all" => self.parse_re_all(tail),
             "re.range" => todo!(),
             _ => Err(SmtParseError::unrecog(re_type)),
         }
     }
 
-    fn parse_re_union(& self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+    fn parse_re_union(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         if let Value::Cons(c) = v {
             let (head, tail) = c.as_pair();
             let head_parsed = self.parse_regex(head)?;
@@ -268,10 +268,10 @@ impl SmtParser {
         todo!();
     }
 
-    fn parse_re_all(&mut self, _: &Value) -> Result<GenRegex, SmtParseError> {
+    fn parse_re_all(&mut self, _: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         let new_name = "c".to_owned() + &self.fresh_var_ind.to_string();
         let all_term =
-            GenRegex::CharExpression(CharExpression::CharVar(CharVar { name: new_name }));
+            Rc::new(GenRegex::CharExpression(CharExpression::CharVar(CharVar { name: new_name })));
         self.fresh_var_ind += 1;
         Ok(all_term)
     }
@@ -301,7 +301,7 @@ impl SmtParser {
 
 
 
-    fn parse_re_concat(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+    fn parse_re_concat(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Syntax (re.++ R R)
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
@@ -525,8 +525,6 @@ mod tests {
         );
 
         assert_eq!(gen_regex_unwrapped, expected);
-        // TODO
-        //unimplemented!()
     }
 
     #[ignore]
