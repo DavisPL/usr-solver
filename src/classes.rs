@@ -68,7 +68,7 @@ impl GenRegex {
         for c in char_list {
             retval = GenRegex::concat(&GenRegex::create_gre_char_lit(&c.to_string()), &retval);
         }
-        return retval;
+        retval
     }
     pub fn re_range(start: &char, end: &char) -> Rc<GenRegex> {
         let mut retval = GenRegex::create_gre_char_lit(&end.to_string());

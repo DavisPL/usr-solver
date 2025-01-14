@@ -626,7 +626,7 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     }
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::clone(expr),
-        GenRegex::Sigma=> Rc::clone(expr),
+        GenRegex::Sigma => Rc::clone(expr),
         GenRegex::CharExpression(char_expr) => match char_expr {
             CharExpression::CharVar(char_var) => match substitution.get_char_var(char_var) {
                 Some(value) => Rc::new(GenRegex::CharExpression(value.clone())),
