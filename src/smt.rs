@@ -226,14 +226,21 @@ impl SmtParser {
     }
 
     fn parse_regex(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //Handles base case regex
         if let Some(re_type) = v.as_symbol() {
             return match re_type {
                 "re.all" => self.parse_re_all(),
                 _ => Err(SmtParseError::unrecog(v)),
             };
         }
-        //Handles (str.to_re), (re.++), (re.inter), (re.union), (re.*), (re.range)
+        //Handles recursive case
         let (re_type, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        //Handles regex func  Ex ((_ re.loop n1 n2) Regex)
+        if re_type.is_cons() {
+            //Parse the command
+            todo!()
+        }
+        //Handles recursive regex
         match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
             "str.to_re" => self.parse_str_to_re(tail),
             "re.++" => self.parse_re_concat(tail),
@@ -241,10 +248,8 @@ impl SmtParser {
             "re.*" => self.parse_re_star(tail),
             "re.inter" => self.parse_re_inter(tail),
             "re.range" => self.parse_re_range(tail),
-            _ => {
-                println!("Huh?");
-                Err(SmtParseError::unrecog(re_type))
-            }
+            "re.loop" => todo!(),
+            _ => Err(SmtParseError::unrecog(re_type)),
         }
     }
 
@@ -371,6 +376,10 @@ impl SmtParser {
             return Ok(GenRegex::re_range(&char1, &char2));
         }
         Err(SmtParseError::unrecog(v))
+    }
+
+    fn parse_re_loop(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        unimplemented!()
     }
 
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
@@ -788,4 +797,36 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
     }
+    #[ignore]
+    #[test]
+    fn test_passw_sat1() {
+        let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+    }
+
+    fn test_passw_unsat1() {
+        let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+    }
 }
+
