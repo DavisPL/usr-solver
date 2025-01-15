@@ -222,19 +222,16 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
             Rc::clone(&derivative(&Rc::clone(side1), deriv_char)),
             Rc::clone(&derivative(&Rc::clone(side2), deriv_char)),
         ))),
-        GenRegex::StringIndex(string_index) => {
-            // TODO: unused?
-            simplifies(&Rc::new(GenRegex::IfThenElse(
-                Rc::new(Predicate::Equals(
-                    Rc::new(MaybeCharExpression::StringIndex(string_index.clone())),
-                    Rc::new(MaybeCharExpression::CharExpression(
-                        deriv_char.as_ref().clone(),
-                    )),
+        GenRegex::StringIndex(string_index) => simplifies(&Rc::new(GenRegex::IfThenElse(
+            Rc::new(Predicate::Equals(
+                Rc::new(MaybeCharExpression::StringIndex(string_index.clone())),
+                Rc::new(MaybeCharExpression::CharExpression(
+                    deriv_char.as_ref().clone(),
                 )),
-                empty_string(),
-                empty_set(),
-            )))
-        }
+            )),
+            empty_string(),
+            empty_set(),
+        ))),
     }
 }
 
@@ -243,10 +240,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         GenRegex::Sigma => Rc::new(GenRegex::EmptySet),
         GenRegex::EmptySet => Rc::clone(gre),
         GenRegex::CharExpression(cExpr) => match cExpr {
-            CharExpression::CharVar(_name) => {
-                // TODO: Unused?
-                Rc::new(GenRegex::EmptySet)
-            }
+            CharExpression::CharVar(_name) => Rc::new(GenRegex::EmptySet),
             CharExpression::Literal(value) => {
                 if value.is_empty() {
                     Rc::clone(gre)

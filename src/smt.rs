@@ -373,7 +373,6 @@ impl SmtParser {
         Err(SmtParseError::unrecog(v))
     }
 
-
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
         eprintln!("TODO: Implement parse_empty");
         Err(SmtParseError::Unimplemented(
@@ -704,6 +703,87 @@ mod tests {
         );
         let third = GenRegex::star(&GenRegex::re_range(&'!', &'~'));
         let regex = GenRegex::intersect(&&GenRegex::intersect(&first, &second), &third);
+        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+
+        assert_eq!(gen_regex_unwrapped, expected);
+    }
+    #[test]
+    fn test_date_2() {
+        fn create_case_insensitive(day: &str) -> Rc<GenRegex> {
+                let first_char = day.chars().next().unwrap();
+    
+    // Initialize day_regex with the first character's lowercase and uppercase union
+                let mut day_regex = GenRegex::str_to_re(&first_char.to_uppercase().to_string());
+                let lower = GenRegex::str_to_re(&first_char.to_lowercase().to_string());
+                day_regex = GenRegex::union(&day_regex, &lower);
+
+                // Process the remaining characters
+                for c in day[1..].chars() {
+                    let lower = GenRegex::str_to_re(&c.to_lowercase().to_string());
+                    let upper = GenRegex::str_to_re(&c.to_uppercase().to_string());
+                    let char_union = GenRegex::union(&upper, &lower);
+                    
+                    // Concatenate with the rest of the regex for the day
+                    day_regex = GenRegex::concat(&day_regex, &char_union);
+                }
+
+                day_regex
+
+        }
+        let smt_result = parse_smtlib_file("benchmarks/date2.smt2");
+        println!("Parsed s-expression: {:?}\n", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        let dot_star = GenRegex::star(&GenRegex::create_sigma());
+        let mut days_of_the_week: Vec<Rc<GenRegex>> = Vec::new();
+        days_of_the_week.push(create_case_insensitive("monday"));
+        days_of_the_week.push(create_case_insensitive("tuesday"));
+        days_of_the_week.push(create_case_insensitive("wednesday"));
+        days_of_the_week.push(create_case_insensitive("thursday"));
+        days_of_the_week.push(create_case_insensitive("friday"));
+        days_of_the_week.push(create_case_insensitive("saturday"));
+        days_of_the_week.push(create_case_insensitive("sunday"));
+        let mut union_days = days_of_the_week[0].clone();
+        for v in &days_of_the_week[1..] {
+            union_days = GenRegex::union(&union_days, v);
+        }
+        let mut months: Vec<Rc<GenRegex>> = Vec::new();
+        months.push(create_case_insensitive("january"));
+        months.push(create_case_insensitive("february"));
+        months.push(create_case_insensitive("march"));
+        months.push(create_case_insensitive("april"));
+        months.push(create_case_insensitive("may"));
+        months.push(create_case_insensitive("june"));
+        months.push(create_case_insensitive("july"));
+        months.push(create_case_insensitive("august"));
+        months.push(create_case_insensitive("september"));
+        months.push(create_case_insensitive("october"));
+        months.push(create_case_insensitive("november"));
+        months.push(create_case_insensitive("december"));
+        let mut union_months = months[0].clone();
+        for v in &months[1..] {
+            union_months = GenRegex::union(&union_months, v);
+        }
+        let first = GenRegex::concat(
+            &GenRegex::concat(&dot_star.clone(), &union_days),
+            &dot_star.clone(),
+        );
+        let second = GenRegex::concat(
+            &GenRegex::concat(&dot_star.clone(), &union_months),
+            &dot_star.clone(),
+        );
+        //let third = GenRegex::star(&GenRegex::re_range(&'!', &'~'));
+        let regex = GenRegex::intersect(&first, &second);
         let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
         assert_eq!(gen_regex_unwrapped, expected);
