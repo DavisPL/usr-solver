@@ -225,12 +225,12 @@ impl SmtParser {
         Ok(())
     }
 
-    fn parse_regex(& self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        if let Some(re_type)=v.as_symbol(){
-            return match re_type{
-                "re.all"=>self.parse_re_all(),
-                _=>Err(SmtParseError::unrecog(v))
-            }
+    fn parse_regex(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        if let Some(re_type) = v.as_symbol() {
+            return match re_type {
+                "re.all" => self.parse_re_all(),
+                _ => Err(SmtParseError::unrecog(v)),
+            };
         }
         //Handles (str.to_re), (re.++), (re.inter), (re.union), (re.*), (re.range)
         let (re_type, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
@@ -244,35 +244,35 @@ impl SmtParser {
             _ => {
                 println!("Huh?");
                 Err(SmtParseError::unrecog(re_type))
-            },
+            }
         }
     }
 
-/* 
-    fn parse_re_union(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        if let Value::Cons(c) = v {
-            let (head, tail) = c.as_pair();
-            let head_parsed = self.parse_regex(head)?;
-            //let head_unwrapped = head_parsed.unwrap();
-            let tail_parsed = self.parse_regex(tail)?;
-            //let tail_unwrapped = tail_parsed.unwrap();
-            let union_term = GenRegex::union(&head_parsed, &tail_parsed);
-            return Ok(union_term);
+    /*
+        fn parse_re_union(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+            if let Value::Cons(c) = v {
+                let (head, tail) = c.as_pair();
+                let head_parsed = self.parse_regex(head)?;
+                //let head_unwrapped = head_parsed.unwrap();
+                let tail_parsed = self.parse_regex(tail)?;
+                //let tail_unwrapped = tail_parsed.unwrap();
+                let union_term = GenRegex::union(&head_parsed, &tail_parsed);
+                return Ok(union_term);
+            }
+            Err(SmtParseError::unrecog(v))
         }
-        Err(SmtParseError::unrecog(v))
-    }
 
-    fn parse_re_inter(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        if let Value::Cons(c) = v {
-            let (head, tail) = c.as_pair();
-            let head_parsed = self.parse_regex(head)?;
-            let tail_parsed = self.parse_regex(tail)?;
-            let union_term = GenRegex::intersect(&head_parsed, &tail_parsed);
-            return Ok(union_term);
+        fn parse_re_inter(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+            if let Value::Cons(c) = v {
+                let (head, tail) = c.as_pair();
+                let head_parsed = self.parse_regex(head)?;
+                let tail_parsed = self.parse_regex(tail)?;
+                let union_term = GenRegex::intersect(&head_parsed, &tail_parsed);
+                return Ok(union_term);
+            }
+            Err(SmtParseError::unrecog(v))
         }
-        Err(SmtParseError::unrecog(v))
-    }
-*/
+    */
 
     fn parse_re_union(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Syntax (re.union R R)
@@ -310,7 +310,7 @@ impl SmtParser {
         Ok(GenRegex::star(&self.parse_regex(regex)?))
     }
 
-    fn parse_re_all(&self)->Result<Rc<GenRegex>, SmtParseError>{
+    fn parse_re_all(&self) -> Result<Rc<GenRegex>, SmtParseError> {
         Ok(GenRegex::star(&GenRegex::create_sigma()))
     }
 
@@ -372,7 +372,7 @@ impl SmtParser {
         }
         Err(SmtParseError::unrecog(v))
     }
-    
+
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
         eprintln!("TODO: Implement parse_empty");
         Err(SmtParseError::Unimplemented(
@@ -439,6 +439,8 @@ impl SmtParser {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
 
     #[test]
@@ -620,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn test_re_all(){
+    fn test_re_all() {
         let smt_result = parse_smtlib_file("benchmarks/re_all.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
 
@@ -635,14 +637,16 @@ mod tests {
         assert!(gen_regex.is_ok());
         let gen_regex_unwrapped = gen_regex.unwrap();
 
-        let union=GenRegex::union(&GenRegex::create_gre_char_lit("a"), &GenRegex::create_gre_char_lit("b"));
-        let regex=GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
-        let expected=GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+        let union = GenRegex::union(
+            &GenRegex::create_gre_char_lit("a"),
+            &GenRegex::create_gre_char_lit("b"),
+        );
+        let regex = GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
+        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
-        assert_eq!(gen_regex_unwrapped,expected);
+        assert_eq!(gen_regex_unwrapped, expected);
     }
 
-    #[ignore]
     #[test]
     fn test_date() {
         let smt_result = parse_smtlib_file("benchmarks/date.smt2");
@@ -657,6 +661,50 @@ mod tests {
         println!("Parsed GenRegex: {:?}", gen_regex);
 
         assert!(gen_regex.is_ok());
-        unimplemented!()
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        let dot_star = GenRegex::star(&GenRegex::create_sigma());
+        let mut days_of_the_week: Vec<Rc<GenRegex>> = Vec::new();
+        days_of_the_week.push(GenRegex::str_to_re("monday"));
+        days_of_the_week.push(GenRegex::str_to_re("tuesday"));
+        days_of_the_week.push(GenRegex::str_to_re("wednesday"));
+        days_of_the_week.push(GenRegex::str_to_re("thursday"));
+        days_of_the_week.push(GenRegex::str_to_re("friday"));
+        days_of_the_week.push(GenRegex::str_to_re("saturday"));
+        days_of_the_week.push(GenRegex::str_to_re("sunday"));
+        let mut union_days = days_of_the_week[0].clone();
+        for v in &days_of_the_week[1..] {
+            union_days = GenRegex::union(&union_days, v);
+        }
+        let mut months: Vec<Rc<GenRegex>> = Vec::new();
+        months.push(GenRegex::str_to_re("january"));
+        months.push(GenRegex::str_to_re("february"));
+        months.push(GenRegex::str_to_re("march"));
+        months.push(GenRegex::str_to_re("april"));
+        months.push(GenRegex::str_to_re("may"));
+        months.push(GenRegex::str_to_re("june"));
+        months.push(GenRegex::str_to_re("july"));
+        months.push(GenRegex::str_to_re("august"));
+        months.push(GenRegex::str_to_re("september"));
+        months.push(GenRegex::str_to_re("october"));
+        months.push(GenRegex::str_to_re("november"));
+        months.push(GenRegex::str_to_re("december"));
+        let mut union_months = months[0].clone();
+        for v in &months[1..] {
+            union_months = GenRegex::union(&union_months, v);
+        }
+        let first = GenRegex::concat(
+            &GenRegex::concat(&dot_star.clone(), &union_days),
+            &dot_star.clone(),
+        );
+        let second = GenRegex::concat(
+            &GenRegex::concat(&dot_star.clone(), &union_months),
+            &dot_star.clone(),
+        );
+        let third = GenRegex::star(&GenRegex::re_range(&'!', &'~'));
+        let regex = GenRegex::intersect(&&GenRegex::intersect(&first, &second), &third);
+        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+
+        assert_eq!(gen_regex_unwrapped, expected);
     }
 }

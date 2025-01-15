@@ -387,7 +387,7 @@ pub fn derivative(
             Rc::new(GenRegex::EmptySet),
             MergeResult::Bottom,
         )]),
-        GenRegex::Sigma=> HashSet::from([AntimirovDerivativeElement::new(
+        GenRegex::Sigma => HashSet::from([AntimirovDerivativeElement::new(
             empty_string(),
             MergeResult::SimpleSub(SimpleSub::empty()),
         )]),
@@ -630,7 +630,7 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     }
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::clone(expr),
-        GenRegex::Sigma=> Rc::clone(expr),
+        GenRegex::Sigma => Rc::clone(expr),
         GenRegex::CharExpression(char_expr) => match char_expr {
             CharExpression::CharVar(char_var) => match substitution.get_char_var(char_var) {
                 Some(value) => Rc::new(GenRegex::CharExpression(value.clone())),
@@ -740,7 +740,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     };
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
-        GenRegex::Sigma=>HashSet::new(),
+        GenRegex::Sigma => HashSet::new(),
         GenRegex::CharExpression(cExpr) => match cExpr {
             CharExpression::CharVar(_) => HashSet::new(),
             CharExpression::Literal(value) => {

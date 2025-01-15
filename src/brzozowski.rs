@@ -149,7 +149,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
     };
     let empty_set = || Rc::new(GenRegex::EmptySet);
     match gre.as_ref() {
-        GenRegex::Sigma=>todo!(),
+        GenRegex::Sigma => todo!(),
         GenRegex::EmptySet => Rc::clone(gre),
         GenRegex::CharExpression(cExpr) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
@@ -240,7 +240,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
 
 pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
     match gre.as_ref() {
-        GenRegex::Sigma=>todo!(),
+        GenRegex::Sigma => todo!(),
         GenRegex::EmptySet => Rc::clone(gre),
         GenRegex::CharExpression(cExpr) => match cExpr {
             CharExpression::CharVar(_name) => {

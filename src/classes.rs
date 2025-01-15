@@ -30,7 +30,7 @@ impl GenRegex {
     pub fn create_emptyset() -> Rc<GenRegex> {
         Rc::new(GenRegex::EmptySet)
     }
-    pub fn create_sigma()-> Rc<GenRegex>{
+    pub fn create_sigma() -> Rc<GenRegex> {
         Rc::new(GenRegex::Sigma)
     }
     pub fn create_gre_char_lit(lit: &str) -> Rc<GenRegex> {
