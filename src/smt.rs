@@ -718,26 +718,23 @@ mod tests {
     }
     #[test]
     fn test_date_2() {
-        fn create_case_insensitive(day: &str) -> Rc<GenRegex> {
-                let first_char = day.chars().next().unwrap();
-    
-    // Initialize day_regex with the first character's lowercase and uppercase union
-                let mut day_regex = GenRegex::str_to_re(&first_char.to_uppercase().to_string());
-                let lower = GenRegex::str_to_re(&first_char.to_lowercase().to_string());
-                day_regex = GenRegex::union(&day_regex, &lower);
+        fn create_case_insensitive(word: &str) -> Rc<GenRegex> {
+            //init first character of word
+            let first_char = word.chars().next().unwrap();
+            let mut curr_regex = GenRegex::str_to_re(&first_char.to_uppercase().to_string());
+            let lower = GenRegex::str_to_re(&first_char.to_lowercase().to_string());
+            curr_regex = GenRegex::union(&curr_regex, &lower);
 
-                // Process the remaining characters
-                for c in day[1..].chars() {
-                    let lower = GenRegex::str_to_re(&c.to_lowercase().to_string());
-                    let upper = GenRegex::str_to_re(&c.to_uppercase().to_string());
-                    let char_union = GenRegex::union(&upper, &lower);
-                    
-                    // Concatenate with the rest of the regex for the day
-                    day_regex = GenRegex::concat(&day_regex, &char_union);
-                }
+            //iterate over word and add union of upper and lowercase versions
+            for c in word[1..].chars() {
+                let lower = GenRegex::str_to_re(&c.to_lowercase().to_string());
+                let upper = GenRegex::str_to_re(&c.to_uppercase().to_string());
+                let char_union = GenRegex::union(&upper, &lower);
 
-                day_regex
+                curr_regex = GenRegex::concat(&curr_regex, &char_union);
+            }
 
+            curr_regex
         }
         let smt_result = parse_smtlib_file("benchmarks/date2.smt2");
         println!("Parsed s-expression: {:?}\n", smt_result);
@@ -829,4 +826,3 @@ mod tests {
         assert!(gen_regex.is_ok());
     }
 }
-
