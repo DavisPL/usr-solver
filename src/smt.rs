@@ -373,6 +373,7 @@ impl SmtParser {
         Err(SmtParseError::unrecog(v))
     }
 
+
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
         eprintln!("TODO: Implement parse_empty");
         Err(SmtParseError::Unimplemented(
