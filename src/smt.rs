@@ -4,7 +4,7 @@
 
 use super::classes::{CharExpression, CharVar, GenRegex, StringVar};
 
-use lexpr::{self, value, Value};
+use lexpr::{self, value, Number, Value};
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -234,50 +234,26 @@ impl SmtParser {
             };
         }
         //Handles recursive case
-        let (re_type, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (re_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         //Handles regex func  Ex ((_ re.loop n1 n2) Regex)
-        if re_type.is_cons() {
-            //Parse the command
-            todo!()
+        if let Some((head, tail)) = re_type.as_pair() {
+            return match head.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+                "_" => self.parse_re_func(tail, args),
+                _ => Err(SmtParseError::unrecog(v)),
+            };
         }
         //Handles recursive regex
         match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
-            "str.to_re" => self.parse_str_to_re(tail),
-            "re.++" => self.parse_re_concat(tail),
-            "re.union" => self.parse_re_union(tail),
-            "re.*" => self.parse_re_star(tail),
-            "re.inter" => self.parse_re_inter(tail),
-            "re.range" => self.parse_re_range(tail),
+            "str.to_re" => self.parse_str_to_re(args),
+            "re.++" => self.parse_re_concat(args),
+            "re.union" => self.parse_re_union(args),
+            "re.*" => self.parse_re_star(args),
+            "re.inter" => self.parse_re_inter(args),
+            "re.range" => self.parse_re_range(args),
             "re.loop" => todo!(),
             _ => Err(SmtParseError::unrecog(re_type)),
         }
     }
-
-    /*
-        fn parse_re_union(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-            if let Value::Cons(c) = v {
-                let (head, tail) = c.as_pair();
-                let head_parsed = self.parse_regex(head)?;
-                //let head_unwrapped = head_parsed.unwrap();
-                let tail_parsed = self.parse_regex(tail)?;
-                //let tail_unwrapped = tail_parsed.unwrap();
-                let union_term = GenRegex::union(&head_parsed, &tail_parsed);
-                return Ok(union_term);
-            }
-            Err(SmtParseError::unrecog(v))
-        }
-
-        fn parse_re_inter(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-            if let Value::Cons(c) = v {
-                let (head, tail) = c.as_pair();
-                let head_parsed = self.parse_regex(head)?;
-                let tail_parsed = self.parse_regex(tail)?;
-                let union_term = GenRegex::intersect(&head_parsed, &tail_parsed);
-                return Ok(union_term);
-            }
-            Err(SmtParseError::unrecog(v))
-        }
-    */
 
     fn parse_re_union(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Syntax (re.union R R)
@@ -378,8 +354,71 @@ impl SmtParser {
         Err(SmtParseError::unrecog(v))
     }
 
-    fn parse_re_loop(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        unimplemented!()
+    fn parse_re_func(&self, func: &Value, args: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (re_func, func_params) = func.as_pair().ok_or(SmtParseError::unrecog(func))?;
+        match re_func.as_symbol().ok_or(SmtParseError::unrecog(func))? {
+            "re.loop" => {
+                let (param1_val, tail) = func_params
+                    .as_pair()
+                    .ok_or(SmtParseError::unrecog(func_params))?;
+                if tail.is_null() {
+                    return self.parse_re_loop(param1_val, &Value::Null, args);
+                }
+                let (param2_val, tail) =
+                    tail.as_pair().ok_or(SmtParseError::unrecog(func_params))?;
+                if !tail.is_null() {
+                    return Err(SmtParseError::unrecog(func_params));
+                }
+                let (regex, tail) = args.as_pair().ok_or(SmtParseError::unrecog(args))?;
+                if !tail.is_null() {
+                    return Err(SmtParseError::unrecog(tail));
+                }
+                return self.parse_re_loop(param1_val, param2_val, regex);
+            }
+            "re.^" => {
+                let (param1_val, tail) = func_params
+                    .as_pair()
+                    .ok_or(SmtParseError::unrecog(func_params))?;
+                if !tail.is_null() {
+                    return Err(SmtParseError::unrecog(func_params));
+                }
+                let (regex, tail) = args.as_pair().ok_or(SmtParseError::unrecog(args))?;
+                if !tail.is_null() {
+                    return Err(SmtParseError::unrecog(tail));
+                }
+                return self.parse_re_caret(param1_val, regex);
+            }
+            _ => Err(SmtParseError::unrecog(func)),
+        }
+    }
+
+    fn parse_re_caret(&self, param1: &Value, regex: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let p1 = param1.as_number();
+        let p1 = p1.ok_or(SmtParseError::unrecog(param1))?;
+        let p1 = p1.as_u64().ok_or(SmtParseError::Unrecognized(
+            "Integer for re.loop should be positive.".to_string(),
+        ))?;
+        let regex_base = self.parse_regex(regex)?;
+        Ok(GenRegex::caret(p1, &regex_base))
+    }
+
+    fn parse_re_loop(
+        &self,
+        param1: &Value,
+        param2: &Value,
+        regex: &Value,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (p1, p2) = (param1.as_number(), param2.as_number());
+        let p1 = p1.ok_or(SmtParseError::unrecog(param1))?;
+        let p2 = p2.ok_or(SmtParseError::unrecog(param1))?;
+        let p1 = p1.as_u64().ok_or(SmtParseError::Unrecognized(
+            "Integer for re.loop should be positive.".to_string(),
+        ))?;
+        let p2 = p2.as_u64().ok_or(SmtParseError::Unrecognized(
+            "Integer for re.loop should be positive.".to_string(),
+        ))?;
+        let regex_base = self.parse_regex(regex)?;
+        Ok(GenRegex::re_loop(p1, p2, &regex_base))
     }
 
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
@@ -449,6 +488,8 @@ impl SmtParser {
 #[cfg(test)]
 mod tests {
     use std::vec;
+
+    use crate::classes::SubExpr;
 
     use super::*;
 
@@ -794,7 +835,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
     }
-    #[ignore]
+    //#[ignore]
     #[test]
     fn test_passw_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
@@ -809,8 +850,33 @@ mod tests {
         println!("Parsed GenRegex: {:?}", gen_regex);
 
         assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        let dot_star = GenRegex::star(&GenRegex::create_sigma());
+        let first = GenRegex::concat(
+            &GenRegex::concat(&dot_star, &GenRegex::re_range(&'a', &'z')),
+            &dot_star,
+        );
+        let second = GenRegex::concat(
+            &GenRegex::concat(&dot_star, &GenRegex::re_range(&'A', &'Z')),
+            &dot_star,
+        );
+        let third = GenRegex::concat(
+            &GenRegex::concat(&dot_star, &GenRegex::re_range(&'0', &'9')),
+            &dot_star,
+        );
+        let fourth = GenRegex::re_loop(0, 3, &GenRegex::re_range(&'!', &'~'));
+        let regex = GenRegex::intersect(
+            &GenRegex::intersect(&GenRegex::intersect(&first, &second), &third),
+            &fourth,
+        );
+        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+
+        assert_eq!(gen_regex_unwrapped, expected);
     }
 
+    //#[ignore]
+    #[test]
     fn test_passw_unsat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
@@ -824,5 +890,28 @@ mod tests {
         println!("Parsed GenRegex: {:?}", gen_regex);
 
         assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        let dot_star = GenRegex::star(&GenRegex::create_sigma());
+        let first = GenRegex::concat(
+            &GenRegex::concat(&dot_star, &GenRegex::re_range(&'a', &'z')),
+            &dot_star,
+        );
+        let second = GenRegex::concat(
+            &GenRegex::concat(&dot_star, &GenRegex::re_range(&'A', &'Z')),
+            &dot_star,
+        );
+        let third = GenRegex::concat(
+            &GenRegex::concat(&dot_star, &GenRegex::re_range(&'0', &'9')),
+            &dot_star,
+        );
+        let fourth = GenRegex::star(&GenRegex::re_range(&':', &'~'));
+        let regex = GenRegex::intersect(
+            &GenRegex::intersect(&GenRegex::intersect(&first, &second), &third),
+            &fourth,
+        );
+        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+
+        assert_eq!(gen_regex_unwrapped, expected);
     }
 }

@@ -58,6 +58,15 @@ impl GenRegex {
     pub fn union(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Union(gre1.clone(), gre2.clone()))
     }
+    pub fn union_many(args: &Vec<&Rc<GenRegex>>) -> Rc<GenRegex> {
+        if args.len() == 0 {
+            GenRegex::create_emptyset()
+        } else if args.len() == 1 {
+            args[0].clone()
+        } else {
+            GenRegex::union(&args[0].clone(), &GenRegex::union_many(&args[1..].to_vec()))
+        }
+    }
     pub fn star(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Kleene(gre.clone()))
     }
@@ -77,6 +86,26 @@ impl GenRegex {
         let mut retval = GenRegex::create_gre_char_lit(&end.to_string());
         for c in (*start..=*end).rev().skip(1) {
             retval = GenRegex::union(&GenRegex::create_gre_char_lit(&c.to_string()), &retval)
+        }
+        retval
+    }
+    pub fn caret(n: u64, gre: &Rc<GenRegex>) -> Rc<GenRegex> {
+        if n == 0 {
+            return GenRegex::create_gre_char_lit(&"");
+        }
+        let mut retval = gre.clone();
+        for _ in 1..n {
+            retval = GenRegex::concat(&gre.clone(), &retval);
+        }
+        retval
+    }
+    pub fn re_loop(n1: u64, n2: u64, gre: &Rc<GenRegex>) -> Rc<GenRegex> {
+        if n1 > n2 {
+            return GenRegex::create_emptyset();
+        }
+        let mut retval = GenRegex::caret(n2, gre);
+        for i in (n1..n2).rev() {
+            retval = GenRegex::union(&GenRegex::caret(i, gre), &retval);
         }
         retval
     }
