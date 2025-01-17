@@ -180,12 +180,13 @@ impl SmtParser {
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
         }
-        let result = Rc::try_unwrap(self.parse_assert_arg(assert_arg)?);
-        if let Ok(r) = result {
-            self.regex_result = Some(r);
+        let result = self.parse_assert_arg(assert_arg)?;
+        if let Some(r) = &self.regex_result {
+            self.regex_result = Some(GenRegex::Concatenation(Rc::new(r.clone()), result));
             Ok(())
         } else {
-            Err(SmtParseError::unrecog(assert_arg))
+            self.regex_result = Some(Rc::try_unwrap(result).unwrap());
+            Ok(())
         }
     }
 
@@ -214,14 +215,8 @@ impl SmtParser {
         let parsed2 = self.parse_regex(regex2)?;
         println!("parsed2 {}", parsed2);
         Ok(GenRegex::union(
-                &GenRegex::intersect(
-                    &parsed1,
-                    &GenRegex::complement(&parsed2)
-                ),
-                &GenRegex::intersect(
-                    &GenRegex::complement(&parsed1),
-                    &parsed2
-                )
+            &GenRegex::intersect(&parsed1, &GenRegex::complement(&parsed2)),
+            &GenRegex::intersect(&GenRegex::complement(&parsed1), &parsed2),
         ))
         //todo!();
     }
@@ -263,11 +258,12 @@ impl SmtParser {
             return match re_type {
                 "re.all" => self.parse_re_all(),
                 "re.none" => self.parse_re_none(),
+                "re.allchar" => self.parse_re_allchar(),
                 _ => Err(SmtParseError::unrecog(v)),
             };
         }
         //Handles recursive case
-        
+
         let (re_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
 
         if let Some((head, tail)) = re_type.as_pair() {
@@ -284,7 +280,9 @@ impl SmtParser {
             "re.*" => self.parse_re_star(args),
             "re.inter" => self.parse_re_inter(args),
             "re.range" => self.parse_re_range(args),
-            "re.loop" => todo!(),
+            "re.comp" => self.parse_re_comp(args),
+            "re.+" => self.parse_re_plus(args),
+            "re.opt" => self.parse_re_opt(args),
             _ => Err(SmtParseError::unrecog(re_type)),
         }
     }
@@ -488,6 +486,38 @@ impl SmtParser {
         ))?;
         let regex_base = self.parse_regex(regex)?;
         Ok(GenRegex::re_loop(p1, p2, &regex_base))
+    }
+
+    pub fn parse_re_allchar(&self) -> Result<Rc<GenRegex>, SmtParseError> {
+        Ok(GenRegex::create_sigma())
+    }
+
+    pub fn parse_re_comp(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        if !tail.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        Ok(GenRegex::complement(&self.parse_regex(regex)?))
+    }
+
+    pub fn parse_re_opt(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        if !tail.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        Ok(GenRegex::union(
+            &self.parse_regex(regex)?,
+            &GenRegex::create_gre_char_lit(&""),
+        ))
+    }
+
+    pub fn parse_re_plus(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        if !tail.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        let regex = self.parse_regex(regex)?;
+        Ok(GenRegex::concat(&regex, &GenRegex::star(&regex)))
     }
 
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
