@@ -182,7 +182,6 @@ fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
 }
 
 fn merge(substitutions: Rc<AnySub>) -> MergeResult {
-    println!("{}", substitutions);
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
 
@@ -312,7 +311,6 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
         }
         combined_expr.set_string_var(var.clone(), eq_exprs[0].clone());
     }
-    println!("{}", combined_expr);
     MergeResult::SimpleSub(combined_expr)
 }
 
@@ -445,12 +443,7 @@ pub fn derivative(
                     match (p_sub.get_subs(), q_sub.get_subs()) {
                         (MergeResult::SimpleSub(left_elem), MergeResult::SimpleSub(right_elem)) => {
                             let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
-                            println!(
-                                "Left:{} \nRight:{} \nTogether{:?}",
-                                left_elem, right_elem, unionLR
-                            );
                             let ret = merge(Rc::new(unionLR));
-                            println!("Merge: {}", ret);
                             match ret {
                                 MergeResult::SimpleSub(_) => {
                                     let left_minus_right = sub_difference(
@@ -461,10 +454,6 @@ pub fn derivative(
                                         Rc::new(right_elem.clone()),
                                         Rc::new(left_elem.clone()),
                                     );
-                                    println!("{} right\n", right_elem);
-                                    println!("{} left\n", left_elem);
-                                    println!("{} left-minus-right\n", left_minus_right);
-                                    println!("{} right-minus-left\n", right_minus_left);
                                     match (left_minus_right, right_minus_left) {
                                         (
                                             MergeResult::SimpleSub(l_minus_r),
@@ -691,7 +680,7 @@ pub fn satisfiable_helper(
     index: &mut i32,
     mut visited: HashSet<GenRegex>,
 ) -> bool {
-    //println!("{}", expr);
+    println!("{}", expr);
     if visited.contains(expr) {
         return false;
     } else {

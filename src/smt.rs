@@ -10,6 +10,8 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
+use crate::antimirov;
+use antimirov::satisfiable;
 
 /*
     Error type
@@ -68,7 +70,6 @@ impl Error for SmtParseError {}
 
 fn hex_to_char(number: u64) -> char {
     if let Some(character) = char::from_u32(number as u32) {
-        println!("The Unicode character for {} is: {}", number, character);
         return character;
     }
     unimplemented!();
@@ -742,6 +743,8 @@ mod tests {
             Rc::new(expected_intersection_1),
             Rc::new(expected_intersection_2),
         );
+        println!("{}", gen_regex_unwrapped);
+        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
 
         assert_eq!(gen_regex_unwrapped, expected);
     }
@@ -1042,6 +1045,8 @@ mod tests {
     }
     #[test]
     fn test_hex_code() {
+        println!("{}", hex_to_char(43));
+
         let smt_result = parse_smtlib_file("benchmarks/hexcode.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
 

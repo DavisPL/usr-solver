@@ -114,7 +114,6 @@ pub fn evaluate_conjunction(
     //string_map: &mut HashMap<i32, String>,
     map: &mut HashMap<i32, i32>,
 ) -> Vec<Rc<Predicate>> {
-    let alphabet: HashSet<String> = vec!["a".to_string(), "b".to_string()].into_iter().collect();
     let mut final_preds = Vec::new();
     let mut not_equality_preds = HashSet::new();
     let mut length_preds: HashMap<String, i32> = HashMap::new();
@@ -227,11 +226,11 @@ pub fn evaluate_conjunction(
             }
         }
     }
-    for (_, chars) in cant_equal_chars {
+    /*for (_, chars) in cant_equal_chars {
         if alphabet.iter().all(|c| chars.contains(c)) {
             return vec![Rc::new(Predicate::False)];
         }
-    }
+    }*/
 
     for (var_name, length) in length_preds {
         if not_allowed_lengths
