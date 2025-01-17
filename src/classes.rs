@@ -58,8 +58,14 @@ impl GenRegex {
     pub fn union(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Union(gre1.clone(), gre2.clone()))
     }
+    pub fn complement(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
+        Rc::new(GenRegex::Complement(gre.clone()))
+    }
     pub fn star(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Kleene(gre.clone()))
+    }
+    pub fn empty_set() -> Rc<GenRegex> {
+        Rc::new(GenRegex::EmptySet)
     }
     pub fn str_to_re(str: &str) -> Rc<GenRegex> {
         //Needs something better than chars() for more support

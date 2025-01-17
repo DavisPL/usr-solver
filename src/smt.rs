@@ -66,6 +66,12 @@ impl Error for SmtParseError {}
     These are private so that the implementation can be changed later
 */
 
+fn to_char(s: &str) -> char {
+    let hex = &s[3..7];
+    let val = u32::from_str_radix(hex, 16).unwrap();
+    char::try_from(val).unwrap()
+}
+
 fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
     let v = lexpr::from_str(smt_string)?;
     Ok(v)
@@ -187,11 +193,35 @@ impl SmtParser {
         match cmd.as_symbol().ok_or(SmtParseError::unrecog(v))? {
             "str.in_re" => self.parse_str_in_re(tail),
             "and" => self.parse_and(tail),
+            "=" => self.parse_equals(tail),
             _ => Err(SmtParseError::Unsupported(format!(
                 "Unsupported SMTLib command: {}",
                 cmd
             ))),
         }
+    }
+
+    fn parse_equals(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        if !tail.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        let parsed1 = self.parse_regex(regex1)?;
+        println!("hi {}, {}", parsed1, regex2);
+        let parsed2 = self.parse_regex(regex2)?;
+        println!("parsed2 {}", parsed2);
+        Ok(GenRegex::union(
+                &GenRegex::intersect(
+                    &parsed1,
+                    &GenRegex::complement(&parsed2)
+                ),
+                &GenRegex::intersect(
+                    &GenRegex::complement(&parsed1),
+                    &parsed2
+                )
+        ))
+        //todo!();
     }
 
     fn parse_str_in_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -230,10 +260,12 @@ impl SmtParser {
         if let Some(re_type) = v.as_symbol() {
             return match re_type {
                 "re.all" => self.parse_re_all(),
+                "re.none" => self.parse_re_none(),
                 _ => Err(SmtParseError::unrecog(v)),
             };
         }
         //Handles recursive case
+        
         let (re_type, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         //Handles regex func  Ex ((_ re.loop n1 n2) Regex)
         if re_type.is_cons() {
@@ -296,7 +328,9 @@ impl SmtParser {
         //Syntax (re.inter R R)
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        println!("{}, {}, and tail {}", regex1, regex2, tail);
         if !tail.is_null() {
+            println!("failed");
             return Err(SmtParseError::unrecog(v));
         }
         Ok(GenRegex::intersect(
@@ -317,6 +351,9 @@ impl SmtParser {
 
     fn parse_re_all(&self) -> Result<Rc<GenRegex>, SmtParseError> {
         Ok(GenRegex::star(&GenRegex::create_sigma()))
+    }
+    fn parse_re_none(&self) -> Result<Rc<GenRegex>, SmtParseError> {
+        Ok(GenRegex::empty_set())
     }
 
     fn parse_and(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -824,5 +861,57 @@ mod tests {
         println!("Parsed GenRegex: {:?}", gen_regex);
 
         assert!(gen_regex.is_ok());
+    }
+
+    #[ignore]
+    #[test]
+    fn test_passw_eq_sat1() {
+        let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        let union = GenRegex::union(
+            &GenRegex::create_gre_char_lit("a"),
+            &GenRegex::create_gre_char_lit("b"),
+        );
+        let regex = GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
+        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+
+        assert_eq!(gen_regex_unwrapped, expected);
+    }
+    #[test]
+    fn test_hex_code() {
+        let smt_result = parse_smtlib_file("benchmarks/hexcode.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        let union = GenRegex::union(
+            &GenRegex::create_gre_char_lit("a"),
+            &GenRegex::create_gre_char_lit("b"),
+        );
+        let regex = GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
+        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+
+        assert_eq!(gen_regex_unwrapped, expected);
     }
 }
