@@ -178,12 +178,14 @@ impl SmtParser {
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
         }
-        let result = Rc::try_unwrap(self.parse_assert_arg(assert_arg)?);
-        if let Ok(r) = result {
-            self.regex_result = Some(r);
+        let result =self.parse_assert_arg(assert_arg)?;
+        if let Some(r)=&self.regex_result{
+            self.regex_result=Some(GenRegex::Concatenation(Rc::new(r.clone()), result));
             Ok(())
-        } else {
-            Err(SmtParseError::unrecog(assert_arg))
+        }
+        else{
+            self.regex_result=Some(Rc::try_unwrap(result).unwrap());
+            Ok(())
         }
     }
 
