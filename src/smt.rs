@@ -66,10 +66,12 @@ impl Error for SmtParseError {}
     These are private so that the implementation can be changed later
 */
 
-fn to_char(s: &str) -> char {
-    let hex = &s[3..7];
-    let val = u32::from_str_radix(hex, 16).unwrap();
-    char::try_from(val).unwrap()
+fn hex_to_char(number: u64) -> char {
+    if let Some(character) = char::from_u32(number as u32) {
+        println!("The Unicode character for {} is: {}", number, character);
+        return character;
+    }
+    unimplemented!();
 }
 
 fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
@@ -304,9 +306,7 @@ impl SmtParser {
         //Syntax (re.inter R R)
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        println!("{}, {}, and tail {}", regex1, regex2, tail);
         if !tail.is_null() {
-            println!("failed");
             return Err(SmtParseError::unrecog(v));
         }
         Ok(GenRegex::intersect(
@@ -373,15 +373,41 @@ impl SmtParser {
         ))
     }
 
+    fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError>{
+        println!("{}", v);
+        if v.is_string(){
+            if v.as_str().unwrap().len() == 1{
+                return Ok(v.as_str().unwrap().chars().next().expect("ERROR"));
+            }else{
+                return Err(SmtParseError::unrecog(v));
+            }
+        }
+        else if v.is_cons(){
+            let (underscore, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+            let (_, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+            let (hex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+            if hex.is_number(){
+                println!("hello");
+                return Ok(hex_to_char(hex.as_u64().expect("ERROR")));
+            }
+
+        }
+
+        todo!()
+
+    }
+
     fn parse_re_range(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax (re.range char1 char2)
         let (char1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        println!("{}, 2{}, tail {}", char1, char2, tail);
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
         }
-        let char1 = char1.as_str().ok_or(SmtParseError::unrecog(v))?;
-        let char2 = char2.as_str().ok_or(SmtParseError::unrecog(v))?;
+        let char1 = self.parse_char_obj(char1)?.to_string();
+        let char2 = self.parse_char_obj(char2)?.to_string();
+
         if char1.len() != 1 || char2.len() != 1 {
             return Err(SmtParseError::unrecog(v));
         }
@@ -392,6 +418,7 @@ impl SmtParser {
     }
 
     fn parse_re_func(&self, func: &Value, args: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("re_fun");
         let (re_func, func_params) = func.as_pair().ok_or(SmtParseError::unrecog(func))?;
         match re_func.as_symbol().ok_or(SmtParseError::unrecog(func))? {
             "re.loop" => {
@@ -412,6 +439,11 @@ impl SmtParser {
                 }
                 return self.parse_re_loop(param1_val, param2_val, regex);
             }
+            "char" => {
+                println!("what the heckles");
+                todo!();
+
+            },
             "re.^" => {
                 let (param1_val, tail) = func_params
                     .as_pair()
