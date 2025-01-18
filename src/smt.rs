@@ -6,12 +6,12 @@ use super::classes::{CharExpression, CharVar, GenRegex, StringVar};
 
 use lexpr::{self, value, Number, Value};
 
+use crate::antimirov;
+use antimirov::satisfiable;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
-use crate::antimirov;
-use antimirov::satisfiable;
 
 /*
     Error type
@@ -372,28 +372,25 @@ impl SmtParser {
         ))
     }
 
-    fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError>{
+    fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
         println!("{}", v);
-        if v.is_string(){
-            if v.as_str().unwrap().len() == 1{
+        if v.is_string() {
+            if v.as_str().unwrap().len() == 1 {
                 return Ok(v.as_str().unwrap().chars().next().expect("ERROR"));
-            }else{
+            } else {
                 return Err(SmtParseError::unrecog(v));
             }
-        }
-        else if v.is_cons(){
+        } else if v.is_cons() {
             let (underscore, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
             let (_, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
             let (hex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-            if hex.is_number(){
+            if hex.is_number() {
                 println!("hello");
                 return Ok(hex_to_char(hex.as_u64().expect("ERROR")));
             }
-
         }
 
         todo!()
-
     }
 
     fn parse_re_range(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -441,8 +438,7 @@ impl SmtParser {
             "char" => {
                 println!("what the heckles");
                 todo!();
-
-            },
+            }
             "re.^" => {
                 let (param1_val, tail) = func_params
                     .as_pair()
@@ -1044,9 +1040,11 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
     }
+
+    //#[ignore]
     #[test]
     fn test_hex_code() {
-        println!("{}", hex_to_char(43));
+        println!("Another number{}", hex_to_char(43));
 
         let smt_result = parse_smtlib_file("benchmarks/hexcode.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
@@ -1070,5 +1068,23 @@ mod tests {
         let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
         assert_eq!(gen_regex_unwrapped, expected);
+    }
+
+    #[test]
+    fn test_simple_hex() {
+        println!("A number{:?}", hex_to_char(0));
+        let smt_result = parse_smtlib_file("benchmarks/simplehex.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+        todo!()
     }
 }
