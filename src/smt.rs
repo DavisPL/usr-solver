@@ -589,6 +589,8 @@ impl SmtParser {
 mod tests {
     use std::vec;
 
+    use antimirov::derivative;
+
     use crate::classes::SubExpr;
 
     use super::*;
@@ -743,7 +745,6 @@ mod tests {
             Rc::new(expected_intersection_1),
             Rc::new(expected_intersection_2),
         );
-        println!("{}", gen_regex_unwrapped);
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
 
         assert_eq!(gen_regex_unwrapped, expected);
