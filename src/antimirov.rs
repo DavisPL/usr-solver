@@ -459,8 +459,8 @@ pub fn derivative(
                                             MergeResult::SimpleSub(l_minus_r),
                                             MergeResult::SimpleSub(r_minus_l),
                                         ) => {
-                                            let p_prime_sub = sub_in(p_sub.get_expr(), &l_minus_r);
-                                            let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
+                                            let p_prime_sub = sub_in(p_sub.get_expr(), &r_minus_l);
+                                            let q_prime_sub = sub_in(q_sub.get_expr(), &l_minus_r);
                                             let final_expr = Rc::new(GenRegex::Intersect(
                                                 p_prime_sub,
                                                 q_prime_sub,
@@ -680,7 +680,6 @@ pub fn satisfiable_helper(
     index: &mut i32,
     mut visited: HashSet<GenRegex>,
 ) -> bool {
-    println!("{}", expr);
     if visited.contains(expr) {
         return false;
     } else {
