@@ -143,6 +143,7 @@ impl SmtParser {
         // 3 cases here: (declare-const), (assert), (check-sat)
         if let Some((head, tail)) = v.as_pair() {
             match head.as_symbol().ok_or(SmtParseError::unrecog(head))? {
+                "set-logic" => Ok(()),
                 "declare-const" => self.parse_declare_const(tail),
                 "assert" => self.parse_assert(tail),
                 "check-sat" => self.parse_check_sat(tail),
@@ -278,6 +279,7 @@ impl SmtParser {
             "str.to_re" => self.parse_str_to_re(args),
             "re.++" => self.parse_re_concat(args),
             "re.union" => self.parse_re_union(args),
+            "re.diff" => self.parse_re_diff(args),
             "re.*" => self.parse_re_star(args),
             "re.inter" => self.parse_re_inter(args),
             "re.range" => self.parse_re_range(args),
@@ -298,6 +300,18 @@ impl SmtParser {
         Ok(GenRegex::union(
             &self.parse_regex(regex1)?,
             &self.parse_regex(regex2)?,
+        ))
+    }
+    fn parse_re_diff(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //Syntax (re.diff R R)
+        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        if !tail.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        Ok(GenRegex::intersect(
+            &self.parse_regex(regex1)?,
+            &GenRegex::complement(&self.parse_regex(regex2)?),
         ))
     }
 
