@@ -185,7 +185,8 @@ pub fn evaluate_conjunction(
             }
         }
     }
-    let cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
+    // TODO: is this needed?
+    // let cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
     for not_pred in not_equality_preds {
         if let Predicate::Not(inner) = not_pred.as_ref() {
             let leftId;

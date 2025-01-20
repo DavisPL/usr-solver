@@ -22,7 +22,7 @@ pub enum SmtParseError {
     FileError(String),               // File not found
     SexprError(lexpr::parse::Error), // Error parsing S-expression
     MissingAssertion(),              // Missing (assert) statement in SMTLib file
-    MissingCheckSat(),               // Missing (check-sat) statement in SMTLib file
+    BadCheckSat(),                   // Bad or missing (check-sat) statement in SMTLib file
     Unsupported(String),             // Unsupported SMTLib feature
     Unrecognized(String),            // Unrecognized SMTLib feature
     Unimplemented(String),           // Unimplemented SMTLib feature
@@ -52,7 +52,9 @@ impl fmt::Display for SmtParseError {
             SmtParseError::FileError(s) => write!(f, "File error: {}", s),
             SmtParseError::SexprError(e) => write!(f, "S-expression error: {}", e),
             SmtParseError::MissingAssertion() => write!(f, "Expected (assert) statement"),
-            SmtParseError::MissingCheckSat() => write!(f, "Expected (check-sat) statement"),
+            SmtParseError::BadCheckSat() => {
+                write!(f, "Expected (check-sat) statement at end of file")
+            }
             SmtParseError::Unsupported(s) => write!(f, "Unsupported SMTLib feature: {}", s),
             SmtParseError::Unrecognized(s) => write!(f, "Unrecognized SMTLib feature: {}", s),
             SmtParseError::Unimplemented(s) => write!(f, "Unimplemented SMTLib feature: {}", s),
@@ -117,9 +119,19 @@ impl SmtParser {
         }
     }
 
+    /*
+        Parsing entrypoints
+
+        Currently takes input from lexpr::Value.
+    */
+
+    /// Parse list of items at the top level recursively
     pub fn parse_s_expr(&mut self, v: &Value) -> Result<GenRegex, SmtParseError> {
         // println!("called parse_s_expr with value: {:?}", v);
-        // Parse list of items at the top level recursively
+
+        // Note: this function is written recursively (may stack overflow)
+        // We may want to rewrite to be iterative eventually.
+
         if let Some((head, tail)) = v.as_pair() {
             // Process head
             self.parse_head(head)?;
@@ -130,7 +142,7 @@ impl SmtParser {
                 return Err(SmtParseError::MissingAssertion());
             }
             if !self.found_check_sat {
-                return Err(SmtParseError::MissingCheckSat());
+                return Err(SmtParseError::BadCheckSat());
             }
             let result = self.regex_result.take();
             Ok(result.expect("Regex result should have been set by parser earlier!"))
@@ -138,6 +150,10 @@ impl SmtParser {
             Err(SmtParseError::unrecog(v))
         }
     }
+
+    /*
+        Top-level parsing functions
+    */
 
     fn parse_head(&mut self, v: &Value) -> Result<(), SmtParseError> {
         // 3 cases here: (declare-const), (assert), (check-sat)
@@ -158,6 +174,10 @@ impl SmtParser {
     }
 
     fn parse_declare_const(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // Declare const should not occur after check-sat
+        if self.found_check_sat {
+            return Err(SmtParseError::BadCheckSat());
+        }
         // Add variable name to self.var_names
         let (var_name, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         println!("var_name {}", var_name);
@@ -175,6 +195,10 @@ impl SmtParser {
     }
 
     fn parse_assert(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // Assert should not occur after check-sat
+        if self.found_check_sat {
+            return Err(SmtParseError::BadCheckSat());
+        }
         // Set flag
         self.found_assert = true;
         // Parse the arg, don't know if assert can take multiple args
@@ -206,6 +230,23 @@ impl SmtParser {
         }
     }
 
+    fn parse_check_sat(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // check-sat should occur only once
+        if self.found_check_sat {
+            return Err(SmtParseError::BadCheckSat());
+        }
+        // Set flag
+        self.found_check_sat = true;
+        if !v.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        Ok(())
+    }
+
+    /*
+        Parsing functions for specific SMTLib assertions
+    */
+
     fn parse_equals(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
@@ -220,11 +261,10 @@ impl SmtParser {
             &GenRegex::intersect(&parsed1, &GenRegex::complement(&parsed2)),
             &GenRegex::intersect(&GenRegex::complement(&parsed1), &parsed2),
         ))
-        //todo!();
     }
 
     fn parse_str_in_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Syntax (str.in_re x R)
+        // Syntax: (str.in_re x R)
         let (str_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
@@ -245,17 +285,8 @@ impl SmtParser {
         }
     }
 
-    fn parse_check_sat(&mut self, v: &Value) -> Result<(), SmtParseError> {
-        // Set flag
-        self.found_check_sat = true;
-        if !v.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
-        Ok(())
-    }
-
     fn parse_regex(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Handles base case regex
+        // Handles base case regex
         if let Some(re_type) = v.as_symbol() {
             return match re_type {
                 "re.all" => self.parse_re_all(),
@@ -264,7 +295,7 @@ impl SmtParser {
                 _ => Err(SmtParseError::unrecog(v)),
             };
         }
-        //Handles recursive case
+        // Handles recursive case
 
         let (re_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
 
@@ -274,7 +305,7 @@ impl SmtParser {
                 _ => Err(SmtParseError::unrecog(v)),
             };
         }
-        //Handles recursive regex
+        // Handles recursive regex
         match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
             "str.to_re" => self.parse_str_to_re(args),
             "re.++" => self.parse_re_concat(args),
@@ -291,7 +322,7 @@ impl SmtParser {
     }
 
     fn parse_re_union(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Syntax (re.union R R)
+        // Syntax: (re.union R R)
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
@@ -303,7 +334,7 @@ impl SmtParser {
         ))
     }
     fn parse_re_diff(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Syntax (re.diff R R)
+        // Syntax: (re.diff R R)
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
@@ -316,7 +347,7 @@ impl SmtParser {
     }
 
     fn parse_re_inter(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Syntax (re.inter R R)
+        // Syntax: (re.inter R R)
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
@@ -329,8 +360,8 @@ impl SmtParser {
     }
 
     fn parse_re_star(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Syntax (re.* R)
-        //Returns R*
+        // Syntax: (re.* R)
+        // Returns R*
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
@@ -346,7 +377,7 @@ impl SmtParser {
     }
 
     fn parse_and(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Syntax (and cmd cmd)
+        // Syntax: (and cmd cmd)
         if let Value::Cons(c) = v {
             let (head, tail) = c.as_pair();
             let regex1 = self.parse_assert_arg(head)?;
@@ -363,7 +394,7 @@ impl SmtParser {
     }
 
     fn parse_re_concat(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //Syntax (re.++ R R)
+        // Syntax: (re.++ R R)
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
@@ -376,7 +407,7 @@ impl SmtParser {
     }
 
     fn parse_str_to_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        //(str.to_re "String")
+        // (str.to_re "String")
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
@@ -402,6 +433,7 @@ impl SmtParser {
                 println!("hello");
                 return Ok(hex_to_char(hex.as_u64().expect("ERROR")));
             }
+            // TODO
         }
 
         todo!()
@@ -597,13 +629,10 @@ impl SmtParser {
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
-
-    use antimirov::derivative;
-
-    use crate::classes::SubExpr;
-
     use super::*;
+
+    use crate::antimirov::derivative;
+    use crate::classes::SubExpr;
 
     #[test]
     fn s_expr_test() {
