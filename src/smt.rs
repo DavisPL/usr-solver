@@ -4,6 +4,8 @@
 
 use super::classes::{CharExpression, CharVar, GenRegex, StringVar};
 
+use regex::Regex;
+
 use lexpr::{self, value, Number, Value};
 
 use crate::antimirov;
@@ -77,6 +79,41 @@ fn hex_to_char(number: u64) -> char {
     unimplemented!();
 }
 
+fn parse_unicode_escape(text: &str) -> Result<String, SmtParseError> {
+    fn replace_all<E>(
+        re: &Regex,
+        haystack: &str,
+        replacement: impl Fn(&regex::Captures) -> Result<String, E>,
+    ) -> Result<String, E> {
+        let mut new = String::with_capacity(haystack.len());
+        let mut last_match = 0;
+        for caps in re.captures_iter(haystack) {
+            let m = caps.get(0).unwrap();
+            new.push_str(&haystack[last_match..m.start()]);
+            new.push_str(&replacement(&caps)?);
+            last_match = m.end();
+        }
+        new.push_str(&haystack[last_match..]);
+        Ok(new)
+    }
+    // Regex pattern for unicode escapes \u{Hex}
+    // Does not check invalid hex
+    let unicode_escape_re = Regex::new(r"\\u\{([0-9A-Fa-f]+)\}").unwrap();
+
+    replace_all(&unicode_escape_re, text, |caps: &regex::Captures| {
+        // Unwrap is okay since regex check between 0-f for hex
+        let hex_value = u32::from_str_radix(&caps[1], 16).unwrap();
+        match char::from_u32(hex_value) {
+            Some(v) => Ok(v.to_string()),
+            // Error on invalid hex
+            None => Err(SmtParseError::FileError(format!(
+                "Bad hex in unicode escape {:?}",
+                hex_value
+            ))),
+        }
+    })
+}
+
 fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
     let v = lexpr::from_str(smt_string)?;
     Ok(v)
@@ -88,6 +125,7 @@ fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
 
     // Add an opening and closoing paren
     let smt_string = format!("(\n{}\n)", smt_string);
+    let smt_string = parse_unicode_escape(&smt_string)?;
 
     // Parse S-expression
     let v = lexpr::from_str(&smt_string)?;
@@ -180,7 +218,7 @@ impl SmtParser {
         }
         // Add variable name to self.var_names
         let (var_name, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        println!("var_name {}", var_name);
+        //println!("var_name {}", var_name);
         let (var_type, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
@@ -418,19 +456,19 @@ impl SmtParser {
     }
 
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
-        println!("{}", v);
+        println!("char_obj: {:?}", v);
         if v.is_string() {
-            if v.as_str().unwrap().len() == 1 {
+            if v.as_str().unwrap().chars().count() == 1 {
                 return Ok(v.as_str().unwrap().chars().next().expect("ERROR"));
             } else {
                 return Err(SmtParseError::unrecog(v));
             }
         } else if v.is_cons() {
-            let (underscore, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+            //Removes underscore
+            let (_underscore, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
             let (_, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
             let (hex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
             if hex.is_number() {
-                println!("hello");
                 return Ok(hex_to_char(hex.as_u64().expect("ERROR")));
             }
             // TODO
@@ -450,7 +488,7 @@ impl SmtParser {
         let char1 = self.parse_char_obj(char1)?.to_string();
         let char2 = self.parse_char_obj(char2)?.to_string();
 
-        if char1.len() != 1 || char2.len() != 1 {
+        if char1.chars().count() != 1 || char2.chars().count() != 1 {
             return Err(SmtParseError::unrecog(v));
         }
         if let (Some(char1), Some(char2)) = (char1.chars().next(), char2.chars().next()) {
@@ -1084,11 +1122,9 @@ mod tests {
         assert_eq!(gen_regex_unwrapped, expected);
     }
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn test_hex_code() {
-        println!("Another number{}", hex_to_char(43));
-
         let smt_result = parse_smtlib_file("benchmarks/hexcode.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
 
@@ -1128,6 +1164,45 @@ mod tests {
         println!("Parsed GenRegex: {:?}", gen_regex);
 
         assert!(gen_regex.is_ok());
-        todo!()
+        let gen_regex_unwrapped = gen_regex.unwrap();
+        let expected = GenRegex::Intersect(
+            GenRegex::create_gre_str_var("x"),
+            GenRegex::re_range(&hex_to_char(0x0), &'/'),
+        );
+
+        assert_eq!(gen_regex_unwrapped, expected);
+    }
+
+    #[test]
+    fn unicode_hex_test() {
+        let smt_result = parse_smtlib_file("benchmarks/hex_syntax_test.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
+    }
+
+    #[ignore]
+    #[test]
+    fn intersect_test1() {
+        let smt_result = parse_smtlib_file("benchmarks/intersect_0_0.smt2");
+        println!("Parsed s-expression: {:?}", smt_result);
+
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+
+        assert!(gen_regex.is_ok());
     }
 }
