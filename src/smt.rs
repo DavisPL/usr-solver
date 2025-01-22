@@ -323,6 +323,20 @@ impl SmtParser {
         }
     }
 
+    fn get_args(v: &Value) -> Result<Vec<&Value>, SmtParseError> {
+        if !v.is_null() && !v.is_cons() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        let mut retval: Vec<&Value> = Vec::new();
+        let mut curval = v;
+        while !curval.is_null() {
+            let (head, tail) = curval.as_pair().ok_or(SmtParseError::unrecog(curval))?;
+            retval.push(head);
+            curval = tail;
+        }
+        Ok(retval)
+    }
+
     fn parse_regex(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Handles base case regex
         if let Some(re_type) = v.as_symbol() {
@@ -360,16 +374,16 @@ impl SmtParser {
     }
 
     fn parse_re_union(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // Syntax: (re.union R R)
-        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
+        // Syntax: (re.union R1 R2 ...)
+        let args = SmtParser::get_args(v)?;
+        if args.len() < 2 {
             return Err(SmtParseError::unrecog(v));
         }
-        Ok(GenRegex::union(
-            &self.parse_regex(regex1)?,
-            &self.parse_regex(regex2)?,
-        ))
+        let mut regex_args: Vec<Rc<GenRegex>> = Vec::new();
+        for a in args {
+            regex_args.push(self.parse_regex(a)?);
+        }
+        Ok(GenRegex::union_many(&regex_args))
     }
     fn parse_re_diff(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (re.diff R R)
@@ -385,16 +399,16 @@ impl SmtParser {
     }
 
     fn parse_re_inter(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // Syntax: (re.inter R R)
-        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
+        // Syntax: (re.inter R1 R2 ...)
+        let args = SmtParser::get_args(v)?;
+        if args.len() < 2 {
             return Err(SmtParseError::unrecog(v));
         }
-        Ok(GenRegex::intersect(
-            &self.parse_regex(regex1)?,
-            &self.parse_regex(regex2)?,
-        ))
+        let mut regex_args: Vec<Rc<GenRegex>> = Vec::new();
+        for a in args {
+            regex_args.push(self.parse_regex(a)?);
+        }
+        Ok(GenRegex::intersect_many(&regex_args))
     }
 
     fn parse_re_star(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -432,16 +446,16 @@ impl SmtParser {
     }
 
     fn parse_re_concat(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // Syntax: (re.++ R R)
-        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
+        // Syntax: (re.++ R1 R2 ...)
+        let args = SmtParser::get_args(v)?;
+        if args.len() < 2 {
             return Err(SmtParseError::unrecog(v));
         }
-        Ok(GenRegex::concat(
-            &self.parse_regex(regex1)?,
-            &self.parse_regex(regex2)?,
-        ))
+        let mut regex_args: Vec<Rc<GenRegex>> = Vec::new();
+        for a in args {
+            regex_args.push(self.parse_regex(a)?);
+        }
+        Ok(GenRegex::concat_many(&regex_args))
     }
 
     fn parse_str_to_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -1095,7 +1109,7 @@ mod tests {
         assert_eq!(gen_regex_unwrapped, expected);
     }
 
-    #[ignore]
+    //#[ignore]
     #[test]
     fn test_passw_eq_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
@@ -1112,13 +1126,34 @@ mod tests {
         assert!(gen_regex.is_ok());
         let gen_regex_unwrapped = gen_regex.unwrap();
 
-        let union = GenRegex::union(
-            &GenRegex::create_gre_char_lit("a"),
-            &GenRegex::create_gre_char_lit("b"),
-        );
-        let regex = GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
-        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
-
+        let dot_star = GenRegex::star(&GenRegex::create_sigma());
+        let one = GenRegex::concat_many(&vec![
+            dot_star.clone(),
+            GenRegex::re_range(&'a', &'z'),
+            dot_star.clone(),
+        ]);
+        let two = GenRegex::concat_many(&vec![
+            dot_star.clone(),
+            GenRegex::re_range(&'0', &'9'),
+            dot_star.clone(),
+        ]);
+        let three = GenRegex::concat_many(&vec![
+            dot_star.clone(),
+            GenRegex::re_range(&'A', &'Z'),
+            dot_star.clone(),
+        ]);
+        let four = GenRegex::re_loop(8, 20, &GenRegex::create_sigma());
+        let five = GenRegex::star(&GenRegex::re_range(&'A', &'z'));
+        let together = GenRegex::intersect_many(&vec![
+            one.clone(),
+            two.clone(),
+            three.clone(),
+            four.clone(),
+            five.clone(),
+        ]);
+        let eq1 = GenRegex::intersect(&GenRegex::empty_set(), &GenRegex::complement(&together));
+        let eq2 = GenRegex::intersect(&GenRegex::complement(&GenRegex::empty_set()), &together);
+        let expected = GenRegex::Union(eq1, eq2);
         assert_eq!(gen_regex_unwrapped, expected);
     }
 

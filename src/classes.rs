@@ -27,9 +27,6 @@ pub enum GenRegex {
 }
 
 impl GenRegex {
-    pub fn create_emptyset() -> Rc<GenRegex> {
-        Rc::new(GenRegex::EmptySet)
-    }
     pub fn create_sigma() -> Rc<GenRegex> {
         Rc::new(GenRegex::Sigma)
     }
@@ -61,15 +58,42 @@ impl GenRegex {
     pub fn complement(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Complement(gre.clone()))
     }
-    pub fn union_many(args: &Vec<&Rc<GenRegex>>) -> Rc<GenRegex> {
+    pub fn union_many(args: &Vec<Rc<GenRegex>>) -> Rc<GenRegex> {
         if args.len() == 0 {
-            GenRegex::create_emptyset()
+            GenRegex::empty_set()
         } else if args.len() == 1 {
             args[0].clone()
         } else {
             GenRegex::union(&args[0].clone(), &GenRegex::union_many(&args[1..].to_vec()))
         }
     }
+
+    pub fn intersect_many(args: &Vec<Rc<GenRegex>>) -> Rc<GenRegex> {
+        if args.len() == 0 {
+            GenRegex::empty_set()
+        } else if args.len() == 1 {
+            args[0].clone()
+        } else {
+            GenRegex::intersect(
+                &args[0].clone(),
+                &GenRegex::intersect_many(&args[1..].to_vec()),
+            )
+        }
+    }
+
+    pub fn concat_many(args: &Vec<Rc<GenRegex>>) -> Rc<GenRegex> {
+        if args.len() == 0 {
+            GenRegex::empty_set()
+        } else if args.len() == 1 {
+            args[0].clone()
+        } else {
+            GenRegex::concat(
+                &args[0].clone(),
+                &GenRegex::concat_many(&args[1..].to_vec()),
+            )
+        }
+    }
+
     pub fn star(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Kleene(gre.clone()))
     }
@@ -107,7 +131,7 @@ impl GenRegex {
     }
     pub fn re_loop(n1: u64, n2: u64, gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         if n1 > n2 {
-            return GenRegex::create_emptyset();
+            return GenRegex::empty_set();
         }
         let mut retval = GenRegex::caret(n2, gre);
         for i in (n1..n2).rev() {
