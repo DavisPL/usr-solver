@@ -1,4 +1,4 @@
-;(set-logic QF_S)
+(set-logic QF_S)
 ;---
 ; .NET regular expressions restricted to 7-bit characters
 ; membership in intersection of
