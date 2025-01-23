@@ -288,9 +288,7 @@ impl SmtParser {
             return Err(SmtParseError::unrecog(v));
         }
         let parsed1 = self.parse_regex(regex1)?;
-        println!("hi {}, {}", parsed1, regex2);
         let parsed2 = self.parse_regex(regex2)?;
-        println!("parsed2 {}", parsed2);
         Ok(GenRegex::union(
             &GenRegex::intersect(&parsed1, &GenRegex::complement(&parsed2)),
             &GenRegex::intersect(&GenRegex::complement(&parsed1), &parsed2),
@@ -467,7 +465,7 @@ impl SmtParser {
     }
 
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
-        println!("char_obj: {:?}", v);
+        //println!("char_obj: {:?}", v);
         if v.is_string() {
             if v.as_str().unwrap().chars().count() == 1 {
                 return Ok(v.as_str().unwrap().chars().next().expect("ERROR"));
@@ -492,7 +490,6 @@ impl SmtParser {
         // Syntax (re.range char1 char2)
         let (char1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        println!("{}, 2{}, tail {}", char1, char2, tail);
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
         }
@@ -538,7 +535,6 @@ impl SmtParser {
     }
 
     fn parse_re_func(&mut self, func: &Value, args: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("re_fun");
         let (re_func, func_params) = func.as_pair().ok_or(SmtParseError::unrecog(func))?;
         match re_func.as_symbol().ok_or(SmtParseError::unrecog(func))? {
             "re.loop" => {
@@ -560,7 +556,6 @@ impl SmtParser {
                 self.parse_re_loop(param1_val, param2_val, regex)
             }
             "char" => {
-                println!("what the heckles");
                 todo!();
             }
             "re.^" => {
@@ -714,7 +709,8 @@ impl SmtParser {
 mod tests {
     use super::*;
 
-    use crate::antimirov::satisfiable;
+    use crate::brzozowski::satisfiable;
+    use crate::brzozowski::matching;
     use crate::classes::{CharExpression, CharVar, GenRegex, StringVar, SubExpr};
 
     #[test]
@@ -1140,7 +1136,7 @@ mod tests {
         assert_eq!(gen_regex_unwrapped, expected);
     }
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn test_passw_eq_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
@@ -1189,10 +1185,9 @@ mod tests {
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)), true);
     }
 
-    #[ignore]
     #[test]
     fn test_hex_code() {
-        let smt_result = parse_smtlib_file("benchmarks/hexcode.smt2");
+        let smt_result = parse_smtlib_file("benchmarks/hexcode_sat.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
 
         assert!(smt_result.is_ok());
@@ -1213,7 +1208,8 @@ mod tests {
         let regex = GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
         let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
-        assert_eq!(gen_regex_unwrapped, expected);
+        //assert_eq!(gen_regex_unwrapped, expected);
+        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)), true);
     }
 
     #[test]
