@@ -3,7 +3,7 @@
 	"usr_solver": {
 		"path": "../target/release/gen-regex-impl.exe",
 		"opts": [],
-		"rseed_opt": "",
+		"rseed_opt": null,
 		"detect_crash_patterns": []
 	},
 	"z3": {

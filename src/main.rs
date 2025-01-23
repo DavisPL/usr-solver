@@ -2,7 +2,7 @@
 //! Main entrypoint
 //!
 
-// Better to fix and remove, allowing for now
+// TODO: fix and remove, allowing for now
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
@@ -29,13 +29,15 @@ use std::rc::Rc;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// SMT input file to run on
     filename: String,
-    other: String,
 }
+
 fn main() {
     // Will take 1 arg .smt2 file
     // Print out true or false based on asserts in smt2 file
     let args = Args::parse();
+
     let v=smt::parse_smtlib_file(&args.filename).expect("Invalid File path");
     let mut parser=SmtParser::new();
     let re=parser.parse_s_expr(&v).expect("Invalid S-expr");
