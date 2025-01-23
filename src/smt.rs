@@ -508,6 +508,35 @@ impl SmtParser {
         Err(SmtParseError::unrecog(v))
     }
 
+    fn parse_str_at(&self, v: &Value) -> Result<String, SmtParseError> {
+        let (string, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (index, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        if !tail.is_null() {
+            return Err(SmtParseError::unrecog(v));
+        }
+        if index.is_number() {
+            Ok(string
+                .as_str()
+                .ok_or(SmtParseError::unrecog(v))?
+                .chars()
+                .nth(index.as_u64().ok_or(SmtParseError::unrecog(v))? as usize)
+                .ok_or(SmtParseError::unrecog(v))?
+                .to_string())
+        } else {
+            Err(SmtParseError::unrecog(v))
+        }
+    }
+
+    fn parse_str_func(&mut self, v: &Value) -> Result<String, SmtParseError> {
+        let (str_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+
+        // Handles recursive regex
+        match str_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+            "str.at" => self.parse_str_at(args),
+            _ => Err(SmtParseError::unrecog(str_type)),
+        }
+    }
+
     fn parse_re_func(&mut self, func: &Value, args: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         println!("re_fun");
         let (re_func, func_params) = func.as_pair().ok_or(SmtParseError::unrecog(func))?;
@@ -1157,6 +1186,7 @@ mod tests {
         let eq2 = GenRegex::intersect(&GenRegex::complement(&GenRegex::empty_set()), &together);
         let expected = GenRegex::Union(eq1, eq2);
         assert_eq!(gen_regex_unwrapped, expected);
+        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)), true);
     }
 
     #[ignore]
