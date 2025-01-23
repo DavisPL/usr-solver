@@ -8,3 +8,4 @@ either = "1.6"
 disjoint-sets = "0.4.2"
 lexpr = "0.2.7"
 regex = "1.11.1"
+clap = { version = "4.5.27", features = ["derive"] }
