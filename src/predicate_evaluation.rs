@@ -96,7 +96,7 @@ fn assign_unique_ids(
     }
 }
 
-pub fn evaluateComplete(pred: &Rc<Predicate>) -> Vec<Vec<Rc<Predicate>>> {
+pub fn evaluate_complete(pred: &Rc<Predicate>) -> Vec<Vec<Rc<Predicate>>> {
     let mut id_map: HashMap<MaybeCharExpression, i32> = HashMap::new();
     //let mut canonical_map: HashMap<i32, i32> = HashMap::new();
     let mut next_id = 1;
@@ -236,7 +236,7 @@ pub fn evaluate_conjunction(
     for (var_name, length) in length_preds {
         if not_allowed_lengths
             .get(&var_name)
-            .map_or(false, |lengths| lengths.contains(&length))
+            .is_some_and(|lengths| lengths.contains(&length))
         {
             return vec![Rc::new(Predicate::False)];
             //return Rc::new(Predicate::False);

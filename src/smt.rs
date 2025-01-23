@@ -2,14 +2,12 @@
 //! Parsing for SMTLib files
 //!
 
-use super::classes::{CharExpression, CharVar, GenRegex, StringVar};
+use super::classes::GenRegex;
 
 use regex::Regex;
 
-use lexpr::{self, value, Number, Value};
+use lexpr::{self, Value};
 
-use crate::antimirov;
-use antimirov::satisfiable;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
@@ -73,8 +71,7 @@ impl Error for SmtParseError {}
 */
 
 fn hex_to_char(number: u64) -> char {
-    let character = char::from_u32(number as u32).expect("hex_to_char:number needs to be a valid char");
-        return character;
+    char::from_u32(number as u32).expect("hex_to_char:number needs to be a valid char")
 }
 
 fn parse_unicode_escape(text: &str) -> Result<String, SmtParseError> {
@@ -284,7 +281,7 @@ impl SmtParser {
     */
 
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        self.brzozowski_flag=true;
+        self.brzozowski_flag = true;
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
@@ -386,7 +383,7 @@ impl SmtParser {
     }
     fn parse_re_diff(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (re.diff R R)
-        self.brzozowski_flag=true;
+        self.brzozowski_flag = true;
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
@@ -478,10 +475,10 @@ impl SmtParser {
                 return Err(SmtParseError::unrecog(v));
             }
         } else if v.is_cons() {
-            //Removes underscore
+            // Removes underscore
             let (_underscore, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
             let (_, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-            let (hex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+            let (hex, _tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
             if hex.is_number() {
                 return Ok(hex_to_char(hex.as_u64().expect("ERROR")));
             }
@@ -531,7 +528,7 @@ impl SmtParser {
                 if !tail.is_null() {
                     return Err(SmtParseError::unrecog(tail));
                 }
-                return self.parse_re_loop(param1_val, param2_val, regex);
+                self.parse_re_loop(param1_val, param2_val, regex)
             }
             "char" => {
                 println!("what the heckles");
@@ -548,13 +545,17 @@ impl SmtParser {
                 if !tail.is_null() {
                     return Err(SmtParseError::unrecog(tail));
                 }
-                return self.parse_re_caret(param1_val, regex);
+                self.parse_re_caret(param1_val, regex)
             }
             _ => Err(SmtParseError::unrecog(func)),
         }
     }
 
-    fn parse_re_caret(&mut self, param1: &Value, regex: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+    fn parse_re_caret(
+        &mut self,
+        param1: &Value,
+        regex: &Value,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
         let p1 = param1.as_number();
         let p1 = p1.ok_or(SmtParseError::unrecog(param1))?;
         let p1 = p1.as_u64().ok_or(SmtParseError::Unrecognized(
@@ -588,7 +589,7 @@ impl SmtParser {
     }
 
     pub fn parse_re_comp(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        self.brzozowski_flag=true;
+        self.brzozowski_flag = true;
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         if !tail.is_null() {
             return Err(SmtParseError::unrecog(v));
@@ -603,7 +604,7 @@ impl SmtParser {
         }
         Ok(GenRegex::union(
             &self.parse_regex(regex)?,
-            &GenRegex::create_gre_char_lit(&""),
+            &GenRegex::create_gre_char_lit(""),
         ))
     }
 
@@ -684,8 +685,8 @@ impl SmtParser {
 mod tests {
     use super::*;
 
-    use crate::antimirov::derivative;
-    use crate::classes::SubExpr;
+    use crate::antimirov::satisfiable;
+    use crate::classes::{CharExpression, CharVar, GenRegex, StringVar, SubExpr};
 
     #[test]
     fn s_expr_test() {

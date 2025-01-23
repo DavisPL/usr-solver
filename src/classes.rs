@@ -58,39 +58,33 @@ impl GenRegex {
     pub fn complement(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Complement(gre.clone()))
     }
-    pub fn union_many(args: &Vec<Rc<GenRegex>>) -> Rc<GenRegex> {
-        if args.len() == 0 {
+    pub fn union_many(args: &[Rc<GenRegex>]) -> Rc<GenRegex> {
+        if args.is_empty() {
             GenRegex::empty_set()
         } else if args.len() == 1 {
             args[0].clone()
         } else {
-            GenRegex::union(&args[0].clone(), &GenRegex::union_many(&args[1..].to_vec()))
+            GenRegex::union(&args[0].clone(), &GenRegex::union_many(&args[1..]))
         }
     }
 
-    pub fn intersect_many(args: &Vec<Rc<GenRegex>>) -> Rc<GenRegex> {
-        if args.len() == 0 {
+    pub fn intersect_many(args: &[Rc<GenRegex>]) -> Rc<GenRegex> {
+        if args.is_empty() {
             GenRegex::empty_set()
         } else if args.len() == 1 {
             args[0].clone()
         } else {
-            GenRegex::intersect(
-                &args[0].clone(),
-                &GenRegex::intersect_many(&args[1..].to_vec()),
-            )
+            GenRegex::intersect(&args[0].clone(), &GenRegex::intersect_many(&args[1..]))
         }
     }
 
-    pub fn concat_many(args: &Vec<Rc<GenRegex>>) -> Rc<GenRegex> {
-        if args.len() == 0 {
+    pub fn concat_many(args: &[Rc<GenRegex>]) -> Rc<GenRegex> {
+        if args.is_empty() {
             GenRegex::empty_set()
         } else if args.len() == 1 {
             args[0].clone()
         } else {
-            GenRegex::concat(
-                &args[0].clone(),
-                &GenRegex::concat_many(&args[1..].to_vec()),
-            )
+            GenRegex::concat(&args[0].clone(), &GenRegex::concat_many(&args[1..]))
         }
     }
 
@@ -121,7 +115,7 @@ impl GenRegex {
     }
     pub fn caret(n: u64, gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         if n == 0 {
-            return GenRegex::create_gre_char_lit(&"");
+            return GenRegex::create_gre_char_lit("");
         }
         let mut retval = gre.clone();
         for _ in 1..n {
@@ -235,12 +229,12 @@ impl SubExpr {
         let split = head.split_first();
         match split {
             Some((first, rest)) => {
-                let retVal = Rc::new(GenRegex::CharExpression(first.clone()));
+                let ret_val = Rc::new(GenRegex::CharExpression(first.clone()));
                 if rest.to_vec().len() == 1 {
-                    retVal
+                    ret_val
                 } else {
                     Rc::new(GenRegex::Concatenation(
-                        retVal,
+                        ret_val,
                         Self::to_gen_regex_helper(rest),
                     ))
                 }

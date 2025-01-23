@@ -8,8 +8,8 @@
 
 use crate::classes::StringIndex;
 use crate::classes::{
-    AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression,
-    MergeResult, Predicate, SimpleSub, StringVar, SubExpr,
+    AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MergeResult, SimpleSub,
+    StringVar, SubExpr,
 };
 //use crate::classes::Pair;
 //use crate::classes::Subs::Sub;
@@ -436,14 +436,14 @@ pub fn derivative(
         GenRegex::Intersect(left, right) => {
             let p_deriv = derivative(left, deriv_char);
             let q_deriv = derivative(right, deriv_char);
-            let mut retSet = HashSet::new();
+            let mut ret_set = HashSet::new();
 
             for p_sub in p_deriv {
                 for q_sub in &q_deriv {
                     match (p_sub.get_subs(), q_sub.get_subs()) {
                         (MergeResult::SimpleSub(left_elem), MergeResult::SimpleSub(right_elem)) => {
-                            let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
-                            let ret = merge(Rc::new(unionLR));
+                            let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
+                            let ret = merge(Rc::new(union_lr));
                             match ret {
                                 MergeResult::SimpleSub(_) => {
                                     let left_minus_right = sub_difference(
@@ -467,7 +467,7 @@ pub fn derivative(
                                             ));
                                             let term =
                                                 AntimirovDerivativeElement::new(final_expr, ret);
-                                            retSet.insert(term);
+                                            ret_set.insert(term);
                                         }
                                         _ => {}
                                     }
@@ -505,14 +505,14 @@ pub fn derivative(
                 }
             }
 
-            retSet
+            ret_set
             //unimplemented!();
         }
         GenRegex::Concatenation(left, right) => {
             let left_deriv = derivative(left, deriv_char);
             let right_deriv = derivative(right, deriv_char);
 
-            let mut retSet = HashSet::new();
+            let mut ret_set = HashSet::new();
             for sub in left_deriv {
                 match sub.get_subs() {
                     MergeResult::SimpleSub(simple_sub) => {
@@ -524,7 +524,7 @@ pub fn derivative(
                                         sub_in(right, simple_sub),
                                         sub.get_subs().clone(),
                                     );
-                                    retSet.insert(curr);
+                                    ret_set.insert(curr);
                                 } else {
                                     let curr = AntimirovDerivativeElement::new(
                                         Rc::new(GenRegex::Concatenation(
@@ -533,7 +533,7 @@ pub fn derivative(
                                         )),
                                         sub.get_subs().clone(),
                                     );
-                                    retSet.insert(curr);
+                                    ret_set.insert(curr);
                                 }
                             }
                         } else {
@@ -544,7 +544,7 @@ pub fn derivative(
                                 )),
                                 sub.get_subs().clone(),
                             );
-                            retSet.insert(curr);
+                            ret_set.insert(curr);
                         }
                     }
                     _ => {}
@@ -556,8 +556,8 @@ pub fn derivative(
                 for q_sub in &right_deriv {
                     match q_sub.get_subs() {
                         MergeResult::SimpleSub(right_elem) => {
-                            let unionLR: AnySub = n_sub.clone().union(right_elem.clone());
-                            let ret = merge(Rc::new(unionLR));
+                            let union_lr: AnySub = n_sub.clone().union(right_elem.clone());
+                            let ret = merge(Rc::new(union_lr));
                             match ret {
                                 MergeResult::SimpleSub(_) => {
                                     let right_minus_left = sub_difference(
@@ -569,7 +569,7 @@ pub fn derivative(
                                             let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
                                             let term =
                                                 AntimirovDerivativeElement::new(q_prime_sub, ret);
-                                            retSet.insert(term);
+                                            ret_set.insert(term);
                                         }
                                         _ => {}
                                     }
@@ -582,7 +582,7 @@ pub fn derivative(
                 }
             }
 
-            retSet
+            ret_set
             //unimplemented!();
         }
         GenRegex::Kleene(expr) => {
@@ -729,7 +729,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
         GenRegex::Sigma => HashSet::new(),
-        GenRegex::CharExpression(cExpr) => match cExpr {
+        GenRegex::CharExpression(c_expr) => match c_expr {
             CharExpression::CharVar(_) => HashSet::new(),
             CharExpression::Literal(value) => {
                 if value.is_empty() {
@@ -752,44 +752,44 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::Union(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
             let right_null = nullable(&Rc::clone(side2));
-            let unionLR: HashSet<_> = left_null.union(&right_null).cloned().collect();
-            unionLR
+            let union_lr: HashSet<_> = left_null.union(&right_null).cloned().collect();
+            union_lr
         }
         GenRegex::Intersect(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
             let right_null = nullable(&Rc::clone(side2));
-            let mut retSet = HashSet::new();
+            let mut ret_set = HashSet::new();
             for left_elem in &left_null {
                 for right_elem in &right_null {
-                    let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(Rc::new(unionLR));
+                    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
+                    let ret = merge(Rc::new(union_lr));
                     match ret {
                         MergeResult::SimpleSub(simple_sub) => {
-                            retSet.insert(simple_sub);
+                            ret_set.insert(simple_sub);
                         }
                         _ => {}
                     }
                 }
             }
-            retSet
+            ret_set
         }
         GenRegex::Concatenation(side1, side2) => {
             let left_null = nullable(&Rc::clone(side1));
             let right_null = nullable(&Rc::clone(side2));
-            let mut retSet = HashSet::new();
+            let mut ret_set = HashSet::new();
             for left_elem in &left_null {
                 for right_elem in &right_null {
-                    let unionLR: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(Rc::new(unionLR));
+                    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
+                    let ret = merge(Rc::new(union_lr));
                     match ret {
                         MergeResult::SimpleSub(simple_sub) => {
-                            retSet.insert(simple_sub);
+                            ret_set.insert(simple_sub);
                         }
                         _ => {}
                     }
                 }
             }
-            retSet
+            ret_set
         }
         GenRegex::Kleene(_) => {
             let mut ret = HashSet::new();
