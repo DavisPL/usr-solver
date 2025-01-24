@@ -712,9 +712,11 @@ impl SmtParser {
 
 #[cfg(test)]
 mod tests {
+    use lexpr::print;
+
     use super::*;
 
-    use crate::antimirov::satisfiable;
+    use crate::antimirov::{derivative, satisfiable};
     use crate::classes::{CharExpression, CharVar, GenRegex, StringVar, SubExpr};
 
     #[test]
@@ -786,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_simple_2() {
-        let smt_result = parse_smtlib_file("benchmarks/simple2.smt2");
+        let smt_result = parse_smtlib_file("benchmarks/simple2_unsat.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
 
         assert!(smt_result.is_ok());
@@ -823,8 +825,17 @@ mod tests {
         );
 
         assert_eq!(gen_regex_unwrapped, expected);
-        // TODO
-        //unimplemented!()
+
+        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), false);
+        /*let r=derivative(&Rc::new(expected), &Rc::new(CharExpression::CharVar(CharVar { name: "c1".to_string() })));
+        println!("First:");
+        for ele in r{
+            println!("First:{:?}",ele);
+            let r2=derivative(ele.get_expr(), &Rc::new(CharExpression::CharVar(CharVar { name: "c2".to_string() })));
+            for ele2 in r2{
+                println!("Second:{:?}",ele2);
+            }
+        }*/
     }
 
     #[test]
@@ -1098,6 +1109,7 @@ mod tests {
         let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
         assert_eq!(gen_regex_unwrapped, expected);
+        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)),true);
     }
 
     //#[ignore]
