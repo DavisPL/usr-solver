@@ -203,13 +203,13 @@ class TestResult:
                             f" greater thanthe timeout {self.timeout}!")
 
     def is_unknown(self):
-        return (self.time == UNKNOWN_CODE)
+        return self.time == UNKNOWN_CODE
     def is_wrong(self):
-        return (self.time == WRONG_CODE)
+        return self.time == WRONG_CODE
     def is_timeout(self):
-        return (self.time == TIMEOUT_CODE)
+        return self.time == TIMEOUT_CODE
     def is_crash(self):
-        return (self.time == CRASH_CODE)
+        return self.time == CRASH_CODE
     def is_err(self):
         return (self.is_unknown() or self.is_wrong() or
                 self.is_timeout() or self.is_crash())
@@ -521,7 +521,7 @@ class SolverImpl:
         logging.debug(f"===== Timing {os.path.basename(infile)} =====")
         self.prepare_input(infile, tempfile)
         test_results = []
-        for i in range(self.reps):
+        for _ in range(self.reps):
             cmd = self.make_cl_call(tempfile)
             # Get test_result and save output
             test_result = time_cl_call(cmd, self.timeout)
@@ -778,8 +778,10 @@ if __name__ == "__main__":
     # Set up logging
     if args.debug:
         args.log_level = 'debug'
-    log_level = logging.getLevelName(args.log_level.upper())
+    log_level = logging.getLevelNamesMapping()[args.log_level.upper()]
     logging.getLogger().setLevel(log_level)
+    if args.debug:
+        logging.debug("Debug mode enabled: logging level set to DEBUG")
 
     # Finish parsing the JSON data
     # Add regex input replacements to the solvers they apply to
@@ -797,7 +799,7 @@ if __name__ == "__main__":
         solvers[solver]["name"] = solver
         solvers[solver]["timeout"] = args.timeout
         solvers[solver]["reps"] = args.num_repetitions
-        solvers[solver]["randomize"] = (args.randomize == 'y')
+        solvers[solver]["randomize"] = args.randomize == 'y'
         solvers[solver]["opts"] += args.opts
         solvers[solver]["output_pattern"] = output_pattern
         solvers[solver]["path"] += EXECUTABLE_EXT
@@ -860,7 +862,7 @@ if __name__ == "__main__":
         out_files = [summary_file, raw_file]
         totals_objs = [TestResultTotals(s.name) for s in solver_impls]
         def test_fun(filepath):
-            kwd_args = dict()
+            kwd_args = {}
             # If filepath contains 'sat' or 'unsat', this labels satisfiability
             if ANSWER_UNSAT in filepath:
                 kwd_args["correct_answer"] = ANSWER_UNSAT
@@ -879,7 +881,7 @@ if __name__ == "__main__":
                 fh.write("===== Experiment Info =====\n")
                 fh.write(f"command: {sys.argv}\n")
                 fh.write(f"parsed: {args}\n")
-                fh.write(f"solvers:\n")
+                fh.write("solvers:\n")
                 for impl in solver_impls:
                     fh.write(f"- {impl}\n")
             with open(raw_file, "w") as fh:
