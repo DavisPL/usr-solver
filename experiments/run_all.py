@@ -52,6 +52,7 @@ import glob
 import json
 import logging
 import os
+import platform
 import random
 import re
 import subprocess
@@ -64,6 +65,32 @@ import time
 MIN_PYTHON3 = 7
 assert sys.version_info >= (3, MIN_PYTHON3), \
     f"requires Python 3.{MIN_PYTHON3} or newer"
+
+# ==================== Set up logging ====================
+
+# Logging level
+logging.basicConfig(level=logging.INFO)
+
+# Color output for warnings and errors
+logging.addLevelName(
+    logging.WARNING,
+    "\033[1;31m%s\033[1;0m" % logging.getLevelName(logging.WARNING)
+)
+logging.addLevelName(
+    logging.ERROR,
+    "\033[1;41m%s\033[1;0m" % logging.getLevelName(logging.ERROR)
+)
+
+# ==================== Check Platform ====================
+
+SYSTEM = platform.system()
+if SYSTEM == "Windows":
+    EXECUTABLE_EXT = ".exe"
+elif SYSTEM in ["Linux", "Darwin"]:
+    EXECUTABLE_EXT = ""
+else:
+    logging.error(f"Unsupported platform: {SYSTEM}")
+    sys.exit(1)
 
 # ==================== Constants ====================
 
@@ -107,17 +134,6 @@ SLOWDOWN_VSLOW = 10
 SLOWDOWN_SLOW = 1.3
 SPEEDUP_FAST = 0.8
 SPEEDUP_VFAST = 0.1
-
-# Set up logging; color output for warnings and errors
-logging.basicConfig(level=logging.INFO)
-logging.addLevelName(
-    logging.WARNING,
-    "\033[1;31m%s\033[1;0m" % logging.getLevelName(logging.WARNING)
-)
-logging.addLevelName(
-    logging.ERROR,
-    "\033[1;41m%s\033[1;0m" % logging.getLevelName(logging.ERROR)
-)
 
 # ==================== Validation ====================
 
@@ -784,6 +800,7 @@ if __name__ == "__main__":
         solvers[solver]["randomize"] = (args.randomize == 'y')
         solvers[solver]["opts"] += args.opts
         solvers[solver]["output_pattern"] = output_pattern
+        solvers[solver]["path"] += EXECUTABLE_EXT
 
     # Get specific set of solvers to use
     using_solvers = args.solvers
