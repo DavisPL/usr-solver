@@ -421,8 +421,9 @@ def time_cl_call(cl_call, timeout):
     logging.debug(f"Timing {cl_call}")
     try:
         start_time = time.time()
-        result = subprocess.run(cl_call, timeout=timeout, text=True,
-                                check=True, stdout=subprocess.PIPE,
+        result = subprocess.run(cl_call, timeout=timeout,
+                                text=True, check=True,
+                                stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT)
         end_time = time.time()
         return TestResult(end_time - start_time, timeout, result.stdout)
