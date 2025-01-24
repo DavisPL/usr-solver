@@ -298,11 +298,11 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
                         Some(v) => {
                             // The key was found, and `v` is the value, so update the vector element
                             *item = v.clone();
-                            println!("Updated value at index {}: {:?}", i, v);
+                            //println!("Updated value at index {}: {:?}", i, v);
                         }
                         None => {
                             // The key was not found, so do nothing
-                            println!("No value found for key at index {}", i);
+                            //println!("No value found for key at index {}", i);
                         }
                     }
                 }
@@ -404,11 +404,11 @@ pub fn derivative(
                 }
             }
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
-                if lit_val.len()==0{
+                if lit_val.len() == 0 {
                     return HashSet::from([AntimirovDerivativeElement::new(
                         Rc::new(GenRegex::EmptySet),
                         MergeResult::Bottom,
-                    )])
+                    )]);
                 }
                 let mut char_to = BTreeMap::new();
                 char_to.insert(d_var.clone(), c_expr.clone());
@@ -516,7 +516,6 @@ pub fn derivative(
         }
         GenRegex::Concatenation(left, right) => {
             let left_deriv = derivative(left, deriv_char);
-            
 
             let mut ret_set = HashSet::new();
             for sub in left_deriv {
@@ -558,7 +557,7 @@ pub fn derivative(
             }
 
             let p_nullable = nullable(left);
-            if !p_nullable.is_empty(){
+            if !p_nullable.is_empty() {
                 let right_deriv = derivative(right, deriv_char);
                 for n_sub in p_nullable {
                     for q_sub in &right_deriv {
@@ -574,9 +573,12 @@ pub fn derivative(
                                         );
                                         match right_minus_left {
                                             MergeResult::SimpleSub(r_minus_l) => {
-                                                let q_prime_sub = sub_in(q_sub.get_expr(), &r_minus_l);
-                                                let term =
-                                                    AntimirovDerivativeElement::new(q_prime_sub, ret);
+                                                let q_prime_sub =
+                                                    sub_in(q_sub.get_expr(), &r_minus_l);
+                                                let term = AntimirovDerivativeElement::new(
+                                                    q_prime_sub,
+                                                    ret,
+                                                );
                                                 ret_set.insert(term);
                                             }
                                             _ => {}
