@@ -30,6 +30,9 @@ impl GenRegex {
     pub fn create_sigma() -> Rc<GenRegex> {
         Rc::new(GenRegex::Sigma)
     }
+    pub fn epsilon()-> Rc<GenRegex> {
+        GenRegex::create_gre_char_lit("")
+    }
     pub fn create_gre_char_lit(lit: &str) -> Rc<GenRegex> {
         let lit = CharExpression::Literal(lit.to_string());
         Rc::new(GenRegex::CharExpression(lit))

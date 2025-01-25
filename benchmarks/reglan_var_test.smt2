@@ -1,0 +1,5 @@
+(declare-const regexA RegLan)
+(declare-const x String)
+(assert (= regexA (re.++ (str.to_re "a") (str.to_re "b"))))
+(assert (str.in_re x regexA))
+(check-sat)
