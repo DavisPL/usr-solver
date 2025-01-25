@@ -1,25 +1,25 @@
 {
     "solvers": {
 	"usr_solver": {
-		"path": "../target/release/gen-regex-impl.exe",
+		"path": "../target/release/gen-regex-impl",
 		"opts": [],
 		"rseed_opt": null,
 		"detect_crash_patterns": []
 	},
 	"z3": {
-		"path": "../experiments/z3.exe",
+		"path": "z3/z3",
 		"opts": [],
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []
 	},
 	"z3str3": {
-		"path": "../experiments/z3.exe",
+		"path": "z3/z3",
 		"opts": ["smt.string_solver=z3str3"],
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []
 	},
 	"cvc5": {
-		"path": "../experiments/cvc5.exe",
+		"path": "cvc5/bin/cvc5",
 		"opts": [],
 		"rseed_opt": "--random-seed=",
 		"detect_crash_patterns": []
@@ -139,7 +139,7 @@
 	}
 ],
 "output_pattern": "(?:^|\\n)(sat|unsat|unknown)\\n",
-"default_solver": "dz3",
+"default_solver": "usr_solver",
 "default_baseline": "cvc4",
-"disabled_solvers": ["dz3.v3", "dz3.v2", "dz3.v1"]
+"disabled_solvers": []
 }
