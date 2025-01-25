@@ -139,7 +139,5 @@
 	}
 ],
 "output_pattern": "(?:^|\\n)(sat|unsat|unknown)\\n",
-"default_solver": "usr_solver",
-"default_baseline": "cvc4",
 "disabled_solvers": []
 }

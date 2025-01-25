@@ -74,11 +74,11 @@ logging.basicConfig(level=logging.INFO)
 # Color output for warnings and errors
 logging.addLevelName(
     logging.WARNING,
-    "\033[1;31m%s\033[1;0m" % logging.getLevelName(logging.WARNING)
+    f"\033[1;31m{logging.getLevelName(logging.WARNING)}\033[1;0m"
 )
 logging.addLevelName(
     logging.ERROR,
-    "\033[1;41m%s\033[1;0m" % logging.getLevelName(logging.ERROR)
+    f"\033[1;41m{logging.getLevelName(logging.ERROR)}\033[1;0m"
 )
 
 # ==================== Check Platform ====================
@@ -196,7 +196,7 @@ class TestResult:
         self.answer = None
         self.path = None
         # Validation
-        assert type(output) == str
+        assert isinstance(output, str)
         assert (self.is_crash() or self.is_timeout() or self.time > 0)
         if self.time > self.timeout + .2:
             logging.warning(f"Time result {self.timeout} was significantly"
@@ -241,28 +241,26 @@ class TestResult:
     def __gt__(self, other):
         if other.is_wrong():
             return False
-        elif self.is_wrong():
+        if self.is_wrong():
             return True
-        elif other.is_err():
+        if other.is_err():
             return False
-        elif self.is_err():
+        if self.is_err():
             return True
-        else:
-            return self.time > other.time
+        return self.time > other.time
 
     def __repr__(self):
         if self.is_crash():
             return "Crash"
-        elif self.is_timeout():
+        if self.is_timeout():
             return f"Timeout ({self.timeout}s)"
-        elif self.is_wrong():
+        if self.is_wrong():
             return "Wrong"
-        elif self.is_unknown():
+        if self.is_unknown():
             return "Unknown"
-        elif self.answer is not None:
+        if self.answer is not None:
             return f"{self.answer} ({self.time:.2f}s)"
-        else:
-            return f"{self.time:.2f}s"
+        return f"{self.time:.2f}s"
 
 def make_crash_result(timeout, output):
     return TestResult(CRASH_CODE, timeout, output)
@@ -274,9 +272,9 @@ def avg_test_result(test_result_list):
     # Precondition: nonempty list with no error results
     assert len(test_result_list) > 0
     assert not [tr for tr in test_result_list if tr.is_err()]
-    total = sum([tr.time for tr in test_result_list])
+    total = sum(tr.time for tr in test_result_list)
     avg_time = total / len(test_result_list)
-    max_timeout = max([tr.timeout for tr in test_result_list])
+    max_timeout = max(tr.timeout for tr in test_result_list)
     fst_output = test_result_list[0].output
     result = TestResult(avg_time, max_timeout, fst_output)
     result.answer = test_result_list[0].answer
@@ -348,7 +346,7 @@ class TestResultTotals:
         self.raw.append((self.name, path, cat, time, answer))
 
     def __repr__(self):
-        info_str = f"{name}:Totals:"
+        info_str = f"{self.name}: Totals:"
         for cat, ttl in self.ctotals.items():
             info_str += f" {ttl} {cat},"
         # self.times.sort()
@@ -459,7 +457,7 @@ class SolverImpl:
         validate_executable_path(path)
         assert timeout > 0
         assert reps >= 1
-        assert type(randomize) == bool
+        assert isinstance(randomize, bool)
         if randomize and rseed_opt is None:
             logging.warning(f"Solver {name}: 'randomize=true' ignored because"
                             f" solver does not support random seeds. Edit"
@@ -544,8 +542,7 @@ class SolverImpl:
             test_results.append(test_result)
 
         logging.debug(f"Time results: {test_results}")
-        avg_tr = avg_test_result(test_results)
-        return avg_tr
+        return avg_test_result(test_results)
 
     def __repr__(self):
         display_opts = self.opts.copy()
@@ -695,8 +692,6 @@ if __name__ == "__main__":
         solver_data = json.load(fh)
     solvers = solver_data["solvers"]
     solver_names = solvers.keys() - solver_data["disabled_solvers"]
-    default_solver = solver_data["default_solver"]
-    default_baseline = solver_data["default_baseline"]
 
     # Parse command-line arguments
     parser = argparse.ArgumentParser(formatter_class=lambda prog:
@@ -751,7 +746,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-r", "--randomize",
-        help=f"use random seeds to randomize each solver run",
+        help="use random seeds to randomize each solver run",
         choices=['y', 'n'],
         default=DEFAULT_USE_RANDOM_SEEDS
     )
@@ -775,6 +770,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     validate_file_or_folder_exists(args.input_path)
+    validate_folder_exists(RESULTS_FOLDER)
 
     # Set up logging
     if args.debug:
@@ -840,7 +836,6 @@ if __name__ == "__main__":
         out_files = []
         def test_fun(filepath):
             run_standalone_test_case(solver_impls[0], filepath, args.debug)
-        print_summary = None
 
     # === Comparison Mode ===
     elif args.comparison:
@@ -849,11 +844,9 @@ if __name__ == "__main__":
         def test_fun(filepath):
             run_comparison_test_case(solver_impls[1], solver_impls[0],
                                      filepath, args.compare_out, args.debug)
-        print_summary = None
 
     # === Default Mode (any number of solvers) ===
     else:
-        validate_folder_exists(RESULTS_FOLDER)
         temp_files = TEMP_IN_FILES
         timestr = time.strftime("%Y%m%d_%H%M%S")
         sum_suffix = "_" + os.path.basename(input_path) + SUMMARY_RESULTS_SUFFIX
@@ -874,21 +867,6 @@ if __name__ == "__main__":
                 kwd_args["baseline_index"] = 0
             run_group_test_case(solver_impls, totals_objs,
                                 filepath, args.debug, **kwd_args)
-        def print_summary():
-            logging.info(f"\n{list_of_totals_tostr(totals_objs)}")
-            with open(summary_file, "w") as fh:
-                list_of_totals_dump_summary(totals_objs, fh)
-                # Add some other useful info
-                fh.write("===== Experiment Info =====\n")
-                fh.write(f"command: {sys.argv}\n")
-                fh.write(f"parsed: {args}\n")
-                fh.write("solvers:\n")
-                for impl in solver_impls:
-                    fh.write(f"- {impl}\n")
-            with open(raw_file, "w") as fh:
-                list_of_totals_dump_raw(totals_objs, fh)
-            logging.info(f"Results successfully saved to"
-                         f" {summary_file} and {raw_file}.")
 
     # === Run the Tests ===
     for temp_file in (temp_files + out_files):
@@ -904,9 +882,21 @@ if __name__ == "__main__":
             with contextlib.suppress(FileNotFoundError):
                 os.remove(temp_file)
 
-    if print_summary is not None:
+    if not args.standalone and not args.comparison:
+        # Print summary
         logging.info(f"========== {SCRIPT_NAME}: Summary ==========")
-
-        print_summary()
+        logging.info(f"\n{list_of_totals_tostr(totals_objs)}")
+        with open(summary_file, "w") as fh:
+            list_of_totals_dump_summary(totals_objs, fh)
+            # Add some other useful info
+            fh.write("===== Experiment Info =====\n")
+            fh.write(f"command: {sys.argv}\n")
+            fh.write(f"parsed: {args}\n")
+            fh.write("solvers:\n")
+            for impl in solver_impls:
+                fh.write(f"- {impl}\n")
+        with open(raw_file, "w") as fh:
+            list_of_totals_dump_raw(totals_objs, fh)
+        logging.info(f"Results successfully saved to {summary_file} and {raw_file}.")
 
     sys.exit(0)
