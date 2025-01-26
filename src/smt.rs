@@ -8,7 +8,7 @@ use regex::Regex;
 
 use lexpr::{self, Value};
 
-use std::collections::{HashSet,HashMap};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
@@ -68,7 +68,11 @@ impl fmt::Display for SmtParseError {
             SmtParseError::Unimplemented(s) => write!(f, "Unimplemented SMTLib feature: {}", s),
             SmtParseError::BadLiteral(s) => write!(f, "Bad literal in S-expression: {}", s),
             SmtParseError::Unexpected(got, expected) => {
-                write!(f, "Unexpected S-expression: got {}, expected {}", got, expected)
+                write!(
+                    f,
+                    "Unexpected S-expression: got {}, expected {}",
+                    got, expected
+                )
             }
         }
     }
@@ -160,11 +164,11 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
     Main parsing interface
 */
 
-enum RegexToken{
+enum RegexToken {
     Var(String),
     Val(Rc<GenRegex>),
 }
-enum StringToken{
+enum StringToken {
     Var(String),
     Val(String),
 }
@@ -263,7 +267,7 @@ impl SmtParser {
                 Ok(())
             }
             "RegLan" => {
-                self.re_var_names.insert(var_name.to_string(),None);
+                self.re_var_names.insert(var_name.to_string(), None);
                 Ok(())
             }
             _ => Err(SmtParseError::unrecog(v)),
@@ -333,50 +337,52 @@ impl SmtParser {
         //Initializes variables if its var=Regex
         //Asserts equality if Regex=Regex
         //Will return epsilin in case of initialization
-        match (parsed1,parsed2){
-            (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(format!("Equality of uninitialzied RegLan variables not supported."))),
+        match (parsed1, parsed2) {
+            (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(format!(
+                "Equality of uninitialzied RegLan variables not supported."
+            ))),
             (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
-                let res=self.re_var_names.get(&name);
-                if let Some(found)=res{
-                    match found{
-                        Some(_) => Err(SmtParseError::Unsupported(format!("Conflicting RegLan initilizations are caught here instead of solver."))),
+                let res = self.re_var_names.get(&name);
+                if let Some(found) = res {
+                    match found {
+                        Some(_) => Err(SmtParseError::Unsupported(format!(
+                            "Conflicting RegLan initilizations are caught here instead of solver."
+                        ))),
                         None => {
                             self.re_var_names.insert(name, Some(gen_regex));
                             Ok(GenRegex::epsilon())
-                        },
+                        }
                     }
-                }
-                else{
+                } else {
                     Err(SmtParseError::Unrecognized(format!(
                         "RegLan variable not declared/found: {}",
                         name
                     )))
                 }
-            },
+            }
             (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
-                let res=self.re_var_names.get(&name);
-                if let Some(found)=res{
-                    match found{
-                        Some(_) => Err(SmtParseError::Unsupported(format!("Conflicting RegLan initilizations are caught here instead of solver."))),
+                let res = self.re_var_names.get(&name);
+                if let Some(found) = res {
+                    match found {
+                        Some(_) => Err(SmtParseError::Unsupported(format!(
+                            "Conflicting RegLan initilizations are caught here instead of solver."
+                        ))),
                         None => {
                             self.re_var_names.insert(name, Some(gen_regex));
                             Ok(GenRegex::epsilon())
-                        },
+                        }
                     }
-                }
-                else{
+                } else {
                     Err(SmtParseError::Unrecognized(format!(
                         "RegLan variable not declared/found: {}",
                         name
                     )))
                 }
-            },
-            (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
-                Ok(GenRegex::union(
-                    &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
-                    &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
-                ))
-            },
+            }
+            (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => Ok(GenRegex::union(
+                &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
+                &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
+            )),
         }
     }
 
@@ -406,8 +412,11 @@ impl SmtParser {
             //Construct str_var \cap R and return
             let str_var = GenRegex::create_gre_str_var(str_var);
             let regex_tok = self.parse_reglan_type(regex)?;
-            match regex_tok{
-                RegexToken::Var(name) => Err(SmtParseError::Unsupported(format!("{:?} in str.in_re needs to be initialzied beforehand.", name))),
+            match regex_tok {
+                RegexToken::Var(name) => Err(SmtParseError::Unsupported(format!(
+                    "{:?} in str.in_re needs to be initialzied beforehand.",
+                    name
+                ))),
                 RegexToken::Val(gen_regex) => Ok(GenRegex::intersect(&str_var, &gen_regex)),
             }
         } else {
@@ -446,7 +455,10 @@ impl SmtParser {
         result
     }
 
-    fn parse_let_declaration<'a, 'b>(&'a mut self, v: &'b Value) -> Result<&'b Value, SmtParseError> {
+    fn parse_let_declaration<'a, 'b>(
+        &'a mut self,
+        v: &'b Value,
+    ) -> Result<&'b Value, SmtParseError> {
         // Helper function which parses the let declaration, stores the variable in the hashmap
         // let_var_names, and returns the tail expression.
 
@@ -479,22 +491,19 @@ impl SmtParser {
     */
 
     //parse_reglan_type must be used in all places that take reglan as input
-    fn parse_reglan_type(&mut self,v:&Value)->Result<RegexToken,SmtParseError>{
+    fn parse_reglan_type(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         //If is a variable returns var name if uninitialized and initialized value o.w.
         //If not variable parses the regex
-        if let Some(name) = v.as_symbol(){
-            let res=self.re_var_names.get(name);
-            match res{
-                Some(found) => {
-                    match found{
-                        Some(re) => Ok(RegexToken::Val(re.clone())),
-                        None => Ok(RegexToken::Var(name.to_string())),
-                    }
+        if let Some(name) = v.as_symbol() {
+            let res = self.re_var_names.get(name);
+            match res {
+                Some(found) => match found {
+                    Some(re) => Ok(RegexToken::Val(re.clone())),
+                    None => Ok(RegexToken::Var(name.to_string())),
                 },
                 None => Err(SmtParseError::unrecog(v)),
             }
-        }
-        else{
+        } else {
             Ok(RegexToken::Val(self.parse_regex(v)?))
         }
     }
@@ -514,7 +523,7 @@ impl SmtParser {
                     } else {
                         Err(SmtParseError::unrecog(v))
                     }
-                },
+                }
             };
         }
 
@@ -662,7 +671,7 @@ impl SmtParser {
             }
             "char" => {
                 println!("what the heckles"); // Lol
-                // Should we call parse_char_obj here?
+                                              // Should we call parse_char_obj here?
                 todo!();
             }
             "re.^" => {
@@ -739,8 +748,8 @@ impl SmtParser {
     }
 
     /*
-        Parsing functions with output String/Char
-     */
+       Parsing functions with output String/Char
+    */
 
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
         // println!("char_obj: {:?}", v);
@@ -792,8 +801,8 @@ impl SmtParser {
     }
 
     /*
-        Helper Functions
-     */
+       Helper Functions
+    */
 
     fn get_args(v: &Value) -> Result<Vec<&Value>, SmtParseError> {
         if !v.is_null() && !v.is_cons() {
@@ -1480,7 +1489,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_exp(){
+    fn parse_exp() {
         let smt_result = parse_smtlib_file("benchmarks/reglan_var_test.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
 
