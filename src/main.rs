@@ -32,7 +32,7 @@ fn main() {
     let v = smt::parse_smtlib_file(&args.filename).expect("Invalid File path");
     let mut parser = SmtParser::new();
     let re = parser.parse_s_expr(&v).expect("Invalid S-expr");
-    let result: bool = if parser.brzozowski_flag {
+    let result: bool = if parser.use_brzozowski() {
         brzozowski::satisfiable(&Rc::new(re))
     } else {
         antimirov::satisfiable(&Rc::new(re))

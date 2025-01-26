@@ -146,9 +146,10 @@ pub struct SmtParser {
     found_assert: bool,
     found_check_sat: bool,
     str_var_names: HashSet<String>,
-    re_var_names: HashMap<String,Option<Rc<GenRegex>>>,
+    re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
+    let_var_names: HashMap<String, Option<Rc<GenRegex>>>,
     regex_result: Option<GenRegex>,
-    pub brzozowski_flag: bool,
+    brzozowski_flag: bool,
 }
 
 impl SmtParser {
@@ -158,15 +159,16 @@ impl SmtParser {
             found_check_sat: false,
             str_var_names: HashSet::new(),
             re_var_names: HashMap::new(),
+            let_var_names: HashMap::new(),
             regex_result: None,
             brzozowski_flag: false,
         }
     }
 
     /*
-        Parsing entrypoints
+        Parsing entrypoint and public API
 
-        Currently takes input from lexpr::Value.
+        The main parse_s_expr takes input from lexpr::Value.
     */
 
     /// Parse list of items at the top level recursively
@@ -191,6 +193,10 @@ impl SmtParser {
         } else {
             Err(SmtParseError::unrecog(v))
         }
+    }
+
+    pub fn use_brzozowski(&self) -> bool {
+        self.brzozowski_flag
     }
 
     /*
@@ -268,6 +274,7 @@ impl SmtParser {
             "str.in_re" => self.parse_str_in_re(tail),
             "and" => self.parse_and(tail),
             "=" => self.parse_equals(tail),
+            "let" => self.parse_let(tail),
             _ => Err(SmtParseError::Unsupported(format!(
                 "Unsupported SMTLib command: {}",
                 cmd
@@ -393,6 +400,12 @@ impl SmtParser {
                 str_var
             )))
         }
+    }
+
+    fn parse_let(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("VALUE: {:?}", v);
+        let (let_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        unimplemented!()
     }
 
     /*
@@ -581,7 +594,7 @@ impl SmtParser {
                 self.parse_re_loop(param1_val, param2_val, regex)
             }
             "char" => {
-                println!("what the heckles");
+                println!("what the heckles"); // Lol
                 todo!();
             }
             "re.^" => {
@@ -722,7 +735,7 @@ impl SmtParser {
         }
     }
 
-    
+
 
     /*
         Helper Functions
@@ -808,13 +821,41 @@ impl SmtParser {
 
 #[cfg(test)]
 mod tests {
-    use lexpr::print;
-
     use super::*;
 
-    use crate::antimirov::{derivative, satisfiable};
+    use crate::antimirov::satisfiable;
     use crate::brzozowski;
-    use crate::classes::{CharExpression, CharVar, GenRegex, StringVar, SubExpr};
+    use crate::classes::{CharExpression, GenRegex, StringVar};
+
+    // Helper function
+    // TODO: Update some of the other tests to use this
+    // Run the SMT2 file and assert that satisfiable() returns as expected
+    fn assert_smt2_file_helper(filepath: &str, expected: bool) {
+        // Read the file and parse as s-expression
+        let smt_result = parse_smtlib_file(filepath);
+        println!("Parsed s-expression: {:?}", smt_result);
+        assert!(smt_result.is_ok());
+        let s_expr = smt_result.unwrap();
+
+        // Parse the s-expression as a GenRegex
+        let mut parser = SmtParser::new();
+        let gen_regex = parser.parse_s_expr(&s_expr);
+        println!("Parsed GenRegex: {:?}", gen_regex);
+        assert!(gen_regex.is_ok());
+        let gen_regex_unwrapped = gen_regex.unwrap();
+
+        // Get result
+        let result = satisfiable(&Rc::new(gen_regex_unwrapped));
+        assert_eq!(result, expected);
+    }
+
+    fn assert_satisfiable(filepath: &str) {
+        assert_smt2_file_helper(filepath, true);
+    }
+
+    fn assert_unsatisfiable(filepath: &str) {
+        assert_smt2_file_helper(filepath, false);
+    }
 
     #[test]
     fn s_expr_test() {
@@ -1169,7 +1210,7 @@ mod tests {
 
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
     }
-    //#[ignore]
+    #[ignore]
     #[test]
     fn test_passw_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
@@ -1210,7 +1251,7 @@ mod tests {
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)), true);
     }
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn test_passw_unsat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
@@ -1252,7 +1293,7 @@ mod tests {
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), false);
     }
 
-    //#[ignore]
+    #[ignore]
     #[test]
     fn test_passw_eq_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
@@ -1397,5 +1438,21 @@ mod tests {
         println!("Parsed GenRegex: {:?}", gen_regex);
 
         assert!(gen_regex.is_ok());
+    }
+
+    #[test]
+    fn test_let_1() {
+        assert_satisfiable("benchmarks/simple_let_sat_1.smt2");
+    }
+
+    #[ignore]
+    #[test]
+    fn test_let_2() {
+        assert_satisfiable("benchmarks/simple_let_sat_2.smt2");
+    }
+
+    #[test]
+    fn test_let_3() {
+        assert_satisfiable("benchmarks/date_format_days_sat.smt2");
     }
 }
