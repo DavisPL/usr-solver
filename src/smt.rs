@@ -299,7 +299,7 @@ impl SmtParser {
             "str.in_re" => self.parse_str_in_re(tail),
             "and" => self.parse_and(tail),
             "=" => self.parse_equals(tail),
-            "let" => self.parse_let(tail),
+            "let" => self.parse_let_assertion(tail),
             _ => Err(SmtParseError::Unsupported(format!(
                 "Unsupported SMTLib command: {}",
                 cmd
@@ -410,7 +410,17 @@ impl SmtParser {
         }
     }
 
-    fn parse_let(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+    /*
+        Parsing functions for let expressions
+    */
+
+    fn parse_let_assertion(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("VALUE: {:?}", v);
+        let (let_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        unimplemented!()
+    }
+
+    fn parse_let_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         println!("VALUE: {:?}", v);
         let (let_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         unimplemented!()
@@ -451,18 +461,21 @@ impl SmtParser {
                 _ => Err(SmtParseError::unrecog(v)),
             };
         }
-        // Handles recursive case
 
+        // Handles recursive case
         let (re_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
 
+        // re_func case
         if let Some((head, tail)) = re_type.as_pair() {
             return match head.as_symbol().ok_or(SmtParseError::unrecog(v))? {
                 "_" => self.parse_re_func(tail, args),
                 _ => Err(SmtParseError::unrecog(v)),
             };
         }
-        // Handles recursive regex
+
+        // All other cases
         match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+            "let" => self.parse_let_regex(args),
             "str.to_re" => self.parse_str_to_re(args),
             "re.++" => self.parse_re_concat(args),
             "re.union" => self.parse_re_union(args),
@@ -1453,7 +1466,6 @@ mod tests {
         assert_satisfiable("benchmarks/simple_let_sat_1.smt2");
     }
 
-    #[ignore]
     #[test]
     fn test_let_2() {
         assert_satisfiable("benchmarks/simple_let_sat_2.smt2");
