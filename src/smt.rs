@@ -26,11 +26,15 @@ pub enum SmtParseError {
     Unsupported(String),             // Unsupported SMTLib feature
     Unrecognized(String),            // Unrecognized SMTLib feature
     Unimplemented(String),           // Unimplemented SMTLib feature
+    BadLiteral(String),              // Bad literal in SMTLib file
 }
 
 impl SmtParseError {
     fn unrecog(expr: &Value) -> SmtParseError {
-        SmtParseError::Unrecognized(format!("Found unexpected S-expression: {:?}", expr))
+        SmtParseError::Unrecognized(expr.to_string())
+    }
+    fn bad_literal(expr: &Value) -> SmtParseError {
+        SmtParseError::BadLiteral(expr.to_string())
     }
 }
 
@@ -56,8 +60,9 @@ impl fmt::Display for SmtParseError {
                 write!(f, "Expected (check-sat) statement at end of file")
             }
             SmtParseError::Unsupported(s) => write!(f, "Unsupported SMTLib feature: {}", s),
-            SmtParseError::Unrecognized(s) => write!(f, "Unrecognized SMTLib feature: {}", s),
+            SmtParseError::Unrecognized(s) => write!(f, "Unrecognized S-expression: {}", s),
             SmtParseError::Unimplemented(s) => write!(f, "Unimplemented SMTLib feature: {}", s),
+            SmtParseError::BadLiteral(s) => write!(f, "Bad literal in S-expression: {}", s),
         }
     }
 }
@@ -65,13 +70,16 @@ impl fmt::Display for SmtParseError {
 impl Error for SmtParseError {}
 
 /*
-    S expression parsing functions
+    S-expression parsing functions
 
     These are private so that the implementation can be changed later
 */
 
-fn hex_to_char(number: u64) -> char {
-    char::from_u32(number as u32).expect("hex_to_char:number needs to be a valid char")
+fn hex_to_char(number: u64) -> Result<char, SmtParseError> {
+    char::from_u32(number as u32).ok_or(SmtParseError::FileError(format!(
+        "Invalid hex value: {}",
+        number
+    )))
 }
 
 fn parse_unicode_escape(text: &str) -> Result<String, SmtParseError> {
@@ -267,21 +275,6 @@ impl SmtParser {
         }
     }
 
-    fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // Parse the command. Going to assume the command always is Cons
-        let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        match cmd.as_symbol().ok_or(SmtParseError::unrecog(v))? {
-            "str.in_re" => self.parse_str_in_re(tail),
-            "and" => self.parse_and(tail),
-            "=" => self.parse_equals(tail),
-            "let" => self.parse_let(tail),
-            _ => Err(SmtParseError::Unsupported(format!(
-                "Unsupported SMTLib command: {}",
-                cmd
-            ))),
-        }
-    }
-
     fn parse_check_sat(&mut self, v: &Value) -> Result<(), SmtParseError> {
         // check-sat should occur only once
         if self.found_check_sat {
@@ -296,8 +289,23 @@ impl SmtParser {
     }
 
     /*
-        Parsing functions for specific SMTLib assertions
+        Parsing functions which return a GenRegex representing a specific SMTLib assertion
     */
+
+    fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        // Parse the command. Going to assume the command always is Cons
+        let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        match cmd.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+            "str.in_re" => self.parse_str_in_re(tail),
+            "and" => self.parse_and(tail),
+            "=" => self.parse_equals(tail),
+            "let" => self.parse_let(tail),
+            _ => Err(SmtParseError::Unsupported(format!(
+                "Unsupported SMTLib command: {}",
+                cmd
+            ))),
+        }
+    }
 
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Assumes RegLan on both sides of =
@@ -410,7 +418,7 @@ impl SmtParser {
 
     /*
         Parsing functions with output RegLan
-     */
+    */
 
     //parse_reglan_type must be used in all places that take reglan as input
     fn parse_reglan_type(&mut self,v:&Value)->Result<RegexToken,SmtParseError>{
@@ -595,6 +603,7 @@ impl SmtParser {
             }
             "char" => {
                 println!("what the heckles"); // Lol
+                // Should we call parse_char_obj here?
                 todo!();
             }
             "re.^" => {
@@ -685,25 +694,25 @@ impl SmtParser {
      */
 
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
-        println!("char_obj: {:?}", v);
+        // println!("char_obj: {:?}", v);
         if v.is_string() {
             if v.as_str().unwrap().chars().count() == 1 {
-                return Ok(v.as_str().unwrap().chars().next().expect("ERROR"));
+                let v_char = v.as_str().unwrap().chars().next().unwrap();
+                Ok(v_char)
             } else {
-                return Err(SmtParseError::unrecog(v));
+                Err(SmtParseError::bad_literal(v))
             }
         } else if v.is_cons() {
             // Removes underscore
+            // TODO: validate initial characters
             let (_underscore, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
             let (_, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
             let (hex, _tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-            if hex.is_number() {
-                return Ok(hex_to_char(hex.as_u64().expect("ERROR")));
-            }
-            // TODO
+            let hex_val = hex.as_u64().ok_or(SmtParseError::bad_literal(hex))?;
+            hex_to_char(hex_val)
+        } else {
+            Err(SmtParseError::bad_literal(v))
         }
-
-        todo!()
     }
 
     fn parse_str_at(&self, v: &Value) -> Result<String, SmtParseError> {
@@ -734,8 +743,6 @@ impl SmtParser {
             _ => Err(SmtParseError::unrecog(str_type)),
         }
     }
-
-
 
     /*
         Helper Functions
@@ -1380,9 +1387,10 @@ mod tests {
 
         assert!(gen_regex.is_ok());
         let gen_regex_unwrapped = gen_regex.unwrap();
+        let hex = hex_to_char(0x0).unwrap();
         let expected = GenRegex::Intersect(
             GenRegex::create_gre_str_var("x"),
-            GenRegex::re_range(&hex_to_char(0x0), &'/'),
+            GenRegex::re_range(&hex, &'/'),
         );
 
         assert_eq!(gen_regex_unwrapped, expected);
