@@ -27,6 +27,7 @@ pub enum SmtParseError {
     Unrecognized(String),            // Unrecognized SMTLib feature
     Unimplemented(String),           // Unimplemented SMTLib feature
     BadLiteral(String),              // Bad literal in SMTLib file
+    Unexpected(String, String),      // Unexpected S-expression
 }
 
 impl SmtParseError {
@@ -35,6 +36,9 @@ impl SmtParseError {
     }
     fn bad_literal(expr: &Value) -> SmtParseError {
         SmtParseError::BadLiteral(expr.to_string())
+    }
+    fn unexpected(got: &Value, expected: &str) -> SmtParseError {
+        SmtParseError::Unexpected(got.to_string(), expected.to_string())
     }
 }
 
@@ -63,6 +67,9 @@ impl fmt::Display for SmtParseError {
             SmtParseError::Unrecognized(s) => write!(f, "Unrecognized S-expression: {}", s),
             SmtParseError::Unimplemented(s) => write!(f, "Unimplemented SMTLib feature: {}", s),
             SmtParseError::BadLiteral(s) => write!(f, "Bad literal in S-expression: {}", s),
+            SmtParseError::Unexpected(got, expected) => {
+                write!(f, "Unexpected S-expression: got {}, expected {}", got, expected)
+            }
         }
     }
 }
@@ -74,6 +81,18 @@ impl Error for SmtParseError {}
 
     These are private so that the implementation can be changed later
 */
+
+fn expect_pair(v: &Value) -> Result<(&Value, &Value), SmtParseError> {
+    v.as_pair().ok_or(SmtParseError::unexpected(v, "pair"))
+}
+
+fn expect_null(v: &Value) -> Result<(), SmtParseError> {
+    v.as_null().ok_or(SmtParseError::unexpected(v, "null"))
+}
+
+fn expect_symbol(v: &Value) -> Result<&str, SmtParseError> {
+    v.as_symbol().ok_or(SmtParseError::unexpected(v, "symbol"))
+}
 
 fn hex_to_char(number: u64) -> Result<char, SmtParseError> {
     char::from_u32(number as u32).ok_or(SmtParseError::FileError(format!(
@@ -155,7 +174,7 @@ pub struct SmtParser {
     found_check_sat: bool,
     str_var_names: HashSet<String>,
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
-    let_var_names: HashMap<String, Option<Rc<GenRegex>>>,
+    let_var_names: HashMap<String, Rc<GenRegex>>,
     regex_result: Option<GenRegex>,
     brzozowski_flag: bool,
 }
@@ -237,9 +256,7 @@ impl SmtParser {
         // Add variable name to self.var_names
         let (var_name, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (var_type, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         match var_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
             "String" => {
                 self.str_var_names.insert(var_name.to_string());
@@ -262,9 +279,7 @@ impl SmtParser {
         self.found_assert = true;
         // Parse the arg
         let (assert_arg, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         let result = self.parse_assert_arg(assert_arg)?;
         if let Some(r) = &self.regex_result {
             self.regex_result = Some(GenRegex::Concatenation(Rc::new(r.clone()), result));
@@ -282,9 +297,7 @@ impl SmtParser {
         }
         // Set flag
         self.found_check_sat = true;
-        if !v.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(v)?;
         Ok(())
     }
 
@@ -293,6 +306,7 @@ impl SmtParser {
     */
 
     fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("called parse_assert_arg: {:?}", v);
         // Parse the command. Going to assume the command always is Cons
         let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         match cmd.as_symbol().ok_or(SmtParseError::unrecog(v))? {
@@ -313,9 +327,7 @@ impl SmtParser {
         self.brzozowski_flag = true;
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         let parsed1 = self.parse_reglan_type(regex1)?;
         let parsed2 = self.parse_reglan_type(regex2)?;
         //Initializes variables if its var=Regex
@@ -375,9 +387,7 @@ impl SmtParser {
             let regex1 = self.parse_assert_arg(head)?;
             if let Value::Cons(c) = tail {
                 let (head, tail) = c.as_pair();
-                if !tail.is_null() {
-                    return Err(SmtParseError::unrecog(v));
-                }
+                expect_null(tail)?;
                 let regex2 = self.parse_assert_arg(head)?;
                 return Ok(GenRegex::concat(&regex1, &regex2));
             }
@@ -389,9 +399,7 @@ impl SmtParser {
         // Syntax: (str.in_re x R)
         let (str_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         //Check str_var is in var_names
         let str_var = str_var.as_symbol().ok_or(SmtParseError::unrecog(str_var))?;
         if self.str_var_names.contains(str_var) {
@@ -415,15 +423,55 @@ impl SmtParser {
     */
 
     fn parse_let_assertion(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("VALUE: {:?}", v);
-        let (let_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        unimplemented!()
+        println!("called let_assertion: {:?}", v);
+        // Parse the let declaration part
+        let expr_tail = self.parse_let_declaration(v)?;
+        // Recurse on the tail expression
+        println!("let_assertion expr_tail: {:?}", expr_tail);
+        let (assert_arg, assert_tail) = expect_pair(expr_tail)?;
+        expect_null(assert_tail)?;
+        let result = self.parse_assert_arg(assert_arg);
+        println!("let_assertion result: {:?}", result);
+        result
     }
 
     fn parse_let_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("VALUE: {:?}", v);
-        let (let_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        unimplemented!()
+        println!("called let_regex: {:?}", v);
+        // Parse the let declaration part
+        let expr_tail = self.parse_let_declaration(v)?;
+        // Recurse on the tail expression
+        println!("let_regex expr_tail: {:?}", expr_tail);
+        let result = self.parse_regex(expr_tail);
+        println!("let_regex result: {:?}", result);
+        result
+    }
+
+    fn parse_let_declaration<'a, 'b>(&'a mut self, v: &'b Value) -> Result<&'b Value, SmtParseError> {
+        // Helper function which parses the let declaration, stores the variable in the hashmap
+        // let_var_names, and returns the tail expression.
+
+        // Decompose the expression
+        // Underscored parts should be null
+        // ((let3 (let4 _tail4_)) _tail2_) tail1
+        let (let1, tail1) = expect_pair(v)?;
+        let (let2, tail2) = expect_pair(let1)?;
+        let (let3, tail3) = expect_pair(let2)?;
+        let (let4, tail4) = expect_pair(tail3)?;
+        expect_null(tail2)?;
+        expect_null(tail4)?;
+
+        // Extract the important parts
+        // (let ((symbol (regex))) expr)
+        //        ^let3   ^let4    ^tail1
+        // TODO: we may need to handle the case that let4 is some other expression, not a regex.
+        let let_symbol = expect_symbol(let3)?;
+        let let_regex = self.parse_regex(let4)?;
+
+        // Store the value into the let_var_names hashmap
+        self.let_var_names.insert(let_symbol.to_string(), let_regex);
+
+        // Return the expression to be evaluated
+        Ok(tail1)
     }
 
     /*
@@ -452,13 +500,21 @@ impl SmtParser {
     }
 
     fn parse_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("called parse_regex: {:?}", v);
         // Handles base case regex
         if let Some(re_type) = v.as_symbol() {
             return match re_type {
                 "re.all" => self.parse_re_all(),
                 "re.none" => self.parse_re_none(),
                 "re.allchar" => self.parse_re_allchar(),
-                _ => Err(SmtParseError::unrecog(v)),
+                _ => {
+                    // Check for let variable
+                    if let Some(let_result) = self.let_var_names.get(re_type) {
+                        Ok(let_result.clone())
+                    } else {
+                        Err(SmtParseError::unrecog(v))
+                    }
+                },
             };
         }
 
@@ -474,7 +530,7 @@ impl SmtParser {
         }
 
         // All other cases
-        match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+        let result = match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
             "let" => self.parse_let_regex(args),
             "str.to_re" => self.parse_str_to_re(args),
             "re.++" => self.parse_re_concat(args),
@@ -487,7 +543,9 @@ impl SmtParser {
             "re.+" => self.parse_re_plus(args),
             "re.opt" => self.parse_re_opt(args),
             _ => Err(SmtParseError::unrecog(re_type)),
-        }
+        };
+        println!("parse_regex result: {:?}", result);
+        result
     }
 
     fn parse_re_union(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -508,9 +566,7 @@ impl SmtParser {
         self.brzozowski_flag = true;
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         Ok(GenRegex::intersect(
             &self.parse_regex(regex1)?,
             &GenRegex::complement(&self.parse_regex(regex2)?),
@@ -534,9 +590,7 @@ impl SmtParser {
         // Syntax: (re.* R)
         // Returns R*
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         Ok(GenRegex::star(&self.parse_regex(regex)?))
     }
 
@@ -564,9 +618,7 @@ impl SmtParser {
     fn parse_str_to_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // (str.to_re "String")
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         Ok(GenRegex::str_to_re(
             str.as_str().ok_or(SmtParseError::unrecog(v))?,
         ))
@@ -577,9 +629,7 @@ impl SmtParser {
         let (char1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         println!("{}, 2{}, tail {}", char1, char2, tail);
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         let char1 = self.parse_char_obj(char1)?.to_string();
         let char2 = self.parse_char_obj(char2)?.to_string();
 
@@ -605,13 +655,9 @@ impl SmtParser {
                 }
                 let (param2_val, tail) =
                     tail.as_pair().ok_or(SmtParseError::unrecog(func_params))?;
-                if !tail.is_null() {
-                    return Err(SmtParseError::unrecog(func_params));
-                }
+                expect_null(tail)?;
                 let (regex, tail) = args.as_pair().ok_or(SmtParseError::unrecog(args))?;
-                if !tail.is_null() {
-                    return Err(SmtParseError::unrecog(tail));
-                }
+                expect_null(tail)?;
                 self.parse_re_loop(param1_val, param2_val, regex)
             }
             "char" => {
@@ -623,13 +669,9 @@ impl SmtParser {
                 let (param1_val, tail) = func_params
                     .as_pair()
                     .ok_or(SmtParseError::unrecog(func_params))?;
-                if !tail.is_null() {
-                    return Err(SmtParseError::unrecog(func_params));
-                }
+                expect_null(tail)?;
                 let (regex, tail) = args.as_pair().ok_or(SmtParseError::unrecog(args))?;
-                if !tail.is_null() {
-                    return Err(SmtParseError::unrecog(tail));
-                }
+                expect_null(tail)?;
                 self.parse_re_caret(param1_val, regex)
             }
             _ => Err(SmtParseError::unrecog(func)),
@@ -676,17 +718,13 @@ impl SmtParser {
     pub fn parse_re_comp(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         self.brzozowski_flag = true;
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         Ok(GenRegex::complement(&self.parse_regex(regex)?))
     }
 
     pub fn parse_re_opt(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         Ok(GenRegex::union(
             &self.parse_regex(regex)?,
             &GenRegex::create_gre_char_lit(""),
@@ -695,9 +733,7 @@ impl SmtParser {
 
     pub fn parse_re_plus(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         let regex = self.parse_regex(regex)?;
         Ok(GenRegex::concat(&regex, &GenRegex::star(&regex)))
     }
@@ -731,9 +767,7 @@ impl SmtParser {
     fn parse_str_at(&self, v: &Value) -> Result<String, SmtParseError> {
         let (string, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (index, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        if !tail.is_null() {
-            return Err(SmtParseError::unrecog(v));
-        }
+        expect_null(tail)?;
         if index.is_number() {
             Ok(string
                 .as_str()
