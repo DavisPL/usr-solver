@@ -10,7 +10,7 @@ use lexpr::{self, Value};
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::fmt;
+use std::fmt::{self, format};
 use std::rc::Rc;
 
 /*
@@ -177,6 +177,7 @@ pub struct SmtParser {
     found_assert: bool,
     found_check_sat: bool,
     str_var_names: HashSet<String>,
+    func_names: HashMap<String, String>,
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
     let_var_names: HashMap<String, Rc<GenRegex>>,
     regex_result: Option<GenRegex>,
@@ -189,6 +190,7 @@ impl SmtParser {
             found_assert: false,
             found_check_sat: false,
             str_var_names: HashSet::new(),
+            func_names: HashMap::new(),
             re_var_names: HashMap::new(),
             let_var_names: HashMap::new(),
             regex_result: None,
@@ -235,13 +237,14 @@ impl SmtParser {
     */
 
     fn parse_head(&mut self, v: &Value) -> Result<(), SmtParseError> {
-        // 3 cases here: (declare-const), (assert), (check-sat)
+        // 4 cases here: (declare-const), (assert), (check-sat), (define-fun)
         if let Some((head, tail)) = v.as_pair() {
             match head.as_symbol().ok_or(SmtParseError::unrecog(head))? {
                 "set-logic" => Ok(()),
                 "declare-const" => self.parse_declare_const(tail),
                 "assert" => self.parse_assert(tail),
                 "check-sat" => self.parse_check_sat(tail),
+                "define-fun" => self.parse_define_fun(tail),
                 _ => Err(SmtParseError::Unsupported(format!(
                     "Unsupported SMTLib command: {}",
                     head
@@ -305,6 +308,45 @@ impl SmtParser {
         Ok(())
     }
 
+    fn parse_define_fun(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // Syntax: (define-fun [fun name] () String [fun defn])
+        let args = SmtParser::get_args(&v)?;
+        if args.len() != 4 {
+            return Err(SmtParseError::unrecog(&v));
+        }
+        let (name, params, ret_type, defn) = (args[0], args[1], args[2], args[3]);
+        //Ensure params and return type are valid
+        match params {
+            Value::Null => (),
+            Value::Cons(_) => {
+                return Err(SmtParseError::Unsupported(format!(
+                    "Function parameters currently not supported."
+                )))
+            }
+            _ => return Err(SmtParseError::unrecog(params)),
+        };
+        match ret_type
+            .as_symbol()
+            .ok_or(SmtParseError::unrecog(ret_type))?
+        {
+            "String" => (),
+            "RegLan" => {
+                return Err(SmtParseError::Unsupported(format!(
+                    "Functions with RegLan output currently not supported."
+                )))
+            }
+            _ => return Err(SmtParseError::unrecog(params)),
+        };
+        //Parses the function definition and inserts into HashMap
+        let constructed_string = self.parse_str(defn)?;
+        self.func_names.insert(
+            name.as_symbol()
+                .ok_or(SmtParseError::unrecog(name))?
+                .to_string(),
+            constructed_string,
+        );
+        Ok(())
+    }
     /*
         Parsing functions which return a GenRegex representing a specific SMTLib assertion
     */
@@ -403,27 +445,24 @@ impl SmtParser {
 
     fn parse_str_in_re(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (str.in_re x R)
-        let (str_var, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (string, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        //Check str_var is in var_names
-        let str_var = str_var.as_symbol().ok_or(SmtParseError::unrecog(str_var))?;
-        if self.str_var_names.contains(str_var) {
-            //Construct str_var \cap R and return
-            let str_var = GenRegex::create_gre_str_var(str_var);
-            let regex_tok = self.parse_reglan_type(regex)?;
-            match regex_tok {
-                RegexToken::Var(name) => Err(SmtParseError::Unsupported(format!(
-                    "{:?} in str.in_re needs to be initialzied beforehand.",
-                    name
-                ))),
-                RegexToken::Val(gen_regex) => Ok(GenRegex::intersect(&str_var, &gen_regex)),
-            }
-        } else {
-            Err(SmtParseError::Unrecognized(format!(
-                "String variable not declared/found: {}",
-                str_var
-            )))
+        //Chooses behavior based on string and regex tokens
+        let str_tok = self.parse_string_type(string)?;
+        let regex_tok = self.parse_reglan_type(regex)?;
+        match (str_tok, regex_tok) {
+            (StringToken::Var(var_name), RegexToken::Val(gen_regex)) => Ok(GenRegex::intersect(
+                &GenRegex::create_gre_str_var(&var_name),
+                &gen_regex,
+            )),
+            (StringToken::Val(string), RegexToken::Val(gen_regex)) => Ok(GenRegex::intersect(
+                &GenRegex::str_to_re(&string),
+                &gen_regex,
+            )),
+            _ => Err(SmtParseError::Unsupported(format!(
+                "RegLan variable in str.in_re needs to be initialzied beforehand."
+            ))),
         }
     }
 
@@ -751,6 +790,27 @@ impl SmtParser {
        Parsing functions with output String/Char
     */
 
+    //parse_reglan_type must be used in all places that take reglan as input
+    fn parse_string_type(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
+        //If is a variable returns var name if uninitialized and initialized value o.w.
+        //If not variable parses the regex
+        if let Some(name) = v.as_symbol() {
+            let res = self.func_names.get(name);
+            if let Some(s) = res {
+                return Ok(StringToken::Val(s.to_string()));
+            } else if self.str_var_names.contains(name) {
+                return Ok(StringToken::Var(name.to_string()));
+            } else {
+                return Err(SmtParseError::BadLiteral(format!(
+                    "{} is not found in declared variables or defined functions.",
+                    name
+                )));
+            }
+        } else {
+            Err(SmtParseError::unrecog(v))
+        }
+    }
+
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
         // println!("char_obj: {:?}", v);
         if v.is_string() {
@@ -790,14 +850,30 @@ impl SmtParser {
         }
     }
 
-    fn parse_str_func(&mut self, v: &Value) -> Result<String, SmtParseError> {
+    fn parse_str(&self, v: &Value) -> Result<String, SmtParseError> {
+        // Handles String literals
+        if let Some(s) = v.as_str() {
+            return Ok(s.to_string());
+        }
         let (str_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-
-        // Handles recursive regex
+        // Handles recursive strings
         match str_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
             "str.at" => self.parse_str_at(args),
+            "str.++" => self.parse_str_concat(args),
             _ => Err(SmtParseError::unrecog(str_type)),
         }
+    }
+
+    fn parse_str_concat(&self, v: &Value) -> Result<String, SmtParseError> {
+        // Syntax: (str.++ String String)
+        let args = SmtParser::get_args(v)?;
+        if args.len() != 2 {
+            return Err(SmtParseError::unrecog(v));
+        }
+        let (string1, string2) = (args[0], args[1]);
+        let string1 = self.parse_str(string1)?;
+        let string2 = self.parse_str(string2)?;
+        Ok(format!("{}{}", string1, string2))
     }
 
     /*
@@ -1517,5 +1593,15 @@ mod tests {
     #[test]
     fn test_let_3() {
         assert_satisfiable("benchmarks/date_format_days_sat.smt2");
+    }
+
+    #[test]
+    fn test_define_fun1() {
+        assert_satisfiable("benchmarks/simple_definefun_sat_1.smt2");
+    }
+
+    #[test]
+    fn test_define_fun2() {
+        assert_satisfiable("benchmarks/simple_definefun_sat_2.smt2");
     }
 }
