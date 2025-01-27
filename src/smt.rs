@@ -450,7 +450,9 @@ impl SmtParser {
         let expr_tail = self.parse_let_declaration(v)?;
         // Recurse on the tail expression
         println!("let_regex expr_tail: {:?}", expr_tail);
-        let result = self.parse_regex(expr_tail);
+        let (regex_arg, regex_tail) = expect_pair(expr_tail)?;
+        expect_null(regex_tail)?;
+        let result = self.parse_regex(regex_arg);
         println!("let_regex result: {:?}", result);
         result
     }
@@ -1516,6 +1518,11 @@ mod tests {
 
     #[test]
     fn test_let_3() {
+        assert_satisfiable("benchmarks/simple_let_sat_3.smt2");
+    }
+
+    #[test]
+    fn test_let_4() {
         assert_satisfiable("benchmarks/date_format_days_sat.smt2");
     }
 }
