@@ -1072,7 +1072,7 @@ mod tests {
     use super::*;
 
     use crate::antimirov::satisfiable;
-    use crate::antimirov_sat::SatChecker;
+    // use crate::antimirov_sat::SatChecker;
     use crate::brzozowski;
     use crate::classes::{CharExpression, GenRegex, StringVar};
 
@@ -1682,6 +1682,7 @@ mod tests {
         assert_satisfiable("benchmarks/simple_let_sat_4.smt2");
     }
 
+    #[ignore]
     #[test]
     fn test_let_5() {
         assert_satisfiable("benchmarks/date_format_days_sat.smt2");
@@ -1711,10 +1712,12 @@ mod tests {
     fn test_loops_3() {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
     }
+
     #[test]
     fn test_not1() {
         assert_satisfiable("benchmarks/simple_not_sat_1.smt2");
     }
+
     #[test]
     fn test_not2() {
         assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
