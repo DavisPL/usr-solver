@@ -5,8 +5,8 @@
 // TODO: fix and remove
 #![allow(dead_code)]
 
-mod antimirov_sat;
 mod antimirov;
+mod antimirov_sat;
 mod brzozowski;
 mod classes;
 mod predicate_evaluation;
@@ -38,7 +38,7 @@ fn main() {
         brzozowski::satisfiable(&Rc::new(re))
     } else {
         //antimirov::satisfiable(&Rc::new(re))
-        let mut sat_check=SatChecker::new();
+        let mut sat_check = SatChecker::new();
         sat_check.satisfiable(&Rc::new(re))
     };
     if result {

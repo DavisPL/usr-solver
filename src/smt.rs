@@ -381,6 +381,7 @@ impl SmtParser {
         match cmd_str {
             "str.in_re" => self.parse_str_in_re(tail),
             "and" => self.parse_and(tail),
+            "or" => self.parse_or(tail),
             "=" => self.parse_equals(tail),
             "let" => self.parse_let_assertion(tail),
             _ => {
@@ -447,9 +448,10 @@ impl SmtParser {
             (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
                 self.brzozowski_flag = true;
                 Ok(GenRegex::union(
-                &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
-                &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
-            ))},
+                    &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
+                    &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
+                ))
+            }
         }
     }
 
@@ -466,6 +468,15 @@ impl SmtParser {
             }
         }
         Err(SmtParseError::unrecog(v))
+    }
+
+    fn parse_or(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        // Syntax: (or cmd cmd)
+        // TODO: not currently supported
+        Err(SmtParseError::Unsupported(format!(
+            "Or operator not currently supported in expression: {}.",
+            v
+        )))
     }
 
     fn parse_str_in_re(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -527,33 +538,49 @@ impl SmtParser {
 
         // Decompose the expression
         // Underscored parts should be null
-        // ((let3 (let4 _tail4_)) _tail2_) tail1
-        let (let1, tail1) = expect_pair(v)?;
-        let (let2, tail2) = expect_pair(let1)?;
-        let (let3, tail3) = expect_pair(let2)?;
-        let (let4, tail4) = expect_pair(tail3)?;
-        expect_null(tail2)?;
-        expect_null(tail4)?;
+        /*
+            (
+                (let_var1 (let_sub1 _null1_))
+                (let_var2 (let_sub2 _null2_))
+                ...
+            ) tail_expr
+        */
+        let (mut let_list, tail_expr) = expect_pair(v)?;
 
-        // Extract the important parts
-        // (let ((symbol (regex))) expr)
-        //        ^let3   ^let4    ^tail1
-        let let_symbol = expect_symbol(let3)?;
-        let let_result = let4;
+        // Extract sequence of let expressions
+        let mut let_subs = Vec::new();
+        while let Some((let_sub_pair, tail)) = let_list.as_pair() {
+            let (let_var, let_sub_tail) = expect_pair(let_sub_pair)?;
+            let (let_sub, null_tail) = expect_pair(let_sub_tail)?;
+            expect_null(null_tail)?;
+            let let_symbol = expect_symbol(let_var)?;
+            let_subs.push((let_symbol, let_sub));
+            let_list = tail;
+        }
+        expect_null(let_list)?;
 
-        // Try parsing as either a regex or as an assertion, and insert into the hashmap
-        if let Ok(let_regex) = self.parse_regex(let_result) {
-            self.let_var_regexes
-                .insert(let_symbol.to_string(), let_regex);
-        } else if let Ok(let_assert) = self.parse_assert_arg(let_result) {
-            self.let_var_asserts
-                .insert(let_symbol.to_string(), let_assert);
-        } else {
-            return Err(SmtParseError::unrecog(let_result));
+        // Go through each substitution
+        // (let ((symbol   (regex)) ...) expr)
+        //        ^let_var  ^let_sub        ^tail_expr
+
+        for (let_symbol, let_sub) in let_subs {
+            // Try parsing as either a regex or as an assertion, and insert into the
+            // corresponding hashmap
+            if let Ok(let_regex) = self.parse_regex(let_sub) {
+                self.let_var_regexes
+                    .insert(let_symbol.to_string(), let_regex);
+            } else if let Ok(let_assert) = self.parse_assert_arg(let_sub) {
+                self.let_var_asserts
+                    .insert(let_symbol.to_string(), let_assert);
+            } else {
+                // This case comes up as
+                println!("Warning: unrecognized let substitution: {:?} (could not parse as regex or assertion)", let_sub);
+                return Err(SmtParseError::unrecog(let_sub));
+            }
         }
 
         // Return the expression to be evaluated
-        Ok(tail1)
+        Ok(tail_expr)
     }
 
     /*
@@ -1020,7 +1047,7 @@ mod tests {
             brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped))
         } else {
             //satisfiable(&Rc::new(gen_regex_unwrapped))
-            let mut sat_check=SatChecker::new();
+            let mut sat_check = SatChecker::new();
             sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
         };
         assert_eq!(result, expected);
@@ -1598,9 +1625,13 @@ mod tests {
         assert_satisfiable("benchmarks/simple_let_sat_3.smt2");
     }
 
-    #[ignore]
     #[test]
     fn test_let_4() {
+        assert_satisfiable("benchmarks/simple_let_sat_4.smt2");
+    }
+
+    #[test]
+    fn test_let_5() {
         assert_satisfiable("benchmarks/date_format_days_sat.smt2");
     }
 
