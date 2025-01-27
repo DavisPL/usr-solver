@@ -178,8 +178,9 @@ pub struct SmtParser {
     found_check_sat: bool,
     str_var_names: HashSet<String>,
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
-    let_var_names: HashMap<String, Rc<GenRegex>>,
-    regex_result: Option<GenRegex>,
+    let_var_regexes: HashMap<String, Rc<GenRegex>>,
+    let_var_asserts: HashMap<String, Rc<GenRegex>>,
+    regex_result: Option<Rc<GenRegex>>,
     brzozowski_flag: bool,
 }
 
@@ -190,7 +191,8 @@ impl SmtParser {
             found_check_sat: false,
             str_var_names: HashSet::new(),
             re_var_names: HashMap::new(),
-            let_var_names: HashMap::new(),
+            let_var_regexes: HashMap::new(),
+            let_var_asserts: HashMap::new(),
             regex_result: None,
             brzozowski_flag: false,
         }
@@ -220,7 +222,9 @@ impl SmtParser {
                 return Err(SmtParseError::BadCheckSat());
             }
             let result = self.regex_result.take();
-            Ok(result.expect("Regex result should have been set by parser earlier!"))
+            Ok(Rc::unwrap_or_clone(result.expect(
+                "Regex result should have been set by parser earlier!",
+            )))
         } else {
             Err(SmtParseError::unrecog(v))
         }
@@ -286,10 +290,10 @@ impl SmtParser {
         expect_null(tail)?;
         let result = self.parse_assert_arg(assert_arg)?;
         if let Some(r) = &self.regex_result {
-            self.regex_result = Some(GenRegex::Concatenation(Rc::new(r.clone()), result));
+            self.regex_result = Some(Rc::new(GenRegex::Concatenation(r.clone(), result)));
             Ok(())
         } else {
-            self.regex_result = Some(Rc::try_unwrap(result).unwrap());
+            self.regex_result = Some(result);
             Ok(())
         }
     }
@@ -311,17 +315,34 @@ impl SmtParser {
 
     fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         println!("called parse_assert_arg: {:?}", v);
-        // Parse the command. Going to assume the command always is Cons
+
+        // Parse the command. Assume the command always is Cons or a single symbol
+
+        // Let variable case
+        // TBD: currently parse_assert_arg can be called for a single symbol,
+        // in the let expression case.
+        // this seems a bit odd though. Maybe some other function is calling it wrong.
+        if let Some(name) = v.as_symbol() {
+            if let Some(let_result) = self.let_var_asserts.get(name) {
+                return Ok(let_result.clone());
+            } else {
+                return Err(SmtParseError::unrecog(v));
+            }
+        }
+
+        // Command cons case
         let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        match cmd.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+        let cmd_str = expect_symbol(cmd)?;
+        match cmd_str {
             "str.in_re" => self.parse_str_in_re(tail),
             "and" => self.parse_and(tail),
             "=" => self.parse_equals(tail),
             "let" => self.parse_let_assertion(tail),
-            _ => Err(SmtParseError::Unsupported(format!(
-                "Unsupported SMTLib command: {}",
-                cmd
-            ))),
+            _ => {
+                // Check for let variable case a second time
+                // println!("cmd_str: {:?}", cmd_str);
+                self.parse_assert_arg(cmd)
+            }
         }
     }
 
@@ -461,8 +482,8 @@ impl SmtParser {
         &'a mut self,
         v: &'b Value,
     ) -> Result<&'b Value, SmtParseError> {
-        // Helper function which parses the let declaration, stores the variable in the hashmap
-        // let_var_names, and returns the tail expression.
+        // Helper function which parses the let declaration, stores the variable as a hashmap entry,
+        // and returns the tail expression.
 
         // Decompose the expression
         // Underscored parts should be null
@@ -477,12 +498,19 @@ impl SmtParser {
         // Extract the important parts
         // (let ((symbol (regex))) expr)
         //        ^let3   ^let4    ^tail1
-        // TODO: we may need to handle the case that let4 is some other expression, not a regex.
         let let_symbol = expect_symbol(let3)?;
-        let let_regex = self.parse_regex(let4)?;
+        let let_result = let4;
 
-        // Store the value into the let_var_names hashmap
-        self.let_var_names.insert(let_symbol.to_string(), let_regex);
+        // Try parsing as either a regex or as an assertion, and insert into the hashmap
+        if let Ok(let_regex) = self.parse_regex(let_result) {
+            self.let_var_regexes
+                .insert(let_symbol.to_string(), let_regex);
+        } else if let Ok(let_assert) = self.parse_assert_arg(let_result) {
+            self.let_var_asserts
+                .insert(let_symbol.to_string(), let_assert);
+        } else {
+            return Err(SmtParseError::unrecog(let_result));
+        }
 
         // Return the expression to be evaluated
         Ok(tail1)
@@ -520,7 +548,7 @@ impl SmtParser {
                 "re.allchar" => self.parse_re_allchar(),
                 _ => {
                     // Check for let variable
-                    if let Some(let_result) = self.let_var_names.get(re_type) {
+                    if let Some(let_result) = self.let_var_regexes.get(re_type) {
                         Ok(let_result.clone())
                     } else {
                         Err(SmtParseError::unrecog(v))
