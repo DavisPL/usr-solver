@@ -573,7 +573,8 @@ impl SmtParser {
                 self.let_var_asserts
                     .insert(let_symbol.to_string(), let_assert);
             } else {
-                // This case comes up as
+                // This case comes up for example if the assertion has an unsupported case,
+                // we don't distinguish above from "couldn't parse" to "unsupported."
                 println!("Warning: unrecognized let substitution: {:?} (could not parse as regex or assertion)", let_sub);
                 return Err(SmtParseError::unrecog(let_sub));
             }
@@ -650,7 +651,7 @@ impl SmtParser {
             "re.opt" => self.parse_re_opt(args),
             _ => Err(SmtParseError::unrecog(re_type)),
         };
-        println!("parse_regex result: {:?}", result);
+        // println!("parse_regex result: {:?}", result);
         result
     }
 
@@ -734,7 +735,7 @@ impl SmtParser {
         // Syntax (re.range char1 char2)
         let (char1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        println!("{}, 2{}, tail {}", char1, char2, tail);
+        // println!("{}, 2{}, tail {}", char1, char2, tail);
         expect_null(tail)?;
         let char1 = self.parse_char_obj(char1)?.to_string();
         let char2 = self.parse_char_obj(char2)?.to_string();
@@ -749,7 +750,7 @@ impl SmtParser {
     }
 
     fn parse_re_func(&mut self, func: &Value, args: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("re_fun");
+        // println!("re_fun");
         let (re_func, func_params) = func.as_pair().ok_or(SmtParseError::unrecog(func))?;
         match re_func.as_symbol().ok_or(SmtParseError::unrecog(func))? {
             "re.loop" => {
