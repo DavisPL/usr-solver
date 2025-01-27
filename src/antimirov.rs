@@ -404,7 +404,7 @@ pub fn derivative(
                 }
             }
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
-                if lit_val.len() == 0 {
+                if lit_val.is_empty() {
                     return HashSet::from([AntimirovDerivativeElement::new(
                         Rc::new(GenRegex::EmptySet),
                         MergeResult::Bottom,
