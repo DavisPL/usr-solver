@@ -314,7 +314,7 @@ impl SmtParser {
 
     fn parse_define_fun(&mut self, v: &Value) -> Result<(), SmtParseError> {
         // Syntax: (define-fun [fun name] () String [fun defn])
-        let args = SmtParser::get_args(&v)?;
+        let args = self.get_args(&v)?;
         if args.len() != 4 {
             return Err(SmtParseError::unrecog(&v));
         }
@@ -391,7 +391,6 @@ impl SmtParser {
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Assumes RegLan on both sides of =
         //Todo: support String equality?
-        self.brzozowski_flag = true;
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
@@ -442,10 +441,12 @@ impl SmtParser {
                     )))
                 }
             }
-            (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => Ok(GenRegex::union(
+            (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
+                self.brzozowski_flag = true;
+                Ok(GenRegex::union(
                 &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
                 &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
-            )),
+            ))},
         }
     }
 
@@ -570,7 +571,7 @@ impl SmtParser {
                     Some(re) => Ok(RegexToken::Val(re.clone())),
                     None => Ok(RegexToken::Var(name.to_string())),
                 },
-                None => Err(SmtParseError::unrecog(v)),
+                None => Ok(RegexToken::Val(self.parse_regex(v)?)),
             }
         } else {
             Ok(RegexToken::Val(self.parse_regex(v)?))
@@ -628,7 +629,7 @@ impl SmtParser {
 
     fn parse_re_union(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (re.union R1 R2 ...)
-        let args = SmtParser::get_args(v)?;
+        let args = self.get_args(v)?;
         if args.len() < 2 {
             return Err(SmtParseError::unrecog(v));
         }
@@ -653,7 +654,7 @@ impl SmtParser {
 
     fn parse_re_inter(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (re.inter R1 R2 ...)
-        let args = SmtParser::get_args(v)?;
+        let args = self.get_args(v)?;
         if args.len() < 2 {
             return Err(SmtParseError::unrecog(v));
         }
@@ -682,7 +683,7 @@ impl SmtParser {
 
     fn parse_re_concat(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (re.++ R1 R2 ...)
-        let args = SmtParser::get_args(v)?;
+        let args = self.get_args(v)?;
         if args.len() < 2 {
             return Err(SmtParseError::unrecog(v));
         }
@@ -896,7 +897,7 @@ impl SmtParser {
 
     fn parse_str_concat(&self, v: &Value) -> Result<String, SmtParseError> {
         // Syntax: (str.++ String String)
-        let args = SmtParser::get_args(v)?;
+        let args = self.get_args(v)?;
         if args.len() != 2 {
             return Err(SmtParseError::unrecog(v));
         }
@@ -910,7 +911,7 @@ impl SmtParser {
        Helper Functions
     */
 
-    fn get_args(v: &Value) -> Result<Vec<&Value>, SmtParseError> {
+    fn get_args<'a>(&self, v: &'a Value) -> Result<Vec<&'a Value>, SmtParseError> {
         if !v.is_null() && !v.is_cons() {
             return Err(SmtParseError::unrecog(v));
         }
@@ -1014,7 +1015,11 @@ mod tests {
         let gen_regex_unwrapped = gen_regex.unwrap();
 
         // Get result
-        let result = satisfiable(&Rc::new(gen_regex_unwrapped));
+        let result: bool = if parser.use_brzozowski() {
+            brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped))
+        } else {
+            satisfiable(&Rc::new(gen_regex_unwrapped))
+        };
         assert_eq!(result, expected);
     }
 
@@ -1561,53 +1566,18 @@ mod tests {
 
     #[test]
     fn unicode_hex_test() {
-        let smt_result = parse_smtlib_file("benchmarks/hex_syntax_test_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert_satisfiable("benchmarks/hex_syntax_test_sat.smt2");
     }
 
     #[ignore]
     #[test]
     fn intersect_test1() {
-        let smt_result = parse_smtlib_file("benchmarks/intersect_0_0_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
+        assert_satisfiable("benchmarks/intersect_0_0_sat.smt2");
     }
 
     #[test]
-    fn parse_exp() {
-        let smt_result = parse_smtlib_file("benchmarks/reglan_var_test.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
+    fn test_reglan_var() {
+        assert_satisfiable("benchmarks/reglan_var_test_sat.smt2");
     }
 
     #[test]
