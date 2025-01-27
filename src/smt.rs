@@ -317,7 +317,7 @@ impl SmtParser {
 
     fn parse_define_fun(&mut self, v: &Value) -> Result<(), SmtParseError> {
         // Syntax: (define-fun [fun name] () String [fun defn])
-        let args = self.get_args(&v)?;
+        let args = self.get_args(v)?;
         if args.len() != 4 {
             return Err(SmtParseError::unrecog(v));
         }

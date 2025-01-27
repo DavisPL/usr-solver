@@ -27,7 +27,7 @@ impl SatChecker {
         false
     }
     fn get_fresh_var(&mut self) -> Rc<CharExpression> {
-        let var_name = format!("f.{}", self.fresh_var_ind.to_string());
+        let var_name = format!("f.{}", self.fresh_var_ind);
         self.fresh_var_ind += 1;
         Rc::new(CharExpression::CharVar(CharVar { name: var_name }))
     }
