@@ -1047,9 +1047,10 @@ mod tests {
         let result: bool = if parser.use_brzozowski() {
             brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped))
         } else {
-            //satisfiable(&Rc::new(gen_regex_unwrapped))
-            let mut sat_check = SatChecker::new();
-            sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
+            satisfiable(&Rc::new(gen_regex_unwrapped))
+            // TBD
+            // let mut sat_check = SatChecker::new();
+            // sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
         };
         assert_eq!(result, expected);
     }
@@ -1646,19 +1647,16 @@ mod tests {
         assert_satisfiable("benchmarks/simple_definefun_sat_2.smt2");
     }
 
-    #[ignore]
     #[test]
     fn test_loops_1() {
         assert_satisfiable("benchmarks/deadloop1_sat.smt2");
     }
 
-    #[ignore]
     #[test]
     fn test_loops_2() {
         assert_unsatisfiable("benchmarks/det_blowup_unsat_3.smt2");
     }
 
-    #[ignore]
     #[test]
     fn test_loops_3() {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");

@@ -374,7 +374,7 @@ pub fn derivative(
     gre: &Rc<GenRegex>,
     deriv_char: &Rc<CharExpression>,
 ) -> HashSet<AntimirovDerivativeElement> {
-    println!("taking d({}, {})", gre, deriv_char);
+    // println!("taking d({}, {})", gre, deriv_char);
     let empty_string = || {
         Rc::new(GenRegex::CharExpression(CharExpression::Literal(
             String::new(),
@@ -691,9 +691,12 @@ pub fn satisfiable_helper(
     index: &mut i32,
     mut visited: HashSet<GenRegex>,
 ) -> bool {
+    print!("Checking sat: {} (index {})", expr, index);
     if visited.contains(expr) {
+        println!(" (already visited)");
         return false;
     } else {
+        println!();
         visited.insert(expr.as_ref().clone());
     }
     if nullable(expr).is_empty() {
