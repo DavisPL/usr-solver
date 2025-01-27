@@ -358,11 +358,16 @@ def table_tostr(fstcol_width, rows, headers):
     """
     Pretty print a table.
 
-    First col width given, others deduced from headers.
+    First col width given, others deduced from headers + entries.
     """
-    fstcol_fmt = '{:>' + str(fstcol_width) + '}'
-    othercol_fmts = ["{:>" + str(len(hdr) + 1) + "}" for hdr in headers[1:]]
-    row_fmt = fstcol_fmt + "".join(othercol_fmts) + "\n"
+    row_widths = [
+        max(max(len(str(row[i])) for row in rows), len(headers[i])) + 1
+        for i in range(len(headers))
+    ]
+    row_widths[0] = max(fstcol_width, row_widths[0])
+
+    col_fmts = ["{:>" + str(w) + "}" for w in row_widths]
+    row_fmt = " ".join(col_fmts) + "\n"
     result = row_fmt.format(*headers)
     for row in rows:
         result += row_fmt.format(*row)

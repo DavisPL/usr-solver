@@ -182,8 +182,7 @@ pub struct SmtParser {
     str_var_names: HashSet<String>,
     func_names: HashMap<String, String>,
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
-    let_var_regexes: HashMap<String, Rc<GenRegex>>,
-    let_var_asserts: HashMap<String, Rc<GenRegex>>,
+    let_vars: HashMap<String, Value>,
     regex_result: Option<Rc<GenRegex>>,
     brzozowski_flag: bool,
     not_flag: bool,
@@ -197,8 +196,7 @@ impl SmtParser {
             str_var_names: HashSet::new(),
             func_names: HashMap::new(),
             re_var_names: HashMap::new(),
-            let_var_regexes: HashMap::new(),
-            let_var_asserts: HashMap::new(),
+            let_vars: HashMap::new(),
             regex_result: None,
             brzozowski_flag: false,
             not_flag: false,
@@ -361,7 +359,7 @@ impl SmtParser {
     */
 
     fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called parse_assert_arg: {:?}", v);
+        // println!("called parse_assert_arg: {:?}", v);
 
         // Parse the command. Assume the command always is Cons or a single symbol
 
@@ -370,8 +368,9 @@ impl SmtParser {
         // in the let expression case.
         // this seems a bit odd though. Maybe some other function is calling it wrong.
         if let Some(name) = v.as_symbol() {
-            if let Some(let_result) = self.let_var_asserts.get(name) {
-                return Ok(let_result.clone());
+            if let Some(let_result) = self.let_vars.get(name) {
+                let let_result_clone = let_result.clone();
+                return self.parse_assert_arg(&let_result_clone);
             } else {
                 return Err(SmtParseError::unrecog(v));
             }
@@ -552,28 +551,28 @@ impl SmtParser {
     */
 
     fn parse_let_assertion(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called let_assertion: {:?}", v);
+        // println!("called let_assertion: {:?}", v);
         // Parse the let declaration part
         let expr_tail = self.parse_let_declaration(v)?;
         // Recurse on the tail expression
-        println!("let_assertion expr_tail: {:?}", expr_tail);
+        // println!("let_assertion expr_tail: {:?}", expr_tail);
         let (assert_arg, assert_tail) = expect_pair(expr_tail)?;
         expect_null(assert_tail)?;
         let result = self.parse_assert_arg(assert_arg);
-        println!("let_assertion result: {:?}", result);
+        // println!("let_assertion result: {:?}", result);
         result
     }
 
     fn parse_let_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called let_regex: {:?}", v);
+        // println!("called let_regex: {:?}", v);
         // Parse the let declaration part
         let expr_tail = self.parse_let_declaration(v)?;
         // Recurse on the tail expression
-        println!("let_regex expr_tail: {:?}", expr_tail);
+        // println!("let_regex expr_tail: {:?}", expr_tail);
         let (regex_arg, regex_tail) = expect_pair(expr_tail)?;
         expect_null(regex_tail)?;
         let result = self.parse_regex(regex_arg);
-        println!("let_regex result: {:?}", result);
+        // println!("let_regex result: {:?}", result);
         result
     }
 
@@ -609,19 +608,25 @@ impl SmtParser {
         //        ^let_var  ^let_sub        ^tail_expr
 
         for (let_symbol, let_sub) in let_subs {
-            // Try parsing as either a regex or as an assertion, and insert into the
-            // corresponding hashmap
-            if let Ok(let_regex) = self.parse_regex(let_sub) {
-                self.let_var_regexes
-                    .insert(let_symbol.to_string(), let_regex);
-            } else if let Ok(let_assert) = self.parse_assert_arg(let_sub) {
-                self.let_var_asserts
-                    .insert(let_symbol.to_string(), let_assert);
-            } else {
-                // This case comes up as
-                println!("Warning: unrecognized let substitution: {:?} (could not parse as regex or assertion)", let_sub);
-                return Err(SmtParseError::unrecog(let_sub));
-            }
+            // Store the let substitution in the hashmap, without parsing it
+            self.let_vars
+                .insert(let_symbol.to_string(), let_sub.clone());
+
+            // OLD CODE
+            // // Try parsing as either a regex or as an assertion, and insert into the
+            // // corresponding hashmap
+            // if let Ok(let_regex) = self.parse_regex(let_sub) {
+            //     self.let_var_regexes
+            //         .insert(let_symbol.to_string(), let_regex);
+            // } else if let Ok(let_assert) = self.parse_assert_arg(let_sub) {
+            //     self.let_var_asserts
+            //         .insert(let_symbol.to_string(), let_assert);
+            // } else {
+            //     // This case comes up for example if the assertion has an unsupported case,
+            //     // we don't distinguish above from "couldn't parse" to "unsupported."
+            //     println!("Warning: unrecognized let substitution: {:?} (could not parse as regex or assertion)", let_sub);
+            //     return Err(SmtParseError::unrecog(let_sub));
+            // }
         }
 
         // Return the expression to be evaluated
@@ -651,7 +656,7 @@ impl SmtParser {
     }
 
     fn parse_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called parse_regex: {:?}", v);
+        // println!("called parse_regex: {:?}", v);
         // Handles base case regex
         if let Some(re_type) = v.as_symbol() {
             return match re_type {
@@ -660,8 +665,9 @@ impl SmtParser {
                 "re.allchar" => self.parse_re_allchar(),
                 _ => {
                     // Check for let variable
-                    if let Some(let_result) = self.let_var_regexes.get(re_type) {
-                        Ok(let_result.clone())
+                    if let Some(let_result) = self.let_vars.get(re_type) {
+                        let let_result_clone = let_result.clone();
+                        self.parse_regex(&let_result_clone)
                     } else {
                         Err(SmtParseError::unrecog(v))
                     }
@@ -695,7 +701,7 @@ impl SmtParser {
             "re.opt" => self.parse_re_opt(args),
             _ => Err(SmtParseError::unrecog(re_type)),
         };
-        println!("parse_regex result: {:?}", result);
+        // println!("parse_regex result: {:?}", result);
         result
     }
 
@@ -779,7 +785,7 @@ impl SmtParser {
         // Syntax (re.range char1 char2)
         let (char1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        println!("{}, 2{}, tail {}", char1, char2, tail);
+        // println!("{}, 2{}, tail {}", char1, char2, tail);
         expect_null(tail)?;
         let char1 = self.parse_char_obj(char1)?.to_string();
         let char2 = self.parse_char_obj(char2)?.to_string();
@@ -794,7 +800,7 @@ impl SmtParser {
     }
 
     fn parse_re_func(&mut self, func: &Value, args: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("re_fun");
+        // println!("re_fun");
         let (re_func, func_params) = func.as_pair().ok_or(SmtParseError::unrecog(func))?;
         match re_func.as_symbol().ok_or(SmtParseError::unrecog(func))? {
             "re.loop" => {
@@ -1091,9 +1097,10 @@ mod tests {
         let result: bool = if parser.use_brzozowski() {
             brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped))
         } else {
-            //satisfiable(&Rc::new(gen_regex_unwrapped))
-            let mut sat_check = SatChecker::new();
-            sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
+            satisfiable(&Rc::new(gen_regex_unwrapped))
+            // TBD
+            // let mut sat_check = SatChecker::new();
+            // sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
         };
         assert_eq!(result, expected);
     }
@@ -1688,6 +1695,21 @@ mod tests {
     #[test]
     fn test_define_fun2() {
         assert_satisfiable("benchmarks/simple_definefun_sat_2.smt2");
+    }
+
+    #[test]
+    fn test_loops_1() {
+        assert_satisfiable("benchmarks/deadloop1_sat.smt2");
+    }
+
+    #[test]
+    fn test_loops_2() {
+        assert_unsatisfiable("benchmarks/det_blowup_unsat_3.smt2");
+    }
+
+    #[test]
+    fn test_loops_3() {
+        assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
     }
     #[test]
     fn test_not1() {

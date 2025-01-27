@@ -69,6 +69,7 @@ pub fn satisfiable_helper(
     index: &mut i32,
     visited: &mut HashSet<Rc<GenRegex>>,
 ) -> bool {
+    println!("Checking sat: {} (index {})", gre, index);
     //let mut expr;
     match gre.as_ref() {
         GenRegex::IfThenElse(pred, left, right) => {
@@ -143,6 +144,7 @@ pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
 }
 
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
+    println!("taking d({}, {})", gre, deriv_char);
     let empty_string = || {
         Rc::new(GenRegex::CharExpression(CharExpression::Literal(
             String::new(),
