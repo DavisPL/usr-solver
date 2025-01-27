@@ -359,7 +359,7 @@ impl SmtParser {
     */
 
     fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called parse_assert_arg: {:?}", v);
+        // println!("called parse_assert_arg: {:?}", v);
 
         // Parse the command. Assume the command always is Cons or a single symbol
 
@@ -507,28 +507,28 @@ impl SmtParser {
     */
 
     fn parse_let_assertion(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called let_assertion: {:?}", v);
+        // println!("called let_assertion: {:?}", v);
         // Parse the let declaration part
         let expr_tail = self.parse_let_declaration(v)?;
         // Recurse on the tail expression
-        println!("let_assertion expr_tail: {:?}", expr_tail);
+        // println!("let_assertion expr_tail: {:?}", expr_tail);
         let (assert_arg, assert_tail) = expect_pair(expr_tail)?;
         expect_null(assert_tail)?;
         let result = self.parse_assert_arg(assert_arg);
-        println!("let_assertion result: {:?}", result);
+        // println!("let_assertion result: {:?}", result);
         result
     }
 
     fn parse_let_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called let_regex: {:?}", v);
+        // println!("called let_regex: {:?}", v);
         // Parse the let declaration part
         let expr_tail = self.parse_let_declaration(v)?;
         // Recurse on the tail expression
-        println!("let_regex expr_tail: {:?}", expr_tail);
+        // println!("let_regex expr_tail: {:?}", expr_tail);
         let (regex_arg, regex_tail) = expect_pair(expr_tail)?;
         expect_null(regex_tail)?;
         let result = self.parse_regex(regex_arg);
-        println!("let_regex result: {:?}", result);
+        // println!("let_regex result: {:?}", result);
         result
     }
 
@@ -606,7 +606,7 @@ impl SmtParser {
     }
 
     fn parse_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called parse_regex: {:?}", v);
+        // println!("called parse_regex: {:?}", v);
         // Handles base case regex
         if let Some(re_type) = v.as_symbol() {
             return match re_type {

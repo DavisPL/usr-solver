@@ -143,6 +143,7 @@ pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
 }
 
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
+    println!("taking d({}, {})", gre, deriv_char);
     let empty_string = || {
         Rc::new(GenRegex::CharExpression(CharExpression::Literal(
             String::new(),
