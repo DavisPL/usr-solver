@@ -775,7 +775,10 @@ if __name__ == "__main__":
     # Set up logging
     if args.debug:
         args.log_level = 'debug'
-    log_level = logging.getLevelNamesMapping()[args.log_level.upper()]
+    # Works on Python >=3.11:
+    # log_level = logging.getLevelNamesMapping()[args.log_level.upper()]
+    # Using the following instead as it's more backwards compatible:
+    log_level = getattr(logging, args.log_level.upper())
     logging.getLogger().setLevel(log_level)
     if args.debug:
         logging.debug("Debug mode enabled: logging level set to DEBUG")
