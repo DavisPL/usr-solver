@@ -5,6 +5,7 @@
 // TODO: fix and remove
 #![allow(dead_code)]
 
+mod antimirov_sat;
 mod antimirov;
 mod brzozowski;
 mod classes;
@@ -12,6 +13,7 @@ mod predicate_evaluation;
 mod print;
 mod smt;
 
+use antimirov_sat::SatChecker;
 use clap::Parser;
 use std::rc::Rc;
 
@@ -35,7 +37,9 @@ fn main() {
     let result: bool = if parser.use_brzozowski() {
         brzozowski::satisfiable(&Rc::new(re))
     } else {
-        antimirov::satisfiable(&Rc::new(re))
+        //antimirov::satisfiable(&Rc::new(re))
+        let mut sat_check=SatChecker::new();
+        sat_check.satisfiable(&Rc::new(re))
     };
     if result {
         println!("sat");

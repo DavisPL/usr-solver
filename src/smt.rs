@@ -994,6 +994,7 @@ mod tests {
     use super::*;
 
     use crate::antimirov::satisfiable;
+    use crate::antimirov_sat::SatChecker;
     use crate::brzozowski;
     use crate::classes::{CharExpression, GenRegex, StringVar};
 
@@ -1018,7 +1019,9 @@ mod tests {
         let result: bool = if parser.use_brzozowski() {
             brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped))
         } else {
-            satisfiable(&Rc::new(gen_regex_unwrapped))
+            //satisfiable(&Rc::new(gen_regex_unwrapped))
+            let mut sat_check=SatChecker::new();
+            sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
         };
         assert_eq!(result, expected);
     }
