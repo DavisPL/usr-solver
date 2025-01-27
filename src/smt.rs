@@ -186,6 +186,7 @@ pub struct SmtParser {
     let_var_asserts: HashMap<String, Rc<GenRegex>>,
     regex_result: Option<Rc<GenRegex>>,
     brzozowski_flag: bool,
+    not_flag: bool,
 }
 
 impl SmtParser {
@@ -200,6 +201,7 @@ impl SmtParser {
             let_var_asserts: HashMap::new(),
             regex_result: None,
             brzozowski_flag: false,
+            not_flag: false,
         }
     }
 
@@ -378,18 +380,48 @@ impl SmtParser {
         // Command cons case
         let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let cmd_str = expect_symbol(cmd)?;
-        match cmd_str {
-            "str.in_re" => self.parse_str_in_re(tail),
-            "and" => self.parse_and(tail),
-            "or" => self.parse_or(tail),
-            "=" => self.parse_equals(tail),
-            "let" => self.parse_let_assertion(tail),
-            _ => {
-                // Check for let variable case a second time
-                // println!("cmd_str: {:?}", cmd_str);
-                self.parse_assert_arg(cmd)
+        if self.not_flag{
+            match cmd_str {
+                "str.in_re" => self.parse_str_in_re(tail),
+                "and" => self.parse_or(tail),
+                "or" => self.parse_and(tail),
+                "not"=> self.parse_assert_arg_not(tail),
+                "=" => self.parse_equals(tail),
+                "let" => self.parse_let_assertion(tail),
+                _ => {
+                    // Check for let variable case a second time
+                    // println!("cmd_str: {:?}", cmd_str);
+                    self.parse_assert_arg(cmd)
+                }
             }
         }
+        else {
+            match cmd_str {
+                "str.in_re" => self.parse_str_in_re(tail),
+                "and" => self.parse_and(tail),
+                "or" => self.parse_or(tail),
+                "not"=> self.parse_assert_arg_not(tail),
+                "=" => self.parse_equals(tail),
+                "let" => self.parse_let_assertion(tail),
+                _ => {
+                    // Check for let variable case a second time
+                    // println!("cmd_str: {:?}", cmd_str);
+                    self.parse_assert_arg(cmd)
+                }
+            }
+        }
+    }
+
+    fn parse_assert_arg_not(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError>{
+        println!("called parse_assert_arg_not: {:?}", v);
+        self.not_flag=!self.not_flag;
+        let args=self.get_args(v)?;
+        if args.len()!=1{
+            return Err(SmtParseError::unexpected(v, "\"not\" should have 1 argument."))
+        }
+        let res =self.parse_assert_arg(args[0])?;
+        self.not_flag=!self.not_flag;
+        return Ok(res);
     }
 
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -402,10 +434,10 @@ impl SmtParser {
         let parsed2 = self.parse_reglan_type(regex2)?;
         //Initializes variables if its var=Regex
         //Asserts equality if Regex=Regex
-        //Will return epsilin in case of initialization
+        //Will return epsilon in case of initialization
         match (parsed1, parsed2) {
             (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(format!(
-                "Equality of uninitialzied RegLan variables not supported."
+                "Equality of uninitialized RegLan variables not supported."
             ))),
             (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
                 let res = self.re_var_names.get(&name);
@@ -445,38 +477,41 @@ impl SmtParser {
                     )))
                 }
             }
-            (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
-                self.brzozowski_flag = true;
+            (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
+                Err(SmtParseError::Unimplemented(format!("Equals had not been fixed")))
+                /*self.brzozowski_flag = true;
                 Ok(GenRegex::union(
                     &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
                     &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
-                ))
+                ))*/
             }
         }
     }
 
     fn parse_and(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // Syntax: (and cmd cmd)
-        if let Value::Cons(c) = v {
-            let (head, tail) = c.as_pair();
-            let regex1 = self.parse_assert_arg(head)?;
-            if let Value::Cons(c) = tail {
-                let (head, tail) = c.as_pair();
-                expect_null(tail)?;
-                let regex2 = self.parse_assert_arg(head)?;
-                return Ok(GenRegex::concat(&regex1, &regex2));
-            }
+        // Syntax: (and cmd cmd ...)
+        let args=self.get_args(v)?;
+        if args.len()<2{
+            return Err(SmtParseError::unexpected(v, ">2 arguments in \"and\""));
         }
-        Err(SmtParseError::unrecog(v))
+        let mut props:Vec<Rc<GenRegex>>=Vec::new();
+        for ele in args{
+            props.push(self.parse_assert_arg(ele)?);
+        }
+        Ok(GenRegex::concat_many(&props))
     }
 
     fn parse_or(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // Syntax: (or cmd cmd)
-        // TODO: not currently supported
-        Err(SmtParseError::Unsupported(format!(
-            "Or operator not currently supported in expression: {}.",
-            v
-        )))
+        // Syntax: (or cmd cmd ...)
+        let args=self.get_args(v)?;
+        if args.len()<2{
+            return Err(SmtParseError::unexpected(v, ">2 arguments in \"or\""));
+        }
+        let mut props:Vec<Rc<GenRegex>>=Vec::new();
+        for ele in args{
+            props.push(self.parse_assert_arg(ele)?);
+        }
+        Ok(GenRegex::union_many(&props))
     }
 
     fn parse_str_in_re(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -487,18 +522,28 @@ impl SmtParser {
         //Chooses behavior based on string and regex tokens
         let str_tok = self.parse_string_type(string)?;
         let regex_tok = self.parse_reglan_type(regex)?;
-        match (str_tok, regex_tok) {
-            (StringToken::Var(var_name), RegexToken::Val(gen_regex)) => Ok(GenRegex::intersect(
-                &GenRegex::create_gre_str_var(&var_name),
-                &gen_regex,
-            )),
-            (StringToken::Val(string), RegexToken::Val(gen_regex)) => Ok(GenRegex::intersect(
-                &GenRegex::str_to_re(&string),
-                &gen_regex,
-            )),
-            _ => Err(SmtParseError::Unsupported(format!(
+        match regex_tok{
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
                 "RegLan variable in str.in_re needs to be initialzied beforehand."
             ))),
+            RegexToken::Val(gen_regex) => {
+                let gen_regex=if self.not_flag{
+                    self.brzozowski_flag=true;
+                    GenRegex::complement(&gen_regex)
+                } else {
+                    gen_regex
+                };
+                match str_tok{
+                    StringToken::Var(var_name) => Ok(GenRegex::intersect(
+                        &GenRegex::create_gre_str_var(&var_name),
+                        &gen_regex,
+                    )),
+                    StringToken::Val(string) => Ok(GenRegex::intersect(
+                        &GenRegex::str_to_re(&string),
+                        &gen_regex,
+                    )),
+                }
+            },
         }
     }
 
@@ -848,7 +893,7 @@ impl SmtParser {
        Parsing functions with output String/Char
     */
 
-    //parse_reglan_type must be used in all places that take reglan as input
+    //parse_string_type must be used in all places that take string as input
     fn parse_string_type(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
         //If is a variable returns var name if uninitialized and initialized value o.w.
         //If not variable parses the regex
@@ -1643,5 +1688,13 @@ mod tests {
     #[test]
     fn test_define_fun2() {
         assert_satisfiable("benchmarks/simple_definefun_sat_2.smt2");
+    }
+    #[test]
+    fn test_not1() {
+        assert_satisfiable("benchmarks/simple_not_sat_1.smt2");
+    }
+    #[test]
+    fn test_not2() {
+        assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
     }
 }
