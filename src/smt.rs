@@ -182,8 +182,7 @@ pub struct SmtParser {
     str_var_names: HashSet<String>,
     func_names: HashMap<String, String>,
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
-    let_var_regexes: HashMap<String, Rc<GenRegex>>,
-    let_var_asserts: HashMap<String, Rc<GenRegex>>,
+    let_vars: HashMap<String, Value>,
     regex_result: Option<Rc<GenRegex>>,
     brzozowski_flag: bool,
 }
@@ -196,8 +195,7 @@ impl SmtParser {
             str_var_names: HashSet::new(),
             func_names: HashMap::new(),
             re_var_names: HashMap::new(),
-            let_var_regexes: HashMap::new(),
-            let_var_asserts: HashMap::new(),
+            let_vars: HashMap::new(),
             regex_result: None,
             brzozowski_flag: false,
         }
@@ -368,8 +366,9 @@ impl SmtParser {
         // in the let expression case.
         // this seems a bit odd though. Maybe some other function is calling it wrong.
         if let Some(name) = v.as_symbol() {
-            if let Some(let_result) = self.let_var_asserts.get(name) {
-                return Ok(let_result.clone());
+            if let Some(let_result) = self.let_vars.get(name) {
+                let let_result_clone = let_result.clone();
+                return self.parse_assert_arg(&let_result_clone);
             } else {
                 return Err(SmtParseError::unrecog(v));
             }
@@ -564,20 +563,25 @@ impl SmtParser {
         //        ^let_var  ^let_sub        ^tail_expr
 
         for (let_symbol, let_sub) in let_subs {
-            // Try parsing as either a regex or as an assertion, and insert into the
-            // corresponding hashmap
-            if let Ok(let_regex) = self.parse_regex(let_sub) {
-                self.let_var_regexes
-                    .insert(let_symbol.to_string(), let_regex);
-            } else if let Ok(let_assert) = self.parse_assert_arg(let_sub) {
-                self.let_var_asserts
-                    .insert(let_symbol.to_string(), let_assert);
-            } else {
-                // This case comes up for example if the assertion has an unsupported case,
-                // we don't distinguish above from "couldn't parse" to "unsupported."
-                println!("Warning: unrecognized let substitution: {:?} (could not parse as regex or assertion)", let_sub);
-                return Err(SmtParseError::unrecog(let_sub));
-            }
+            // Store the let substitution in the hashmap, without parsing it
+            self.let_vars
+                .insert(let_symbol.to_string(), let_sub.clone());
+
+            // OLD CODE
+            // // Try parsing as either a regex or as an assertion, and insert into the
+            // // corresponding hashmap
+            // if let Ok(let_regex) = self.parse_regex(let_sub) {
+            //     self.let_var_regexes
+            //         .insert(let_symbol.to_string(), let_regex);
+            // } else if let Ok(let_assert) = self.parse_assert_arg(let_sub) {
+            //     self.let_var_asserts
+            //         .insert(let_symbol.to_string(), let_assert);
+            // } else {
+            //     // This case comes up for example if the assertion has an unsupported case,
+            //     // we don't distinguish above from "couldn't parse" to "unsupported."
+            //     println!("Warning: unrecognized let substitution: {:?} (could not parse as regex or assertion)", let_sub);
+            //     return Err(SmtParseError::unrecog(let_sub));
+            // }
         }
 
         // Return the expression to be evaluated
@@ -616,8 +620,9 @@ impl SmtParser {
                 "re.allchar" => self.parse_re_allchar(),
                 _ => {
                     // Check for let variable
-                    if let Some(let_result) = self.let_var_regexes.get(re_type) {
-                        Ok(let_result.clone())
+                    if let Some(let_result) = self.let_vars.get(re_type) {
+                        let let_result_clone = let_result.clone();
+                        self.parse_regex(&let_result_clone)
                     } else {
                         Err(SmtParseError::unrecog(v))
                     }
