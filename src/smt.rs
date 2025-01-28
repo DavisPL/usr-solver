@@ -252,6 +252,7 @@ impl SmtParser {
                 "assert" => self.parse_assert(tail),
                 "check-sat" => self.parse_check_sat(tail),
                 "define-fun" => self.parse_define_fun(tail),
+                "declare-fun" => self.parse_declare_fun(tail),
                 _ => Err(SmtParseError::Unsupported(format!(
                     "Unsupported SMTLib command: {}",
                     head
@@ -260,6 +261,40 @@ impl SmtParser {
         } else {
             Err(SmtParseError::unrecog(v))
         }
+    }
+    fn parse_declare_fun(&mut self, v: &Value) -> Result<(), SmtParseError> {
+        // Syntax: (define-fun [fun name] () String )
+        let args = self.get_args(v)?;
+        if args.len() != 3 {
+            return Err(SmtParseError::unrecog(v));
+        }
+        let (name, params, ret_type) = (args[0], args[1], args[2]);
+        //Ensure params and return type are valid
+        match params {
+            Value::Null => (),
+            Value::Cons(_) => {
+                return Err(SmtParseError::Unsupported(format!(
+                    "Function parameters currently not supported."
+                )))
+            }
+            _ => return Err(SmtParseError::unrecog(params)),
+        };
+        match ret_type
+            .as_symbol()
+            .ok_or(SmtParseError::unrecog(ret_type))?
+        {
+            "String" => (),
+            "RegLan" => {
+                return Err(SmtParseError::Unsupported(format!(
+                    "Functions with RegLan output currently not supported."
+                )))
+            }
+            _ => return Err(SmtParseError::unrecog(params)),
+        };
+        //Parses the function definition and inserts into HashMap
+        self.str_var_names.insert(name.to_string());
+        Ok(())
+
     }
 
     fn parse_declare_const(&mut self, v: &Value) -> Result<(), SmtParseError> {
@@ -1662,5 +1697,9 @@ mod tests {
     #[test]
     fn test_loops_3() {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
+    }
+    #[test]
+    fn test_usr_1() {
+        assert_satisfiable("benchmarks/usr_1_sat.smt2");
     }
 }
