@@ -20,21 +20,21 @@ impl SatChecker {
             gre: expr.clone(),
             depth: 0,
         }];
-        let mut visted: HashSet<Rc<GenRegex>> = HashSet::new();
+        let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
         while let Some(layer) = sat_stack.pop() {
             if !nullable(&layer.gre).is_empty() {
                 return true;
             } else {
                 let deriv = derivative(&layer.gre, &self.get_fresh_var(layer.depth));
                 for ele in deriv {
-                    if !visted.contains(ele.get_expr()) {
+                    if !visited.contains(ele.get_expr()) {
                         sat_stack.push(DerivativeDepth {
                             gre: ele.get_expr().clone(),
                             depth: layer.depth + 1,
                         });
                     }
                 }
-                visted.insert(layer.gre);
+                visited.insert(layer.gre);
             }
         }
         false
