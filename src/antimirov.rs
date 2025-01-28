@@ -692,13 +692,7 @@ pub fn satisfiable_helper(
     mut visited: HashSet<GenRegex>,
 ) -> bool {
     print!("Checking sat: {} (index {})", expr, index);
-    if visited.contains(expr) {
-        println!(" (already visited)");
-        return false;
-    } else {
-        println!();
-        visited.insert(expr.as_ref().clone());
-    }
+    visited.insert(expr.as_ref().clone());
     if nullable(expr).is_empty() {
         let new_name = "f".to_owned() + &index.to_string();
         let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
@@ -708,8 +702,10 @@ pub fn satisfiable_helper(
         }
         *index += 1;
         for elem in deriv {
-            if satisfiable_helper(elem.get_expr(), index, visited.clone()) {
-                return true;
+            if visited.contains(expr){
+                if satisfiable_helper(elem.get_expr(), index, visited.clone()) {
+                    return true;
+                }
             }
         }
         return false;
