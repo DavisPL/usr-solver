@@ -379,12 +379,12 @@ impl SmtParser {
         // Command cons case
         let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let cmd_str = expect_symbol(cmd)?;
-        if self.not_flag{
+        if self.not_flag {
             match cmd_str {
                 "str.in_re" => self.parse_str_in_re(tail),
                 "and" => self.parse_or(tail),
                 "or" => self.parse_and(tail),
-                "not"=> self.parse_assert_arg_not(tail),
+                "not" => self.parse_assert_arg_not(tail),
                 "=" => self.parse_equals(tail),
                 "let" => self.parse_let_assertion(tail),
                 _ => {
@@ -393,13 +393,12 @@ impl SmtParser {
                     self.parse_assert_arg(cmd)
                 }
             }
-        }
-        else {
+        } else {
             match cmd_str {
                 "str.in_re" => self.parse_str_in_re(tail),
                 "and" => self.parse_and(tail),
                 "or" => self.parse_or(tail),
-                "not"=> self.parse_assert_arg_not(tail),
+                "not" => self.parse_assert_arg_not(tail),
                 "=" => self.parse_equals(tail),
                 "let" => self.parse_let_assertion(tail),
                 _ => {
@@ -411,15 +410,18 @@ impl SmtParser {
         }
     }
 
-    fn parse_assert_arg_not(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError>{
+    fn parse_assert_arg_not(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         println!("called parse_assert_arg_not: {:?}", v);
-        self.not_flag=!self.not_flag;
-        let args=self.get_args(v)?;
-        if args.len()!=1{
-            return Err(SmtParseError::unexpected(v, "\"not\" should have 1 argument."))
+        self.not_flag = !self.not_flag;
+        let args = self.get_args(v)?;
+        if args.len() != 1 {
+            return Err(SmtParseError::unexpected(
+                v,
+                "\"not\" should have 1 argument.",
+            ));
         }
-        let res =self.parse_assert_arg(args[0])?;
-        self.not_flag=!self.not_flag;
+        let res = self.parse_assert_arg(args[0])?;
+        self.not_flag = !self.not_flag;
         return Ok(res);
     }
 
@@ -477,7 +479,9 @@ impl SmtParser {
                 }
             }
             (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
-                Err(SmtParseError::Unimplemented(format!("Equals had not been fixed")))
+                Err(SmtParseError::Unimplemented(format!(
+                    "Equals had not been fixed"
+                )))
                 /*self.brzozowski_flag = true;
                 Ok(GenRegex::union(
                     &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
@@ -489,12 +493,12 @@ impl SmtParser {
 
     fn parse_and(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (and cmd cmd ...)
-        let args=self.get_args(v)?;
-        if args.len()<2{
+        let args = self.get_args(v)?;
+        if args.len() < 2 {
             return Err(SmtParseError::unexpected(v, ">2 arguments in \"and\""));
         }
-        let mut props:Vec<Rc<GenRegex>>=Vec::new();
-        for ele in args{
+        let mut props: Vec<Rc<GenRegex>> = Vec::new();
+        for ele in args {
             props.push(self.parse_assert_arg(ele)?);
         }
         Ok(GenRegex::concat_many(&props))
@@ -502,12 +506,12 @@ impl SmtParser {
 
     fn parse_or(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // Syntax: (or cmd cmd ...)
-        let args=self.get_args(v)?;
-        if args.len()<2{
+        let args = self.get_args(v)?;
+        if args.len() < 2 {
             return Err(SmtParseError::unexpected(v, ">2 arguments in \"or\""));
         }
-        let mut props:Vec<Rc<GenRegex>>=Vec::new();
-        for ele in args{
+        let mut props: Vec<Rc<GenRegex>> = Vec::new();
+        for ele in args {
             props.push(self.parse_assert_arg(ele)?);
         }
         Ok(GenRegex::union_many(&props))
@@ -521,18 +525,18 @@ impl SmtParser {
         //Chooses behavior based on string and regex tokens
         let str_tok = self.parse_string_type(string)?;
         let regex_tok = self.parse_reglan_type(regex)?;
-        match regex_tok{
+        match regex_tok {
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
                 "RegLan variable in str.in_re needs to be initialzied beforehand."
             ))),
             RegexToken::Val(gen_regex) => {
-                let gen_regex=if self.not_flag{
-                    self.brzozowski_flag=true;
+                let gen_regex = if self.not_flag {
+                    self.brzozowski_flag = true;
                     GenRegex::complement(&gen_regex)
                 } else {
                     gen_regex
                 };
-                match str_tok{
+                match str_tok {
                     StringToken::Var(var_name) => Ok(GenRegex::intersect(
                         &GenRegex::create_gre_str_var(&var_name),
                         &gen_regex,
@@ -542,7 +546,7 @@ impl SmtParser {
                         &gen_regex,
                     )),
                 }
-            },
+            }
         }
     }
 
