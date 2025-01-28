@@ -13,7 +13,7 @@ mod predicate_evaluation;
 mod print;
 mod smt;
 
-use antimirov_sat::SatChecker;
+// use antimirov_sat::SatChecker;
 use clap::Parser;
 use std::rc::Rc;
 
@@ -39,9 +39,10 @@ fn main() {
         brzozowski::satisfiable(&Rc::new(re))
     } else {
         println!("Using Antimirov");
-        //antimirov::satisfiable(&Rc::new(re))
-        let mut sat_check = SatChecker::new();
-        sat_check.satisfiable(&Rc::new(re))
+        antimirov::satisfiable(&Rc::new(re))
+        // TBD
+        // let mut sat_check = SatChecker::new();
+        // sat_check.satisfiable(&Rc::new(re))
     };
     if result {
         println!("sat");

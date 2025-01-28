@@ -69,6 +69,7 @@ pub fn satisfiable_helper(
     index: &mut i32,
     visited: &mut HashSet<Rc<GenRegex>>,
 ) -> bool {
+    println!("Checking sat: {} (index {})", gre, index);
     //let mut expr;
     match gre.as_ref() {
         GenRegex::IfThenElse(pred, left, right) => {
