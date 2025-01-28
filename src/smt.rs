@@ -558,7 +558,9 @@ impl SmtParser {
         let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
         //Chooses behavior based on string and regex tokens
+        println!("he");
         let str_tok = self.parse_string_type(string)?;
+        println!("help");
         let regex_tok = self.parse_reglan_type(regex)?;
         match regex_tok {
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
@@ -813,10 +815,13 @@ impl SmtParser {
 
     fn parse_str_to_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // (str.to_re "String")
-        let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (str_arg, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
+        if str_arg.is_symbol() {
+            return Ok(GenRegex::create_gre_str_var(str_arg.as_symbol().ok_or(SmtParseError::unrecog(v))?));
+        }
         Ok(GenRegex::str_to_re(
-            str.as_str().ok_or(SmtParseError::unrecog(v))?,
+            str_arg.as_str().ok_or(SmtParseError::unrecog(v))?,
         ))
     }
 
@@ -1752,7 +1757,7 @@ mod tests {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
     }
     #[test]
-    fn test_usr_1() {
+    fn test_usr_2() {
         assert_satisfiable("benchmarks/usr_1_sat.smt2");
     }
 
