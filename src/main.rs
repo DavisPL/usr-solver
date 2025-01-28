@@ -13,11 +13,11 @@ mod predicate_evaluation;
 mod print;
 mod smt;
 
-use antimirov_sat::SatChecker;
+// use antimirov_sat::SatChecker;
 use clap::Parser;
 use std::rc::Rc;
 
-//use smt::SmtParser;
+use smt::SmtParser;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
