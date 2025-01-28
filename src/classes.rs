@@ -142,6 +142,8 @@ impl GenRegex {
 pub enum MergeResult {
     SimpleSub(SimpleSub),
     Bottom,
+    // TBD: add
+    // RangeSub(RangeSub),
 }
 
 /*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -280,17 +282,36 @@ impl SubExpr {
     }
 }
 
+/// Represents any sub, not necessarily simple (e.g. x -> y, y -> x)
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct AnySub {
     string_to: BTreeMap<StringVar, Vec<SubExpr>>,
     char_to: BTreeMap<CharVar, Vec<CharExpression>>,
 }
 
+/// Represents a simple sub (in a normalized form)
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
 }
+
+/// Optimization to represent a range of simple subs, e.g. one sub for each A-Z
+// Assumes concrete characters (not CharVar or CharExpression)
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct RangeSub {
+    var: CharVar,                                     // x
+    start: char,                                      // a
+    end: char,                                        // z
+    string_to_start: BTreeMap<StringVar, SubExpr>,    // w |-> eps
+    char_to_start: BTreeMap<CharVar, CharExpression>, // x |-> "a", y |-> "z"
+    string_to_end: BTreeMap<StringVar, SubExpr>,      // w |-> eps
+    char_to_end: BTreeMap<CharVar, CharExpression>,   // x |-> "z", y |-> "z"
+}
+
+// d([a-z], x) = {(epsilon, x->a), (epsilon, x->b) ... (epsilon, x->z)}
+// Store only: x, a, z, (epsilon, x->a), (epsilon, x->z)
+// Another example: x, a, z, (epsilon, x->a, y->z), (epsilon, x->z, y->z)
 
 impl AnySub {
     pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {

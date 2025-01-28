@@ -294,7 +294,6 @@ impl SmtParser {
         //Parses the function definition and inserts into HashMap
         self.str_var_names.insert(name.to_string());
         Ok(())
-
     }
 
     fn parse_declare_const(&mut self, v: &Value) -> Result<(), SmtParseError> {
@@ -457,7 +456,7 @@ impl SmtParser {
         }
         let res = self.parse_assert_arg(args[0])?;
         self.not_flag = !self.not_flag;
-        return Ok(res);
+        Ok(res)
     }
 
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -559,7 +558,7 @@ impl SmtParser {
         expect_null(tail)?;
         //Chooses behavior based on string and regex tokens
         let str_tok = self.parse_string_type(string)?;
-        println!("var_names: {:?}",self.str_var_names);
+        println!("var_names: {:?}", self.str_var_names);
         let regex_tok = self.parse_reglan_type(regex)?;
         match regex_tok {
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
@@ -803,7 +802,7 @@ impl SmtParser {
         // Syntax: (re.++ R1 R2 ...)
         let args = self.get_args(v)?;
         if args.len() < 2 {
-            return Ok(self.parse_regex(args[0])?);
+            return self.parse_regex(args[0]);
             //return Err(SmtParseError::unexpected(v, "re.++ requires at least 2 arguments."));
         }
         let mut regex_args: Vec<Rc<GenRegex>> = Vec::new();
@@ -817,8 +816,8 @@ impl SmtParser {
         // (str.to_re "String")
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        let str=self.parse_string_type(str)?;
-        match str{
+        let str = self.parse_string_type(str)?;
+        match str {
             StringToken::Var(name) => Ok(GenRegex::create_gre_str_var(&name)),
             StringToken::Val(str) => Ok(GenRegex::str_to_re(&str)),
         }
@@ -946,7 +945,7 @@ impl SmtParser {
     fn parse_string_type(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
         //If is a variable returns var name if uninitialized and initialized value o.w.
         //If not variable parses the regex
-        if let Some(str)=v.as_str(){
+        if let Some(str) = v.as_str() {
             return Ok(StringToken::Val(str.to_string()));
         }
         if let Some(name) = v.as_symbol() {

@@ -4,7 +4,7 @@
 
 use crate::classes::{
     AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression,
-    MergeResult, Predicate, SimpleSub, StringIndex, StringVar, SubExpr,
+    MergeResult, Predicate, RangeSub, SimpleSub, StringIndex, StringVar, SubExpr,
 };
 use std::fmt::{self, Display};
 
@@ -21,6 +21,7 @@ impl fmt::Display for MergeResult {
         match self {
             MergeResult::Bottom => write!(f, "\\bot"),
             MergeResult::SimpleSub(s) => write!(f, "{}", s),
+            // MergeResult::RangeSub(s) => write!(f, "{}", s),
         }
     }
 }
@@ -61,6 +62,13 @@ impl Display for SimpleSub {
         write!(f, "}}")?;
 
         Ok(())
+    }
+}
+
+impl Display for RangeSub {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: placeholder
+        write!(f, "RangeSub({:?})", self)
     }
 }
 
