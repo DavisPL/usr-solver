@@ -803,7 +803,8 @@ impl SmtParser {
         // Syntax: (re.++ R1 R2 ...)
         let args = self.get_args(v)?;
         if args.len() < 2 {
-            return Err(SmtParseError::unexpected(v, "re.++ requires at least 2 arguments."));
+            return Ok(self.parse_regex(args[0])?);
+            //return Err(SmtParseError::unexpected(v, "re.++ requires at least 2 arguments."));
         }
         let mut regex_args: Vec<Rc<GenRegex>> = Vec::new();
         for a in args {
@@ -1761,7 +1762,7 @@ mod tests {
     }
     #[test]
     fn test_usr_2() {
-        assert_satisfiable("benchmarks/usr_1_sat.smt2");
+        assert_satisfiable("benchmarks/usr_2_sat.smt2");
     }
 
     #[test]

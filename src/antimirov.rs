@@ -691,7 +691,7 @@ pub fn satisfiable_helper(
     index: &mut i32,
     mut visited: HashSet<GenRegex>,
 ) -> bool {
-    print!("Checking sat: {} (index {})", expr, index);
+    println!("Checking sat: {} (index {})", expr, index);
     visited.insert(expr.as_ref().clone());
     if nullable(expr).is_empty() {
         let new_name = "f".to_owned() + &index.to_string();
