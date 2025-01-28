@@ -558,9 +558,8 @@ impl SmtParser {
         let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
         //Chooses behavior based on string and regex tokens
-        println!("he");
         let str_tok = self.parse_string_type(string)?;
-        println!("help");
+        println!("var_names: {:?}",self.str_var_names);
         let regex_tok = self.parse_reglan_type(regex)?;
         match regex_tok {
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
@@ -804,7 +803,7 @@ impl SmtParser {
         // Syntax: (re.++ R1 R2 ...)
         let args = self.get_args(v)?;
         if args.len() < 2 {
-            return Err(SmtParseError::unrecog(v));
+            return Err(SmtParseError::unexpected(v, "re.++ requires at least 2 arguments."));
         }
         let mut regex_args: Vec<Rc<GenRegex>> = Vec::new();
         for a in args {
@@ -813,16 +812,15 @@ impl SmtParser {
         Ok(GenRegex::concat_many(&regex_args))
     }
 
-    fn parse_str_to_re(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+    fn parse_str_to_re(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         // (str.to_re "String")
-        let (str_arg, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        if str_arg.is_symbol() {
-            return Ok(GenRegex::create_gre_str_var(str_arg.as_symbol().ok_or(SmtParseError::unrecog(v))?));
+        let str=self.parse_string_type(str)?;
+        match str{
+            StringToken::Var(name) => Ok(GenRegex::create_gre_str_var(&name)),
+            StringToken::Val(str) => Ok(GenRegex::str_to_re(&str)),
         }
-        Ok(GenRegex::str_to_re(
-            str_arg.as_str().ok_or(SmtParseError::unrecog(v))?,
-        ))
     }
 
     fn parse_re_range(&self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -947,6 +945,9 @@ impl SmtParser {
     fn parse_string_type(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
         //If is a variable returns var name if uninitialized and initialized value o.w.
         //If not variable parses the regex
+        if let Some(str)=v.as_str(){
+            return Ok(StringToken::Val(str.to_string()));
+        }
         if let Some(name) = v.as_symbol() {
             let res = self.func_names.get(name);
             if let Some(s) = res {
@@ -971,6 +972,7 @@ impl SmtParser {
                 let v_char = v.as_str().unwrap().chars().next().unwrap();
                 Ok(v_char)
             } else {
+                println!("test");
                 Err(SmtParseError::bad_literal(v))
             }
         } else if v.is_cons() {
@@ -982,6 +984,7 @@ impl SmtParser {
             let hex_val = hex.as_u64().ok_or(SmtParseError::bad_literal(hex))?;
             hex_to_char(hex_val)
         } else {
+            println!("testiing");
             Err(SmtParseError::bad_literal(v))
         }
     }
