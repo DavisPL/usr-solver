@@ -972,6 +972,7 @@ impl SmtParser {
                 let v_char = v.as_str().unwrap().chars().next().unwrap();
                 Ok(v_char)
             } else {
+                println!("test");
                 Err(SmtParseError::bad_literal(v))
             }
         } else if v.is_cons() {
@@ -983,6 +984,7 @@ impl SmtParser {
             let hex_val = hex.as_u64().ok_or(SmtParseError::bad_literal(hex))?;
             hex_to_char(hex_val)
         } else {
+            println!("testiing");
             Err(SmtParseError::bad_literal(v))
         }
     }
@@ -1758,7 +1760,7 @@ mod tests {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
     }
     #[test]
-    fn test_usr_1() {
+    fn test_usr_2() {
         assert_satisfiable("benchmarks/usr_1_sat.smt2");
     }
 
