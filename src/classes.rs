@@ -153,14 +153,7 @@ pub struct AntimirovElement {
 }
 
 impl AntimirovElement {
-    pub fn new(deriv_expression: Rc<GenRegex>, subs: SimpleSub) -> Self {
-        Self {
-            deriv_expression,
-            subs,
-            range_constraints: BTreeMap::new(),
-        }
-    }
-    pub fn new_with_constraints(
+    pub fn new(
         deriv_expression: Rc<GenRegex>,
         subs: SimpleSub,
         range_constraints: BTreeMap<CharVar, RangeConstr>,
@@ -169,16 +162,6 @@ impl AntimirovElement {
             deriv_expression,
             subs,
             range_constraints,
-        }
-    }
-    pub fn set_from_merge(
-        deriv_expression: Rc<GenRegex>,
-        subs: Option<SimpleSub>,
-    ) -> HashSet<Self> {
-        if let Some(sub) = subs {
-            HashSet::from([Self::new(deriv_expression, sub)])
-        } else {
-            HashSet::new()
         }
     }
 
@@ -194,6 +177,10 @@ impl AntimirovElement {
     }
     pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
         &self.range_constraints
+    }
+
+    pub fn into_set(self) -> HashSet<Self> {
+        HashSet::from([self])
     }
 }
 
@@ -327,6 +314,12 @@ impl AnySub {
     }
 }
 impl SimpleSub {
+    pub fn new(
+        string_to: BTreeMap<StringVar, SubExpr>,
+        char_to: BTreeMap<CharVar, CharExpression>,
+    ) -> Self {
+        SimpleSub { string_to, char_to }
+    }
     pub fn get_str_map(&self) -> &BTreeMap<StringVar, SubExpr> {
         &self.string_to
     }
@@ -388,11 +381,8 @@ impl SimpleSub {
             char_to: combined_char_to,
         }
     }
-    pub fn new(
-        string_to: BTreeMap<StringVar, SubExpr>,
-        char_to: BTreeMap<CharVar, CharExpression>,
-    ) -> Self {
-        SimpleSub { string_to, char_to }
+    pub fn into_set(self) -> HashSet<SimpleSub> {
+        HashSet::from([self])
     }
 }
 
