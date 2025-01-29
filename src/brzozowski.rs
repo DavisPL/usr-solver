@@ -360,9 +360,9 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 }
 pub fn nullable_projection(gre: &Rc<GenRegex>) -> Vec<Vec<Rc<Predicate>>> {
     let nullable_gre = &nullable(gre);
-    //println!("{}", nullable_gre);
+    println!("{}", nullable_gre);
     let nullable_predicates = nullable_projection_helper(nullable_gre);
-    //println!("{}", nullable_predicates);
+    println!("{}", nullable_predicates);
     evaluate_complete(&nullable_predicates)
     //nullable_predicatesEval
 }
@@ -388,6 +388,7 @@ fn simplifies(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         GenRegex::IfThenElse(pred, true_branch, false_branch) => {
             simplify_if_then_else(pred, true_branch, false_branch)
         }
+        GenRegex::Complement(inner) => GenRegex::complement(&simplifies(inner)),
         _ => Rc::clone(gre),
     }
 }
@@ -548,6 +549,17 @@ fn simplify_if_then_else(
     if let (GenRegex::EmptySet, GenRegex::EmptySet) = (&*simplified_true, &*simplified_false) {
         return simplified_true;
     };
+    if let (GenRegex::IfThenElse(inner_pred, inner_true, inner_false), GenRegex::EmptySet) =
+        (&*simplified_true, &*simplified_false)
+    {
+        if let GenRegex::EmptySet = inner_false.as_ref() {
+            return Rc::new(GenRegex::IfThenElse(
+                Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(inner_pred))),
+                Rc::clone(inner_true),
+                Rc::clone(&simplified_false),
+            ));
+        }
+    }
 
     if let Predicate::Equals(left, right) = pred.as_ref() {
         if let (MaybeCharExpression::CharExpression(c1), MaybeCharExpression::CharExpression(c2)) =

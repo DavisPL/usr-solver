@@ -196,7 +196,7 @@ pub fn evaluate_conjunction(
                 //be redone?
                 leftId = id_map[left];
                 rightId = id_map[right];
-                if leftId == rightId {
+                if leftId == rightId || union_find.find(leftId as usize) == union_find.find(rightId as usize){
                     return vec![Rc::new(Predicate::False)];
                     //return Rc::new(Predicate::False);
                 }
@@ -205,6 +205,11 @@ pub fn evaluate_conjunction(
                 }
             } else if let Predicate::EqualLength(var_name, length) = &**inner {
                 //let Predicate::EqualLength(var_name, length) = &**inner;
+                if let Some(temp) = length_preds.get(&var_name.name) {
+                    if *temp == *length {
+                        return vec![Rc::new(Predicate::False)];
+                    }
+                }
                 let mut flag = false;
                 for (key, value) in id_map.iter() {
                     if is_string_index(&Rc::new(key.clone())) {

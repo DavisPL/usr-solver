@@ -597,9 +597,8 @@ impl SmtParser {
         // println!("let_assertion expr_tail: {:?}", expr_tail);
         let (assert_arg, assert_tail) = expect_pair(expr_tail)?;
         expect_null(assert_tail)?;
-        let result = self.parse_assert_arg(assert_arg);
+        self.parse_assert_arg(assert_arg)
         // println!("let_assertion result: {:?}", result);
-        result
     }
 
     fn parse_let_regex(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -610,9 +609,8 @@ impl SmtParser {
         // println!("let_regex expr_tail: {:?}", expr_tail);
         let (regex_arg, regex_tail) = expect_pair(expr_tail)?;
         expect_null(regex_tail)?;
-        let result = self.parse_regex(regex_arg);
+        self.parse_regex(regex_arg)
         // println!("let_regex result: {:?}", result);
-        result
     }
 
     fn parse_let_declaration<'b>(&mut self, v: &'b Value) -> Result<&'b Value, SmtParseError> {
@@ -726,7 +724,7 @@ impl SmtParser {
         }
 
         // All other cases
-        let result = match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+        match re_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
             "let" => self.parse_let_regex(args),
             "str.to_re" => self.parse_str_to_re(args),
             "re.++" => self.parse_re_concat(args),
@@ -739,9 +737,8 @@ impl SmtParser {
             "re.+" => self.parse_re_plus(args),
             "re.opt" => self.parse_re_opt(args),
             _ => Err(SmtParseError::unrecog(re_type)),
-        };
+        }
         // println!("parse_regex result: {:?}", result);
-        result
     }
 
     fn parse_re_union(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {

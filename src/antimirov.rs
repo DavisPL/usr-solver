@@ -154,7 +154,6 @@ fn union_over_set(
     true
 }
 fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
-
     /*let mut char_vars: HashSet<CharExpression> = HashSet::new();
     for sub in substitutions.get_str_map().values(){
         for sub_expr in sub{
@@ -190,7 +189,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
     let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
     let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
     let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
-    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions)+1);
+    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions) + 1);
 
     for eq_exprs in str_eq_class.values_mut() {
         let mut ind = 0;
@@ -703,10 +702,10 @@ pub fn satisfiable_helper(
         }
         *index += 1;
         for elem in deriv {
-            if !visited.contains(elem.get_expr()) {
-                if satisfiable_helper(elem.get_expr(), index, visited.clone()) {
-                    return true;
-                }
+            if !visited.contains(elem.get_expr())
+                && satisfiable_helper(elem.get_expr(), index, visited.clone())
+            {
+                return true;
             }
         }
         return false;
