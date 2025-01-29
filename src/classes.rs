@@ -14,6 +14,7 @@ use std::rc::Rc;
 pub enum GenRegex {
     EmptySet,
     Sigma,
+    Range(char, char),
     CharExpression(CharExpression),
     StringVar(StringVar),
     StringSlice(StringVar, i32),
@@ -176,20 +177,49 @@ pub struct SubExpr {
 pub struct AntimirovDerivativeElement {
     deriv_expression: Rc<GenRegex>,
     subs: MergeResult,
+    range_constraints: BTreeMap<Rc<CharExpression>, RangeConstr>,
 }
 
 impl AntimirovDerivativeElement {
+    pub fn new(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> Self {
+        AntimirovDerivativeElement {
+            deriv_expression,
+            subs,
+            range_constraints: BTreeMap::new(),
+        }
+    }
+    pub fn add_range(&mut self, key: Rc<CharExpression>, start: char, end: char) {
+        let value = RangeConstr::new(start, end);
+        self.range_constraints.insert(key, value);
+    }
     pub fn get_expr(&self) -> &Rc<GenRegex> {
         &self.deriv_expression
     }
     pub fn get_subs(&self) -> &MergeResult {
         &self.subs
     }
-    pub fn new(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> Self {
-        AntimirovDerivativeElement {
-            deriv_expression,
-            subs,
-        }
+    pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
+        unimplemented!()
+    }
+}
+
+/// Optimization to represent ranges as constraints on subs
+// example: d([a-z], x) = {(epsilon, x->a), (epsilon, x->b) ... (epsilon, x->z)}
+// Store only: x, [a, z], {(epsilon, {})}.
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct RangeConstr {
+    start: char,
+    end: char,
+}
+impl RangeConstr {
+    pub fn new(start: char, end: char) -> Self {
+        RangeConstr { start, end }
+    }
+    pub fn get_start(&self) -> &char {
+        &self.start
+    }
+    pub fn get_end(&self) -> &char {
+        &self.end
     }
 }
 
@@ -295,23 +325,6 @@ pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
 }
-
-/// Optimization to represent a range of simple subs, e.g. one sub for each A-Z
-// Assumes concrete characters (not CharVar or CharExpression)
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct RangeSub {
-    var: CharVar,                                     // x
-    start: char,                                      // a
-    end: char,                                        // z
-    string_to_start: BTreeMap<StringVar, SubExpr>,    // w |-> eps
-    char_to_start: BTreeMap<CharVar, CharExpression>, // x |-> "a", y |-> "z"
-    string_to_end: BTreeMap<StringVar, SubExpr>,      // w |-> eps
-    char_to_end: BTreeMap<CharVar, CharExpression>,   // x |-> "z", y |-> "z"
-}
-
-// d([a-z], x) = {(epsilon, x->a), (epsilon, x->b) ... (epsilon, x->z)}
-// Store only: x, a, z, (epsilon, x->a), (epsilon, x->z)
-// Another example: x, a, z, (epsilon, x->a, y->z), (epsilon, x->z, y->z)
 
 impl AnySub {
     pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {

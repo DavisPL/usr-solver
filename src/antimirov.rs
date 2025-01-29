@@ -390,6 +390,14 @@ pub fn derivative(
             empty_string(),
             MergeResult::SimpleSub(SimpleSub::empty()),
         )]),
+        GenRegex::Range(char1, char2) => {
+            let mut result = AntimirovDerivativeElement::new(
+                empty_string(),
+                MergeResult::SimpleSub(SimpleSub::empty()),
+            );
+            result.add_range(deriv_char.clone(), *char1, *char2);
+            HashSet::from([result])
+        },
         GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
             (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
                 if deriv_lit == literal_value {
@@ -631,6 +639,7 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::clone(expr),
         GenRegex::Sigma => Rc::clone(expr),
+        GenRegex::Range(char1, char2) => Rc::clone(expr),
         GenRegex::CharExpression(char_expr) => match char_expr {
             CharExpression::CharVar(char_var) => match substitution.get_char_var(char_var) {
                 Some(value) => Rc::new(GenRegex::CharExpression(value.clone())),

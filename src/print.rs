@@ -4,7 +4,7 @@
 
 use crate::classes::{
     AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression,
-    MergeResult, Predicate, RangeSub, SimpleSub, StringIndex, StringVar, SubExpr,
+    MergeResult, Predicate, RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
 };
 use std::fmt::{self, Display};
 
@@ -65,16 +65,19 @@ impl Display for SimpleSub {
     }
 }
 
-impl Display for RangeSub {
+impl Display for RangeConstr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: placeholder
-        write!(f, "RangeSub({:?})", self)
+        write!(f, "[{}, {}]", self.get_start(), self.get_end())
     }
 }
 
 impl Display for AntimirovDerivativeElement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.get_expr(), self.get_subs())
+        write!(f, "({}, {}", self.get_expr(), self.get_subs())?;
+        for (var, range) in self.get_ranges() {
+            write!(f, ", {}: {}", var, range)?;
+        }
+        write!(f, ")")
     }
 }
 
@@ -165,6 +168,9 @@ impl Display for GenRegex {
             }
             GenRegex::Sigma => {
                 write!(f, ".")
+            }
+            GenRegex::Range(char1, char2) => {
+                write!(f, "[{}, {}]", char1, char2)
             }
             GenRegex::CharExpression(char_expr) => {
                 // Use Display on char_expr
