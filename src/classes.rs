@@ -184,15 +184,15 @@ pub struct SubExpr {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct AntimirovDerivativeElement {
+pub struct AntimirovElement {
     deriv_expression: Rc<GenRegex>,
     subs: SimpleSub,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
 }
 
-impl AntimirovDerivativeElement {
+impl AntimirovElement {
     pub fn new(deriv_expression: Rc<GenRegex>, subs: SimpleSub) -> Self {
-        AntimirovDerivativeElement {
+        Self {
             deriv_expression,
             subs,
             range_constraints: BTreeMap::new(),

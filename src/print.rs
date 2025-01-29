@@ -3,8 +3,8 @@
 //!
 
 use crate::classes::{
-    AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression,
-    MergeResult, Predicate, RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression, MergeResult,
+    Predicate, RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
 };
 use std::fmt::{self, Display};
 
@@ -71,7 +71,7 @@ impl Display for RangeConstr {
     }
 }
 
-impl Display for AntimirovDerivativeElement {
+impl Display for AntimirovElement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {}", self.get_expr(), self.get_subs())?;
         for (var, range) in self.get_ranges() {
