@@ -56,7 +56,7 @@ pub fn simplify_and_check_cycles(gre: &Rc<GenRegex>, visited: &mut HashSet<Rc<Ge
             println!("temp {}", temp);
             if visited.contains(&temp){
                 println!("_----------------------------------------");
-                return Rc::new(GenRegex::EmptySet)
+                return GenRegex::empty_set()
             }
             visited.insert(temp);
             gre.clone()
@@ -76,12 +76,12 @@ pub fn satisfiable_helper(
             let mut temp_left = left.clone();
             let mut temp_right = right.clone();
             if visited.contains(left) {
-                temp_left = Rc::new(GenRegex::EmptySet);
+                temp_left = GenRegex::empty_set();
             } else {
                 visited.insert(left.clone());
             }
             if visited.contains(right) {
-                temp_right = Rc::new(GenRegex::EmptySet);
+                temp_right = GenRegex::empty_set();
             } else {
                 visited.insert(right.clone());
             }
@@ -103,10 +103,10 @@ pub fn satisfiable_helper(
             let mut temp_left = left.clone();
             let mut temp_right = right.clone();
             if visited.contains(left) {
-                temp_left = Rc::new(GenRegex::EmptySet);
+                temp_left = GenRegex::empty_set();
             }
             if visited.contains(right) {
-                temp_right = Rc::new(GenRegex::EmptySet);
+                temp_right = GenRegex::empty_set();
             }
             let expr = &simplifies(&Rc::new(GenRegex::Union(temp_left, temp_right)));
             if matches!(nullable_projection(expr)[0][0].as_ref(), Predicate::False) {
@@ -145,14 +145,8 @@ pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
 
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
     println!("taking d({}, {})", gre, deriv_char);
-    let empty_string = || {
-        Rc::new(GenRegex::CharExpression(CharExpression::Literal(
-            String::new(),
-        )))
-    };
-    let empty_set = || Rc::new(GenRegex::EmptySet);
     match gre.as_ref() {
-        GenRegex::Sigma => empty_string(),
+        GenRegex::Sigma => GenRegex::epsilon(),
         GenRegex::EmptySet => Rc::clone(gre),
         GenRegex::Range(start, end) => {
             // TODO
@@ -165,8 +159,8 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
                     deriv_char.as_ref().clone(),
                 )),
             )),
-            empty_string(),
-            empty_set(),
+            GenRegex::epsilon(),
+            GenRegex::empty_set(),
         ))),
         GenRegex::StringVar(s_var) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
@@ -179,7 +173,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
                 )),
             )),
             Rc::new(GenRegex::StringSlice(s_var.clone(), 1)),
-            empty_set(),
+            GenRegex::empty_set(),
         ))),
         GenRegex::StringSlice(string_var, index) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
@@ -192,7 +186,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
                 )),
             )),
             Rc::new(GenRegex::StringSlice(string_var.clone(), index + 1)),
-            empty_set(),
+            GenRegex::empty_set(),
         ))),
         GenRegex::Union(side1, side2) => simplifies(&Rc::new(GenRegex::Union(
             Rc::clone(&derivative(&Rc::clone(side1), deriv_char)),
@@ -236,42 +230,32 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
                     deriv_char.as_ref().clone(),
                 )),
             )),
-            empty_string(),
-            empty_set(),
+            GenRegex::epsilon(),
+            GenRegex::empty_set(),
         ))),
     }
 }
 
 pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
     match gre.as_ref() {
-        GenRegex::Sigma => Rc::new(GenRegex::EmptySet),
+        GenRegex::Sigma => GenRegex::empty_set(),
         GenRegex::EmptySet => Rc::clone(gre),
-        GenRegex::Range(_start, _end) => Rc::new(GenRegex::EmptySet),
+        GenRegex::Range(_start, _end) => GenRegex::empty_set(),
         GenRegex::CharExpression(c_expr) => match c_expr {
-            CharExpression::CharVar(_name) => Rc::new(GenRegex::EmptySet),
-            CharExpression::Literal(value) => {
-                if value.is_empty() {
-                    Rc::clone(gre)
-                } else {
-                    Rc::new(GenRegex::EmptySet)
-                }
-            }
+            CharExpression::CharVar(_name) => GenRegex::empty_set(),
+            CharExpression::Literal(value) => GenRegex::empty_set(),
         },
         GenRegex::StringSlice(string_var, index) => Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::EqualLength(Rc::new(string_var.clone()), *index)),
-            Rc::new(GenRegex::CharExpression(CharExpression::Literal(
-                String::from(""),
-            ))),
-            Rc::new(GenRegex::EmptySet),
+            GenRegex::epsilon(),
+            GenRegex::empty_set(),
         )),
         GenRegex::StringVar(string_var) => Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::EqualLength(Rc::new(string_var.clone()), 0)),
-            Rc::new(GenRegex::CharExpression(CharExpression::Literal(
-                String::from(""),
-            ))),
-            Rc::new(GenRegex::EmptySet),
+            GenRegex::epsilon(),
+            GenRegex::empty_set(),
         )),
-        GenRegex::StringIndex(_string_index) => Rc::new(GenRegex::EmptySet),
+        GenRegex::StringIndex(_string_index) => GenRegex::empty_set(),
         GenRegex::Union(side1, side2) => Rc::new(GenRegex::Union(
             Rc::clone(&nullable(&Rc::clone(side1))),
             Rc::clone(&nullable(&Rc::clone(side2))),
@@ -288,13 +272,9 @@ pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
             Rc::new(GenRegex::Complement(Rc::clone(&nullable(&Rc::clone(
                 side1,
             ))))),
-            Rc::new(GenRegex::CharExpression(CharExpression::Literal(
-                String::from(""),
-            ))),
+            GenRegex::epsilon(),
         )),
-        GenRegex::Kleene(_) => Rc::new(GenRegex::CharExpression(CharExpression::Literal(
-            String::from(""),
-        ))),
+        GenRegex::Kleene(_) => GenRegex::epsilon(),
         GenRegex::IfThenElse(pred, side1, side2) => Rc::new(GenRegex::IfThenElse(
             Rc::clone(pred),
             Rc::clone(&nullable(&Rc::clone(side1))),
@@ -372,15 +352,18 @@ pub fn nullable_projection(gre: &Rc<GenRegex>) -> Vec<Vec<Rc<Predicate>>> {
     //nullable_predicatesEval
 }
 
-pub fn matching(gre: &Rc<GenRegex>, proposed: String) -> bool {
+pub fn matching(gre: &Rc<GenRegex>, proposed: &str) -> bool {
     println!("the proposed string is {}", proposed);
     println!("the proposed gre is {}", gre);
     let expr = &simplifies(gre);
     if proposed.is_empty() {
         return !matches!(nullable_projection(expr)[0][0].as_ref(), Predicate::False);
     }
-    let literal = Rc::new(CharExpression::Literal(String::from(&proposed[0..1])));
-    matching(&derivative(expr, &literal), String::from(&proposed[1..]))
+    let head = proposed.chars().next().unwrap();
+    let tail = &proposed[1..];
+    let literal = Rc::new(CharExpression::Literal(head));
+    let deriv = derivative(expr, &literal);
+    matching(&deriv, tail)
 }
 
 fn simplifies(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
@@ -418,7 +401,7 @@ fn simplify_intersect(left_side: &Rc<GenRegex>, right_side: &Rc<GenRegex>) -> Rc
     let right = simplifies(right_side);
 
     match (&*left, &*right) {
-        (GenRegex::EmptySet, _) | (_, GenRegex::EmptySet) => Rc::new(GenRegex::EmptySet),
+        (GenRegex::EmptySet, _) | (_, GenRegex::EmptySet) => GenRegex::empty_set(),
         (
             GenRegex::IfThenElse(pred1, true1, false1),
             GenRegex::IfThenElse(pred2, true2, false2),
@@ -521,7 +504,7 @@ fn create_full_intersect_if_then_else(
                     Rc::new(Predicate::Not(Rc::clone(pred1))),
                 )),
                 Rc::new(GenRegex::Intersect(Rc::clone(false1), Rc::clone(true2))),
-                Rc::new(GenRegex::EmptySet),
+                GenRegex::empty_set(),
             )),
         )),
     ))
@@ -532,12 +515,13 @@ fn simplify_concatenation(left_side: &Rc<GenRegex>, right_side: &Rc<GenRegex>) -
     let right = simplifies(right_side);
 
     match (&*left, &*right) {
-        (GenRegex::EmptySet, _) | (_, GenRegex::EmptySet) => Rc::new(GenRegex::EmptySet),
-        (GenRegex::CharExpression(c1), GenRegex::CharExpression(c2)) => match (c1, c2) {
-            (CharExpression::Literal(s1), _) if s1.is_empty() => right,
-            (_, CharExpression::Literal(s2)) if s2.is_empty() => left,
-            _ => Rc::new(GenRegex::Concatenation(left, right)),
-        },
+        (GenRegex::EmptySet, _) | (_, GenRegex::EmptySet) => GenRegex::empty_set(),
+        // TODO: simplify epsilon case
+        // (GenRegex::CharExpression(c1), GenRegex::CharExpression(c2)) => match (c1, c2) {
+        //     (CharExpression::Literal(s1), _) if s1.is_empty() => right,
+        //     (_, CharExpression::Literal(s2)) if s2.is_empty() => left,
+        //     _ => Rc::new(GenRegex::Concatenation(left, right)),
+        // },
         _ => Rc::new(GenRegex::Concatenation(left, right)),
     }
 }
@@ -576,14 +560,6 @@ fn simplify_if_then_else(
                 } else {
                     simplified_false
                 };
-            } else if let (CharExpression::Literal(val1), CharExpression::CharVar(_)) = (c1, c2) {
-                if val1.is_empty() {
-                    return simplified_false;
-                }
-            } else if let (CharExpression::CharVar(_), CharExpression::Literal(val1)) = (c1, c2) {
-                if val1.is_empty() {
-                    return simplified_false;
-                }
             }
         }
     }

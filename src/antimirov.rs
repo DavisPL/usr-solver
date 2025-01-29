@@ -375,28 +375,34 @@ pub fn derivative(
     deriv_char: &Rc<CharExpression>,
 ) -> HashSet<AntimirovDerivativeElement> {
     // println!("taking d({}, {})", gre, deriv_char);
-    let empty_string = || {
-        Rc::new(GenRegex::CharExpression(CharExpression::Literal(
-            String::new(),
-        )))
-    };
 
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
         GenRegex::Sigma => HashSet::from([AntimirovDerivativeElement::new(
-            empty_string(),
+            GenRegex::epsilon(),
             SimpleSub::empty(),
         )]),
         GenRegex::Range(char1, char2) => {
-            let mut result = AntimirovDerivativeElement::new(empty_string(), SimpleSub::empty());
-            result.add_range(deriv_char.clone(), *char1, *char2);
+            let mut result =
+                AntimirovDerivativeElement::new(GenRegex::epsilon(), SimpleSub::empty());
+            match deriv_char.as_ref() {
+                CharExpression::Literal(literal) => {
+                    if literal < char1 || literal > char2 {
+                        return HashSet::new();
+                    }
+                }
+                CharExpression::CharVar(deriv_var) => {
+                    result.add_range(deriv_var.clone(), *char1, *char2);
+                }
+            }
+
             HashSet::from([result])
         }
         GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
             (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
                 if deriv_lit == literal_value {
                     HashSet::from([AntimirovDerivativeElement::new(
-                        empty_string(),
+                        GenRegex::epsilon(),
                         SimpleSub::empty(),
                     )])
                 } else {
@@ -404,19 +410,16 @@ pub fn derivative(
                 }
             }
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
-                if lit_val.is_empty() {
-                    return HashSet::new();
-                }
                 let mut char_to = BTreeMap::new();
                 char_to.insert(d_var.clone(), c_expr.clone());
                 let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
-                AntimirovDerivativeElement::set_from_merge(empty_string(), subs)
+                AntimirovDerivativeElement::set_from_merge(GenRegex::epsilon(), subs)
             }
             (_, CharExpression::CharVar(c_var)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
                 let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
-                AntimirovDerivativeElement::set_from_merge(empty_string(), subs)
+                AntimirovDerivativeElement::set_from_merge(GenRegex::epsilon(), subs)
             }
         },
         GenRegex::StringVar(string_var) => {
@@ -538,20 +541,13 @@ fn apply_derivs_concat(
     if let GenRegex::CharExpression(c_expr) = left_deriv.get_expr().as_ref() {
         if let CharExpression::Literal(lit) = c_expr {
             // if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
-            if lit.is_empty() {
-                Some(AntimirovDerivativeElement::new(
+            Some(AntimirovDerivativeElement::new(
+                Rc::new(GenRegex::Concatenation(
+                    left_deriv.get_expr().clone(),
                     sub_in(right, simple_sub),
-                    left_deriv.get_subs().clone(),
-                ))
-            } else {
-                Some(AntimirovDerivativeElement::new(
-                    Rc::new(GenRegex::Concatenation(
-                        left_deriv.get_expr().clone(),
-                        sub_in(right, simple_sub),
-                    )),
-                    left_deriv.get_subs().clone(),
-                ))
-            }
+                )),
+                left_deriv.get_subs().clone(),
+            ))
         } else {
             None
         }
@@ -673,17 +669,19 @@ pub fn satisfiable_helper(
     }
     true
 }
-pub fn matching(expr: &Rc<GenRegex>, proposed: String) -> bool {
+pub fn matching(expr: &Rc<GenRegex>, proposed: &str) -> bool {
     if proposed.is_empty() {
         return !nullable(expr).is_empty();
     }
-    let literal = Rc::new(CharExpression::Literal(String::from(&proposed[0..1])));
+    let first_char = proposed.chars().next().unwrap();
+    let tail = &proposed[1..];
+    let literal = Rc::new(CharExpression::Literal(first_char));
     let deriv = derivative(expr, &literal);
     if deriv.is_empty() {
         return false;
     }
     for elem in deriv {
-        if matching(elem.get_expr(), String::from(&proposed[1..])) {
+        if matching(elem.get_expr(), tail) {
             return true;
         }
     }
@@ -697,15 +695,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::Range(_, _) => HashSet::new(),
         GenRegex::CharExpression(c_expr) => match c_expr {
             CharExpression::CharVar(_) => HashSet::new(),
-            CharExpression::Literal(value) => {
-                if value.is_empty() {
-                    let mut ret = HashSet::new();
-                    ret.insert(SimpleSub::empty());
-                    ret
-                } else {
-                    HashSet::new()
-                }
-            }
+            CharExpression::Literal(_) => HashSet::new(),
         },
         GenRegex::StringVar(s_var) => {
             let mut subs = HashSet::new();

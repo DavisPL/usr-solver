@@ -32,10 +32,11 @@ impl GenRegex {
         Rc::new(GenRegex::Sigma)
     }
     pub fn epsilon() -> Rc<GenRegex> {
-        GenRegex::create_gre_char_lit("")
+        // TODO: add a GenRegex::StringLiteral
+        Rc::new(GenRegex::Kleene(Rc::new(GenRegex::EmptySet)))
     }
-    pub fn create_gre_char_lit(lit: &str) -> Rc<GenRegex> {
-        let lit = CharExpression::Literal(lit.to_string());
+    pub fn create_gre_char_lit(lit: char) -> Rc<GenRegex> {
+        let lit = CharExpression::Literal(lit);
         Rc::new(GenRegex::CharExpression(lit))
     }
     pub fn create_gre_char_var(var_name: &str) -> Rc<GenRegex> {
@@ -102,24 +103,24 @@ impl GenRegex {
         //Needs something better than chars() for more support
         let mut char_list = str.chars().rev();
         let Some(c) = char_list.next() else {
-            return GenRegex::create_gre_char_lit("");
+            return GenRegex::epsilon();
         };
-        let mut retval = GenRegex::create_gre_char_lit(&c.to_string());
+        let mut retval = GenRegex::create_gre_char_lit(c);
         for c in char_list {
-            retval = GenRegex::concat(&GenRegex::create_gre_char_lit(&c.to_string()), &retval);
+            retval = GenRegex::concat(&GenRegex::create_gre_char_lit(c), &retval);
         }
         retval
     }
-    pub fn re_range(start: &char, end: &char) -> Rc<GenRegex> {
-        let mut retval = GenRegex::create_gre_char_lit(&end.to_string());
-        for c in (*start..=*end).rev().skip(1) {
-            retval = GenRegex::union(&GenRegex::create_gre_char_lit(&c.to_string()), &retval)
+    pub fn re_range(start: char, end: char) -> Rc<GenRegex> {
+        let mut retval = GenRegex::create_gre_char_lit(end);
+        for c in (start..=end).rev().skip(1) {
+            retval = GenRegex::union(&GenRegex::create_gre_char_lit(c), &retval)
         }
         retval
     }
     pub fn caret(n: u64, gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         if n == 0 {
-            return GenRegex::create_gre_char_lit("");
+            return GenRegex::epsilon();
         }
         let mut retval = gre.clone();
         for _ in 1..n {
@@ -187,7 +188,7 @@ pub struct SubExpr {
 pub struct AntimirovDerivativeElement {
     deriv_expression: Rc<GenRegex>,
     subs: SimpleSub,
-    range_constraints: BTreeMap<Rc<CharExpression>, RangeConstr>,
+    range_constraints: BTreeMap<CharVar, RangeConstr>,
 }
 
 impl AntimirovDerivativeElement {
@@ -206,7 +207,7 @@ impl AntimirovDerivativeElement {
         }
     }
 
-    pub fn add_range(&mut self, key: Rc<CharExpression>, start: char, end: char) {
+    pub fn add_range(&mut self, key: CharVar, start: char, end: char) {
         let value = RangeConstr::new(start, end);
         self.range_constraints.insert(key, value);
     }
@@ -292,9 +293,7 @@ impl SubExpr {
                     ))
                 }
             }
-            None => Rc::new(GenRegex::CharExpression(CharExpression::Literal(
-                String::from(""),
-            ))),
+            None => GenRegex::epsilon(),
         }
     }
     pub fn get_head(&self) -> &Vec<CharExpression> {
@@ -479,7 +478,7 @@ pub enum MaybeCharExpression {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum CharExpression {
     CharVar(CharVar), // change to CharVar
-    Literal(String),
+    Literal(char),    // should be a char
 }
 
 /*#[derive(Debug, PartialEq, Eq, Hash, Clone)] // Deriving PartialEq, Eq, and Hash

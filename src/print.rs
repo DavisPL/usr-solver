@@ -94,11 +94,7 @@ impl Display for CharExpression {
                 write!(f, "char({})", name)
             }
             CharExpression::Literal(name) => {
-                if name.is_empty() {
-                    write!(f, "\"\"")
-                } else {
-                    write!(f, "{}", name)
-                }
+                write!(f, "{}", name)
             }
         }
     }
