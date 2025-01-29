@@ -146,8 +146,9 @@ pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
     println!("taking d({}, {})", gre, deriv_char);
     match gre.as_ref() {
+        GenRegex::EmptySet => GenRegex::empty_set(),
+        GenRegex::Epsilon => GenRegex::empty_set(),
         GenRegex::Sigma => GenRegex::epsilon(),
-        GenRegex::EmptySet => Rc::clone(gre),
         GenRegex::Range(start, end) => {
             // TODO
             unimplemented!()
@@ -238,8 +239,9 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
 
 pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
     match gre.as_ref() {
+        GenRegex::EmptySet => GenRegex::empty_set(),
+        GenRegex::Epsilon => GenRegex::epsilon(),
         GenRegex::Sigma => GenRegex::empty_set(),
-        GenRegex::EmptySet => Rc::clone(gre),
         GenRegex::Range(_start, _end) => GenRegex::empty_set(),
         GenRegex::CharExpression(c_expr) => match c_expr {
             CharExpression::CharVar(_name) => GenRegex::empty_set(),
@@ -516,12 +518,8 @@ fn simplify_concatenation(left_side: &Rc<GenRegex>, right_side: &Rc<GenRegex>) -
 
     match (&*left, &*right) {
         (GenRegex::EmptySet, _) | (_, GenRegex::EmptySet) => GenRegex::empty_set(),
-        // TODO: simplify epsilon case
-        // (GenRegex::CharExpression(c1), GenRegex::CharExpression(c2)) => match (c1, c2) {
-        //     (CharExpression::Literal(s1), _) if s1.is_empty() => right,
-        //     (_, CharExpression::Literal(s2)) if s2.is_empty() => left,
-        //     _ => Rc::new(GenRegex::Concatenation(left, right)),
-        // },
+        (GenRegex::Epsilon, _) => right,
+        (_, GenRegex::Epsilon) => left,
         _ => Rc::new(GenRegex::Concatenation(left, right)),
     }
 }

@@ -83,7 +83,7 @@ impl Display for AntimirovDerivativeElement {
 
 impl Display for CharVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "char({})", self.name)
+        write!(f, "CHAR({})", self.name)
     }
 }
 
@@ -91,7 +91,7 @@ impl Display for CharExpression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CharExpression::CharVar(name) => {
-                write!(f, "char({})", name)
+                write!(f, "{}", name)
             }
             CharExpression::Literal(name) => {
                 write!(f, "{}", name)
@@ -160,7 +160,10 @@ impl Display for GenRegex {
                 write!(f, "{}", var)
             }
             GenRegex::EmptySet => {
-                write!(f, "EMPTY")
+                write!(f, "∅")
+            }
+            GenRegex::Epsilon => {
+                write!(f, "ε")
             }
             GenRegex::Sigma => {
                 write!(f, ".")
@@ -179,7 +182,7 @@ impl Display for GenRegex {
                 write!(f, "({}) AND ({})", gre1, gre2)
             }
             GenRegex::Concatenation(gre1, gre2) => {
-                write!(f, "({}) \\cdot ({})", gre1, gre2)
+                write!(f, "{} . {}", gre1, gre2)
             }
             GenRegex::Kleene(gre1) => {
                 write!(f, "({})*", gre1)

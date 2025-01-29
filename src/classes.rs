@@ -8,11 +8,11 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use std::rc::Rc;
 
-// TODO: replace Rc<CharExpression> with CharExpression
-// and similar for StringVar, StringIndex
+// TODO: add a GenRegex::StringLiteral
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum GenRegex {
     EmptySet,
+    Epsilon,
     Sigma,
     Range(char, char),
     CharExpression(CharExpression),
@@ -32,8 +32,7 @@ impl GenRegex {
         Rc::new(GenRegex::Sigma)
     }
     pub fn epsilon() -> Rc<GenRegex> {
-        // TODO: add a GenRegex::StringLiteral
-        Rc::new(GenRegex::Kleene(Rc::new(GenRegex::EmptySet)))
+        Rc::new(GenRegex::Epsilon)
     }
     pub fn create_gre_char_lit(lit: char) -> Rc<GenRegex> {
         let lit = CharExpression::Literal(lit);

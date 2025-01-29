@@ -378,6 +378,7 @@ pub fn derivative(
 
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
+        GenRegex::Epsilon => HashSet::new(),
         GenRegex::Sigma => HashSet::from([AntimirovDerivativeElement::new(
             GenRegex::epsilon(),
             SimpleSub::empty(),
@@ -586,6 +587,7 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     }
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::clone(expr),
+        GenRegex::Epsilon => Rc::clone(expr),
         GenRegex::Sigma => Rc::clone(expr),
         GenRegex::Range(char1, char2) => Rc::clone(expr),
         GenRegex::CharExpression(char_expr) => match char_expr {
@@ -691,6 +693,7 @@ pub fn matching(expr: &Rc<GenRegex>, proposed: &str) -> bool {
 pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
+        GenRegex::Epsilon => HashSet::from([SimpleSub::empty()]),
         GenRegex::Sigma => HashSet::new(),
         GenRegex::Range(_, _) => HashSet::new(),
         GenRegex::CharExpression(c_expr) => match c_expr {
@@ -747,11 +750,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             }
             ret_set
         }
-        GenRegex::Kleene(_) => {
-            let mut ret = HashSet::new();
-            ret.insert(SimpleSub::empty());
-            ret
-        }
+        GenRegex::Kleene(_) => HashSet::from([SimpleSub::empty()]),
         GenRegex::StringSlice(_, _) => {
             unimplemented!();
         }
