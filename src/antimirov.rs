@@ -142,7 +142,7 @@ fn union_over_set(
             {
                 return false;
             }
-            union_find.union(prev_id, curr_id);
+            union_find.union(prev_id, curr_id); //ERROR HERE
             if canonical_map.contains_key(element.as_ref()) {
                 canonical_map.insert(prev_exists, canonical_map[element.as_ref()].clone());
             } else if canonical_map.contains_key(&prev_exists) {
@@ -154,6 +154,7 @@ fn union_over_set(
     true
 }
 fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
+
     /*let mut char_vars: HashSet<CharExpression> = HashSet::new();
     for sub in substitutions.get_str_map().values(){
         for sub_expr in sub{
@@ -176,7 +177,7 @@ fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
         }
     }
     for c_exprs in substitutions.get_char_map().values() {
-        count += c_exprs.len();
+        count += c_exprs.len() + 1;
     }
     count
 }
@@ -189,7 +190,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
     let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
     let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
     let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
-    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions) + 2);
+    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions)+1);
 
     for eq_exprs in str_eq_class.values_mut() {
         let mut ind = 0;
