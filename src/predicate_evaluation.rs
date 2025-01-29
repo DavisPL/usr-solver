@@ -196,7 +196,9 @@ pub fn evaluate_conjunction(
                 //be redone?
                 leftId = id_map[left];
                 rightId = id_map[right];
-                if leftId == rightId || union_find.find(leftId as usize) == union_find.find(rightId as usize){
+                if leftId == rightId
+                    || union_find.find(leftId as usize) == union_find.find(rightId as usize)
+                {
                     return vec![Rc::new(Predicate::False)];
                     //return Rc::new(Predicate::False);
                 }

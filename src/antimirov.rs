@@ -397,7 +397,7 @@ pub fn derivative(
             );
             result.add_range(deriv_char.clone(), *char1, *char2);
             HashSet::from([result])
-        },
+        }
         GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
             (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
                 if deriv_lit == literal_value {
