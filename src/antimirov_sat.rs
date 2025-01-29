@@ -23,6 +23,7 @@ impl SatChecker {
         });
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
         while let Some(layer) = sat_stack.pop_front() {
+            println!("{}", layer.gre);
             if !nullable(&layer.gre).is_empty() {
                 return true;
             } else {
