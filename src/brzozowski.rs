@@ -343,7 +343,12 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 
         GenRegex::Complement(inner) => Rc::new(Predicate::Not(nullable_projection_helper(inner))),
 
-        _ => Rc::new(Predicate::False),
+        GenRegex::Sigma => Rc::new(Predicate::False),
+        GenRegex::StringVar(_) => Rc::new(Predicate::False),
+        GenRegex::StringIndex(_) => Rc::new(Predicate::False),
+        GenRegex::StringSlice(_, _) => Rc::new(Predicate::False),
+        GenRegex::Kleene(_) => Rc::new(Predicate::False),
+        GenRegex::Range(_, _) => Rc::new(Predicate::False),
     }
 }
 pub fn nullable_projection(gre: &Rc<GenRegex>) -> Vec<Vec<Rc<Predicate>>> {
