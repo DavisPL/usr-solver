@@ -130,15 +130,15 @@ impl Display for Predicate {
         match self {
             Predicate::And(left, right) => {
                 //let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "({} AND {})", left, right)
+                write!(f, "({} v {})", left, right)
             }
             Predicate::Or(left, right) => {
                 //let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "({} OR {})", left, right)
+                write!(f, "({} ^ {})", left, right)
                 //write!(f, "({})", parts.join(" OR "))
             }
             Predicate::Not(pred1) => {
-                write!(f, "NOT({})", pred1)
+                write!(f, "!({})", pred1)
             }
             Predicate::True => write!(f, "TRUE"),
             Predicate::False => write!(f, "FALSE"),
@@ -154,11 +154,65 @@ impl Display for Predicate {
 
 impl Display for GenRegex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GenRegex::StringVar(var) => {
-                // Use Display on var
-                write!(f, "{}", var)
-            }
+        write!(f, "{}", GenRegexPrintHelper::new(self))
+    }
+}
+
+/*
+    Helper struct to pretty-print GenRegexes
+*/
+
+struct GenRegexPrintHelper<'a> {
+    g: &'a GenRegex,
+    concat_ok: bool,
+    union_ok: bool,
+    inter_ok: bool,
+    if_ok: bool,
+}
+
+impl<'a> GenRegexPrintHelper<'a> {
+    fn new(g: &'a GenRegex) -> Self {
+        Self {
+            g,
+            concat_ok: true,
+            union_ok: true,
+            inter_ok: true,
+            if_ok: true,
+        }
+    }
+    fn new_concat(g: &'a GenRegex) -> Self {
+        Self {
+            g,
+            concat_ok: true,
+            union_ok: false,
+            inter_ok: false,
+            if_ok: false,
+        }
+    }
+    fn new_union(g: &'a GenRegex) -> Self {
+        Self {
+            g,
+            concat_ok: true,
+            union_ok: true,
+            inter_ok: false,
+            if_ok: true,
+        }
+    }
+    fn new_inter(g: &'a GenRegex) -> Self {
+        Self {
+            g,
+            concat_ok: true,
+            union_ok: false,
+            inter_ok: true,
+            if_ok: true,
+        }
+    }
+}
+
+impl Display for GenRegexPrintHelper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.g {
+            // Base cases
             GenRegex::EmptySet => {
                 write!(f, "∅")
             }
@@ -171,34 +225,66 @@ impl Display for GenRegex {
             GenRegex::Range(char1, char2) => {
                 write!(f, "[{}, {}]", char1, char2)
             }
+            GenRegex::StringVar(var) => {
+                // Use Display on StringVar
+                write!(f, "{}", var)
+            }
             GenRegex::CharExpression(char_expr) => {
-                // Use Display on char_expr
+                // Use Display on CharExpression
                 write!(f, "{}", char_expr)
             }
-            GenRegex::Union(gre1, gre2) => {
-                write!(f, "({}) OR ({})", gre1, gre2)
-            }
-            GenRegex::Intersect(gre1, gre2) => {
-                write!(f, "({}) AND ({})", gre1, gre2)
-            }
-            GenRegex::Concatenation(gre1, gre2) => {
-                write!(f, "{} . {}", gre1, gre2)
-            }
-            GenRegex::Kleene(gre1) => {
-                write!(f, "({})*", gre1)
-            }
-            GenRegex::Complement(gre1) => {
-                write!(f, "({})^c", gre1)
-            }
-            GenRegex::IfThenElse(pred, gre1, gre2) => {
-                write!(f, "IF({}, {}, {})", pred, gre1, gre2)
-            }
             GenRegex::StringIndex(string_index) => {
-                // Use Display on string_index
+                // Use Display on StringIndex
                 write!(f, "{}", string_index)
             }
             GenRegex::StringSlice(var, index) => {
                 write!(f, "{}[{}:]", var, index)
+            }
+
+            // Inductive cases
+            GenRegex::Union(gre1, gre2) => {
+                let h1 = GenRegexPrintHelper::new_union(gre1);
+                let h2 = GenRegexPrintHelper::new_union(gre2);
+                if self.union_ok {
+                    write!(f, "{} | {}", h1, h2)
+                } else {
+                    write!(f, "({} | {})", h1, h2)
+                }
+            }
+            GenRegex::Intersect(gre1, gre2) => {
+                let h1 = GenRegexPrintHelper::new_inter(gre1);
+                let h2 = GenRegexPrintHelper::new_inter(gre2);
+                if self.inter_ok {
+                    write!(f, "{} & {}", h1, h2)
+                } else {
+                    write!(f, "({} & {})", h1, h2)
+                }
+            }
+            GenRegex::Concatenation(gre1, gre2) => {
+                let h1 = GenRegexPrintHelper::new_concat(gre1);
+                let h2 = GenRegexPrintHelper::new_concat(gre2);
+                if self.concat_ok {
+                    write!(f, "{}{}", h1, h2)
+                } else {
+                    write!(f, "({}{})", h1, h2)
+                }
+            }
+            GenRegex::Kleene(gre1) => {
+                let h = GenRegexPrintHelper::new(gre1);
+                write!(f, "({})*", h)
+            }
+            GenRegex::Complement(gre1) => {
+                let h = GenRegexPrintHelper::new(gre1);
+                write!(f, "({})^c", h)
+            }
+            GenRegex::IfThenElse(pred, gre1, gre2) => {
+                let h1 = GenRegexPrintHelper::new(gre1);
+                let h2 = GenRegexPrintHelper::new(gre2);
+                if self.if_ok {
+                    write!(f, "IF({}, {}, {})", pred, h1, h2)
+                } else {
+                    write!(f, "(IF({}, {}, {}))", pred, h1, h2)
+                }
             }
         }
     }
