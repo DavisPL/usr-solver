@@ -1499,7 +1499,6 @@ mod tests {
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
     }
 
-    #[ignore]
     #[test]
     fn test_passw_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
@@ -1540,7 +1539,6 @@ mod tests {
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)), true);
     }
 
-    #[ignore]
     #[test]
     fn test_passw_unsat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
@@ -1582,7 +1580,6 @@ mod tests {
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), false);
     }
 
-    #[ignore]
     #[test]
     fn test_passw_eq_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
@@ -1631,7 +1628,6 @@ mod tests {
         assert_eq!(brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped)), true);
     }
 
-    #[ignore]
     #[test]
     fn test_hex_code() {
         let smt_result = parse_smtlib_file("benchmarks/hexcode_sat.smt2");
@@ -1715,7 +1711,6 @@ mod tests {
         assert_satisfiable("benchmarks/simple_let_sat_4.smt2");
     }
 
-    #[ignore]
     #[test]
     fn test_let_5() {
         assert_satisfiable("benchmarks/date_format_days_sat.smt2");
@@ -1746,7 +1741,6 @@ mod tests {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
     }
 
-    #[ignore]
     #[test]
     fn test_usr_2() {
         assert_satisfiable("benchmarks/usr_2_sat.smt2");
