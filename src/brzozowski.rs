@@ -288,6 +288,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
 fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::new(Predicate::False),
+        GenRegex::Epsilon => Rc::new(Predicate::True),
 
         GenRegex::CharExpression(c_expr) => match c_expr {
             CharExpression::CharVar(_name) => Rc::new(Predicate::False),

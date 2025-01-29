@@ -1753,14 +1753,12 @@ mod tests {
     }
 
     // TODO: uh oh, this is overflowing its stack
-    #[ignore]
     #[test]
     fn test_not1() {
         assert_satisfiable("benchmarks/simple_not_sat_1.smt2");
     }
 
     // TODO: uh oh, this is overflowing its stack
-    #[ignore]
     #[test]
     fn test_not2() {
         assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
