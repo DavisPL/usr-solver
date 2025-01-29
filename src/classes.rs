@@ -140,44 +140,6 @@ impl GenRegex {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum MergeResult {
-    SimpleSub(SimpleSub),
-    Bottom,
-}
-
-impl MergeResult {
-    pub fn into_sub(self) -> Option<SimpleSub> {
-        match self {
-            MergeResult::SimpleSub(sub) => Some(sub),
-            MergeResult::Bottom => None,
-        }
-    }
-    pub fn is_sub(&self) -> bool {
-        matches!(self, MergeResult::SimpleSub(_))
-    }
-}
-
-/*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum Subs {
-    EmptySub,
-    Sub(Rc<Pair>)
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum Pair {
-    Combined(Rc<Pair>, Rc<Pair>),
-    StringTo(Rc<StringVar>, Rc<SubExpr>),
-    CharTo(Rc<CharExpression>, Rc<CharExpression>)
-}*/
-
-/*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum SubExpr {
-    Combined(Rc<CharExpression>, Rc<SubExpr>),
-    EmptyString,
-    StringVar(Rc<StringVar>),
-}*/
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct SubExpr {
     head: Vec<CharExpression>,
     tail_is_string_var: bool,
@@ -209,8 +171,11 @@ impl AntimirovElement {
             range_constraints,
         }
     }
-    pub fn set_from_merge(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> HashSet<Self> {
-        if let Some(sub) = subs.into_sub() {
+    pub fn set_from_merge(
+        deriv_expression: Rc<GenRegex>,
+        subs: Option<SimpleSub>,
+    ) -> HashSet<Self> {
+        if let Some(sub) = subs {
             HashSet::from([Self::new(deriv_expression, sub)])
         } else {
             HashSet::new()

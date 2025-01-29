@@ -3,8 +3,8 @@
 //!
 
 use crate::classes::{
-    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression, MergeResult,
-    Predicate, RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression, Predicate,
+    RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
 };
 use std::fmt::{self, Display};
 
@@ -14,15 +14,6 @@ impl Display for SubExpr {
             write!(f, "{}", val)?;
         }
         write!(f, "{}", self.get_tail())
-    }
-}
-impl fmt::Display for MergeResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            MergeResult::Bottom => write!(f, "\\bot"),
-            MergeResult::SimpleSub(s) => write!(f, "{}", s),
-            // MergeResult::RangeSub(s) => write!(f, "{}", s),
-        }
     }
 }
 impl Display for AnySub {

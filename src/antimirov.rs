@@ -8,8 +8,8 @@
 
 use crate::classes::StringIndex;
 use crate::classes::{
-    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MergeResult, RangeConstr,
-    SimpleSub, StringVar, SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, RangeConstr, SimpleSub, StringVar,
+    SubExpr,
 };
 use disjoint_sets::UnionFind;
 use std::collections::BTreeMap;
@@ -102,7 +102,7 @@ fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
     Substitution operations: merge, difference, and sub_in
 */
 
-fn merge(substitutions: Rc<AnySub>) -> MergeResult {
+fn merge(substitutions: Rc<AnySub>) -> Option<SimpleSub> {
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
 
@@ -130,7 +130,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
                     for (j, item_j) in eq_exprs.iter().enumerate() {
                         if i != j {
                             if ind < item_j.head_length() {
-                                return MergeResult::Bottom;
+                                return None;
                             } else {
                                 continue;
                             }
@@ -157,7 +157,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
                 &mut id_to_expr,
                 &mut canonical_map,
             ) {
-                return MergeResult::Bottom;
+                return None;
             } //TODO: Union everything together here (add in union_find element)
         }
     }
@@ -188,7 +188,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
             &mut id_to_expr,
             &mut canonical_map,
         ) {
-            return MergeResult::Bottom;
+            return None;
         }
         char_set = char_set.union(&temp_set).cloned().collect();
     }
@@ -232,10 +232,10 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
         }
         combined_expr.set_string_var(var.clone(), eq_exprs[0].clone());
     }
-    MergeResult::SimpleSub(combined_expr)
+    Some(combined_expr)
 }
 
-fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> MergeResult {
+fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<SimpleSub> {
     let mut retsub = merged.clone();
     for char_var in sub.get_char_map().keys() {
         retsub.remove_char_map(char_var);
@@ -247,20 +247,18 @@ fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> MergeResult
                 retsub.get_char_map_mut().append(sub.get_char_map_mut());
                 retsub.get_str_map_mut().append(sub.get_str_map_mut());
             } else {
-                return MergeResult::Bottom;
+                return None;
             }
         }
     }
-    MergeResult::SimpleSub(retsub)
+    Some(retsub)
 }
 
-fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>) -> MergeResult {
-    if let MergeResult::SimpleSub(result) =
-        merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone())))
-    {
+fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>) -> Option<SimpleSub> {
+    if let Some(result) = merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone()))) {
         sub_difference_from_merge(&result, &sub2)
     } else {
-        MergeResult::Bottom
+        None
     }
 }
 
@@ -417,13 +415,13 @@ pub fn derivative(
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(d_var.clone(), c_expr.clone());
-                let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
+                let subs = Some(SimpleSub::new(BTreeMap::new(), char_to));
                 AntimirovElement::set_from_merge(GenRegex::epsilon(), subs)
             }
             (_, CharExpression::CharVar(c_var)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
-                let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
+                let subs = Some(SimpleSub::new(BTreeMap::new(), char_to));
                 AntimirovElement::set_from_merge(GenRegex::epsilon(), subs)
             }
         },
@@ -516,7 +514,7 @@ fn merge_derivs_intersect(
     let l_sub = left.get_subs();
     let r_sub = right.get_subs();
     let union_lr: AnySub = l_sub.clone().union(r_sub.clone());
-    let ret = merge(Rc::new(union_lr)).into_sub()?;
+    let ret = merge(Rc::new(union_lr))?;
 
     // Merge range constraints
     let l_range = left.get_ranges();
@@ -524,8 +522,8 @@ fn merge_derivs_intersect(
     let constraints = merge_range_constraints(l_range, r_range)?;
 
     // Compute the difference and apply needed remaining subs in left and right
-    let l_minus_r = sub_difference(Rc::new(l_sub.clone()), Rc::new(r_sub.clone())).into_sub()?;
-    let r_minus_l = sub_difference(Rc::new(r_sub.clone()), Rc::new(l_sub.clone())).into_sub()?;
+    let l_minus_r = sub_difference(Rc::new(l_sub.clone()), Rc::new(r_sub.clone()))?;
+    let r_minus_l = sub_difference(Rc::new(r_sub.clone()), Rc::new(l_sub.clone()))?;
     let l_expr = left.get_expr();
     let r_expr = right.get_expr();
     let p_prime_sub = sub_in(l_expr, &r_minus_l);
@@ -583,9 +581,8 @@ fn merge_derivs_concat(n_sub: &SimpleSub, right: &AntimirovElement) -> Option<An
     let right_elem = right.get_subs();
     let union_lr: AnySub = n_sub.clone().union(right_elem.clone());
     let ret = merge(Rc::new(union_lr));
-    if let Some(sub) = ret.into_sub() {
-        if let Some(r_minus_l) =
-            sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone())).into_sub()
+    if let Some(sub) = ret {
+        if let Some(r_minus_l) = sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone()))
         {
             let q_prime_sub = sub_in(right.get_expr(), &r_minus_l);
             return Some(AntimirovElement::new(q_prime_sub, sub));
@@ -631,7 +628,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
                     let ret = merge(Rc::new(union_lr));
                     match ret {
-                        MergeResult::SimpleSub(simple_sub) => {
+                        Some(simple_sub) => {
                             ret_set.insert(simple_sub);
                         }
                         _ => {}
@@ -649,7 +646,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
                     let ret = merge(Rc::new(union_lr));
                     match ret {
-                        MergeResult::SimpleSub(simple_sub) => {
+                        Some(simple_sub) => {
                             ret_set.insert(simple_sub);
                         }
                         _ => {}
