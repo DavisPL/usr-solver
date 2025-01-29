@@ -143,8 +143,15 @@ impl GenRegex {
 pub enum MergeResult {
     SimpleSub(SimpleSub),
     Bottom,
-    // TBD: add
-    // RangeSub(RangeSub),
+}
+
+impl MergeResult {
+    pub fn into_sub(self) -> Option<SimpleSub> {
+        match self {
+            MergeResult::SimpleSub(sub) => Some(sub),
+            MergeResult::Bottom => None,
+        }
+    }
 }
 
 /*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
