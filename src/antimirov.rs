@@ -70,7 +70,7 @@ fn union_over_set(
     true
 }
 
-fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
+fn count_union_elems(substitutions: &AnySub) -> usize {
     /*let mut char_vars: HashSet<CharExpression> = HashSet::new();
     for sub in substitutions.get_str_map().values(){
         for sub_expr in sub{
@@ -102,7 +102,7 @@ fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
     Substitution operations: merge, difference, and sub_in
 */
 
-fn merge(substitutions: Rc<AnySub>) -> Option<SimpleSub> {
+fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
 
@@ -254,9 +254,10 @@ fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<Simp
     Some(retsub)
 }
 
-fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>) -> Option<SimpleSub> {
-    if let Some(result) = merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone()))) {
-        sub_difference_from_merge(&result, &sub2)
+// Note: no longer used atm in favor of sub_difference_from_merge
+fn sub_difference(sub1: SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
+    if let Some(result) = merge(sub1.union(sub2.clone())) {
+        sub_difference_from_merge(&result, sub2)
     } else {
         None
     }
@@ -514,7 +515,7 @@ fn merge_derivs_intersect(
     let l_sub = left.get_subs();
     let r_sub = right.get_subs();
     let union_lr: AnySub = l_sub.clone().union(r_sub.clone());
-    let ret = merge(Rc::new(union_lr))?;
+    let merged_sub = merge(union_lr)?;
 
     // Merge range constraints
     let l_range = left.get_ranges();
@@ -522,8 +523,10 @@ fn merge_derivs_intersect(
     let constraints = merge_range_constraints(l_range, r_range)?;
 
     // Compute the difference and apply needed remaining subs in left and right
-    let l_minus_r = sub_difference(Rc::new(l_sub.clone()), Rc::new(r_sub.clone()))?;
-    let r_minus_l = sub_difference(Rc::new(r_sub.clone()), Rc::new(l_sub.clone()))?;
+    let l_minus_r = sub_difference_from_merge(&merged_sub, &r_sub)?;
+    let r_minus_l = sub_difference_from_merge(&merged_sub, &l_sub)?;
+    // let l_minus_r = sub_difference(Rc::new(l_sub.clone()), Rc::new(r_sub.clone()))?;
+    // let r_minus_l = sub_difference(Rc::new(r_sub.clone()), Rc::new(l_sub.clone()))?;
     let l_expr = left.get_expr();
     let r_expr = right.get_expr();
     let p_prime_sub = sub_in(l_expr, &r_minus_l);
@@ -531,7 +534,7 @@ fn merge_derivs_intersect(
     let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
     Some(AntimirovElement::new_with_constraints(
         final_expr,
-        ret,
+        merged_sub,
         constraints,
     ))
 }
@@ -578,17 +581,13 @@ fn apply_deriv_kleene(left_deriv: &AntimirovElement, right: &Rc<GenRegex>) -> An
 }
 
 fn merge_derivs_concat(n_sub: &SimpleSub, right: &AntimirovElement) -> Option<AntimirovElement> {
-    let right_elem = right.get_subs();
-    let union_lr: AnySub = n_sub.clone().union(right_elem.clone());
-    let ret = merge(Rc::new(union_lr));
-    if let Some(sub) = ret {
-        if let Some(r_minus_l) = sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone()))
-        {
-            let q_prime_sub = sub_in(right.get_expr(), &r_minus_l);
-            return Some(AntimirovElement::new(q_prime_sub, sub));
-        }
-    }
-    None
+    let r_sub = right.get_subs();
+    let union_lr: AnySub = n_sub.clone().union(r_sub.clone());
+    let merged_sub = merge(union_lr)?;
+    let r_minus_l = sub_difference_from_merge(&merged_sub, &r_sub)?;
+    // let r_r_minus_l = sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone()))?;
+    let result = sub_in(right.get_expr(), &r_minus_l);
+    Some(AntimirovElement::new(result, merged_sub))
 }
 
 /*
@@ -626,7 +625,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             for left_elem in &left_null {
                 for right_elem in &right_null {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(Rc::new(union_lr));
+                    let ret = merge(union_lr);
                     match ret {
                         Some(simple_sub) => {
                             ret_set.insert(simple_sub);
@@ -644,7 +643,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             for left_elem in &left_null {
                 for right_elem in &right_null {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(Rc::new(union_lr));
+                    let ret = merge(union_lr);
                     match ret {
                         Some(simple_sub) => {
                             ret_set.insert(simple_sub);
