@@ -8,8 +8,8 @@
 
 use crate::classes::StringIndex;
 use crate::classes::{
-    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MergeResult, SimpleSub, StringVar,
-    SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MergeResult, RangeConstr,
+    SimpleSub, StringVar, SubExpr,
 };
 use disjoint_sets::UnionFind;
 use std::collections::BTreeMap;
@@ -235,26 +235,30 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
     MergeResult::SimpleSub(combined_expr)
 }
 
+fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> MergeResult {
+    let mut retsub = merged.clone();
+    for char_var in sub.get_char_map().keys() {
+        retsub.remove_char_map(char_var);
+    }
+    for (string_var, sub_expr1) in merged.get_str_map() {
+        if let Some(sub_expr2) = sub.get_string_var(string_var) {
+            retsub.remove_str_map(string_var);
+            if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
+                retsub.get_char_map_mut().append(sub.get_char_map_mut());
+                retsub.get_str_map_mut().append(sub.get_str_map_mut());
+            } else {
+                return MergeResult::Bottom;
+            }
+        }
+    }
+    MergeResult::SimpleSub(retsub)
+}
+
 fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>) -> MergeResult {
     if let MergeResult::SimpleSub(result) =
         merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone())))
     {
-        let mut retsub = result.clone();
-        for char_var in sub2.get_char_map().keys() {
-            retsub.remove_char_map(char_var);
-        }
-        for (string_var, sub_expr1) in result.get_str_map() {
-            if let Some(sub_expr2) = sub2.get_string_var(string_var) {
-                retsub.remove_str_map(string_var);
-                if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
-                    retsub.get_char_map_mut().append(sub.get_char_map_mut());
-                    retsub.get_str_map_mut().append(sub.get_str_map_mut());
-                } else {
-                    return MergeResult::Bottom;
-                }
-            }
-        }
-        MergeResult::SimpleSub(retsub)
+        sub_difference_from_merge(&result, &sub2)
     } else {
         MergeResult::Bottom
     }
@@ -351,6 +355,20 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
         }
         GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => todo!(),
     }
+}
+
+fn merge_range_constraints(
+    constraints1: &BTreeMap<CharVar, RangeConstr>,
+    constraints2: &BTreeMap<CharVar, RangeConstr>,
+) -> Option<BTreeMap<CharVar, RangeConstr>> {
+    let mut constraints = constraints1.clone();
+    for (key, val) in constraints2 {
+        if let Some(existing_constr) = constraints.get(key) {
+            return None;
+        }
+        constraints.insert(key.clone(), val.clone());
+    }
+    Some(constraints)
 }
 
 /*
@@ -490,28 +508,34 @@ pub fn derivative(
     Derivative helpers
 */
 
-fn merge_derivs_intersect(p: &AntimirovElement, q: &AntimirovElement) -> Option<AntimirovElement> {
-    let left_elem = p.get_subs();
-    let right_elem = q.get_subs();
-    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-    let ret = merge(Rc::new(union_lr));
-    if let Some(sub) = ret.into_sub() {
-        // a bit odd we don't use ret here - I think it's correct though?
-        // TODO: fix sub_diff
-        if let Some(l_minus_r) =
-            sub_difference(Rc::new(left_elem.clone()), Rc::new(right_elem.clone())).into_sub()
-        {
-            if let Some(r_minus_l) =
-                sub_difference(Rc::new(right_elem.clone()), Rc::new(left_elem.clone())).into_sub()
-            {
-                let p_prime_sub = sub_in(p.get_expr(), &r_minus_l);
-                let q_prime_sub = sub_in(q.get_expr(), &l_minus_r);
-                let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
-                return Some(AntimirovElement::new(final_expr, sub));
-            }
-        }
-    }
-    None
+fn merge_derivs_intersect(
+    left: &AntimirovElement,
+    right: &AntimirovElement,
+) -> Option<AntimirovElement> {
+    // Merge subs
+    let l_sub = left.get_subs();
+    let r_sub = right.get_subs();
+    let union_lr: AnySub = l_sub.clone().union(r_sub.clone());
+    let ret = merge(Rc::new(union_lr)).into_sub()?;
+
+    // Merge range constraints
+    let l_range = left.get_ranges();
+    let r_range = right.get_ranges();
+    let constraints = merge_range_constraints(l_range, r_range)?;
+
+    // Compute the difference and apply needed remaining subs in left and right
+    let l_minus_r = sub_difference(Rc::new(l_sub.clone()), Rc::new(r_sub.clone())).into_sub()?;
+    let r_minus_l = sub_difference(Rc::new(r_sub.clone()), Rc::new(l_sub.clone())).into_sub()?;
+    let l_expr = left.get_expr();
+    let r_expr = right.get_expr();
+    let p_prime_sub = sub_in(l_expr, &r_minus_l);
+    let q_prime_sub = sub_in(r_expr, &l_minus_r);
+    let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
+    Some(AntimirovElement::new_with_constraints(
+        final_expr,
+        ret,
+        constraints,
+    ))
 }
 
 fn apply_deriv_concat(

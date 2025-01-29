@@ -198,6 +198,17 @@ impl AntimirovElement {
             range_constraints: BTreeMap::new(),
         }
     }
+    pub fn new_with_constraints(
+        deriv_expression: Rc<GenRegex>,
+        subs: SimpleSub,
+        range_constraints: BTreeMap<CharVar, RangeConstr>,
+    ) -> Self {
+        Self {
+            deriv_expression,
+            subs,
+            range_constraints,
+        }
+    }
     pub fn set_from_merge(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> HashSet<Self> {
         if let Some(sub) = subs.into_sub() {
             HashSet::from([Self::new(deriv_expression, sub)])
@@ -217,7 +228,7 @@ impl AntimirovElement {
         &self.subs
     }
     pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
-        unimplemented!()
+        &self.range_constraints
     }
 }
 
