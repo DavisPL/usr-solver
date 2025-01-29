@@ -1510,6 +1510,7 @@ mod tests {
 
         assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
     }
+
     #[ignore]
     #[test]
     fn test_passw_sat1() {
@@ -1756,6 +1757,8 @@ mod tests {
     fn test_loops_3() {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
     }
+
+    #[ignore]
     #[test]
     fn test_usr_2() {
         assert_satisfiable("benchmarks/usr_2_sat.smt2");

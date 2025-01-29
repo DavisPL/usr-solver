@@ -3,7 +3,7 @@
 //! Main GenRegex class and subclasses
 //!
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::rc::Rc;
@@ -143,8 +143,18 @@ impl GenRegex {
 pub enum MergeResult {
     SimpleSub(SimpleSub),
     Bottom,
-    // TBD: add
-    // RangeSub(RangeSub),
+}
+
+impl MergeResult {
+    pub fn into_sub(self) -> Option<SimpleSub> {
+        match self {
+            MergeResult::SimpleSub(sub) => Some(sub),
+            MergeResult::Bottom => None,
+        }
+    }
+    pub fn is_sub(&self) -> bool {
+        matches!(self, MergeResult::SimpleSub(_))
+    }
 }
 
 /*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -176,18 +186,26 @@ pub struct SubExpr {
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct AntimirovDerivativeElement {
     deriv_expression: Rc<GenRegex>,
-    subs: MergeResult,
+    subs: SimpleSub,
     range_constraints: BTreeMap<Rc<CharExpression>, RangeConstr>,
 }
 
 impl AntimirovDerivativeElement {
-    pub fn new(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> Self {
+    pub fn new(deriv_expression: Rc<GenRegex>, subs: SimpleSub) -> Self {
         AntimirovDerivativeElement {
             deriv_expression,
             subs,
             range_constraints: BTreeMap::new(),
         }
     }
+    pub fn set_from_merge(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> HashSet<Self> {
+        if let Some(sub) = subs.into_sub() {
+            HashSet::from([Self::new(deriv_expression, sub)])
+        } else {
+            HashSet::new()
+        }
+    }
+
     pub fn add_range(&mut self, key: Rc<CharExpression>, start: char, end: char) {
         let value = RangeConstr::new(start, end);
         self.range_constraints.insert(key, value);
@@ -195,7 +213,7 @@ impl AntimirovDerivativeElement {
     pub fn get_expr(&self) -> &Rc<GenRegex> {
         &self.deriv_expression
     }
-    pub fn get_subs(&self) -> &MergeResult {
+    pub fn get_subs(&self) -> &SimpleSub {
         &self.subs
     }
     pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
