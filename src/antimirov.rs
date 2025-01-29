@@ -382,19 +382,13 @@ pub fn derivative(
     };
 
     match gre.as_ref() {
-        GenRegex::EmptySet => HashSet::from([AntimirovDerivativeElement::new(
-            Rc::new(GenRegex::EmptySet),
-            MergeResult::Bottom,
-        )]),
+        GenRegex::EmptySet => HashSet::new(),
         GenRegex::Sigma => HashSet::from([AntimirovDerivativeElement::new(
             empty_string(),
-            MergeResult::SimpleSub(SimpleSub::empty()),
+            SimpleSub::empty(),
         )]),
         GenRegex::Range(char1, char2) => {
-            let mut result = AntimirovDerivativeElement::new(
-                empty_string(),
-                MergeResult::SimpleSub(SimpleSub::empty()),
-            );
+            let mut result = AntimirovDerivativeElement::new(empty_string(), SimpleSub::empty());
             result.add_range(deriv_char.clone(), *char1, *char2);
             HashSet::from([result])
         }
@@ -403,32 +397,26 @@ pub fn derivative(
                 if deriv_lit == literal_value {
                     HashSet::from([AntimirovDerivativeElement::new(
                         empty_string(),
-                        MergeResult::SimpleSub(SimpleSub::empty()),
+                        SimpleSub::empty(),
                     )])
                 } else {
-                    HashSet::from([AntimirovDerivativeElement::new(
-                        Rc::new(GenRegex::EmptySet),
-                        MergeResult::Bottom,
-                    )])
+                    HashSet::new()
                 }
             }
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
                 if lit_val.is_empty() {
-                    return HashSet::from([AntimirovDerivativeElement::new(
-                        Rc::new(GenRegex::EmptySet),
-                        MergeResult::Bottom,
-                    )]);
+                    return HashSet::new();
                 }
                 let mut char_to = BTreeMap::new();
                 char_to.insert(d_var.clone(), c_expr.clone());
                 let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
-                HashSet::from([AntimirovDerivativeElement::new(empty_string(), subs)])
+                AntimirovDerivativeElement::set_from_merge(empty_string(), subs)
             }
             (_, CharExpression::CharVar(c_var)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
                 let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
-                HashSet::from([AntimirovDerivativeElement::new(empty_string(), subs)])
+                AntimirovDerivativeElement::set_from_merge(empty_string(), subs)
             }
         },
         GenRegex::StringVar(string_var) => {
@@ -439,7 +427,7 @@ pub fn derivative(
             let mut string_to = BTreeMap::new();
             string_to.insert(string_var.clone(), subexpr);
 
-            let substitution = MergeResult::SimpleSub(SimpleSub::new(string_to, BTreeMap::new()));
+            let substitution = SimpleSub::new(string_to, BTreeMap::new());
 
             HashSet::from([AntimirovDerivativeElement::new(gre.clone(), substitution)])
         }
@@ -454,7 +442,7 @@ pub fn derivative(
             let mut ret_set = HashSet::new();
             for p_sub in p_deriv {
                 for q_sub in &q_deriv {
-                    if let Some(ret) = merge_derivs_intersect(&p_sub, &q_sub) {
+                    if let Some(ret) = merge_derivs_intersect(&p_sub, q_sub) {
                         ret_set.insert(ret);
                     }
                 }
@@ -475,7 +463,7 @@ pub fn derivative(
                 let right_deriv = derivative(right, deriv_char);
                 for n_sub in p_nullable {
                     for q_sub in &right_deriv {
-                        if let Some(ret) = merge_derivs_concat(&n_sub, &q_sub) {
+                        if let Some(ret) = merge_derivs_concat(&n_sub, q_sub) {
                             ret_set.insert(ret);
                         }
                     }
@@ -486,25 +474,19 @@ pub fn derivative(
         }
         GenRegex::Kleene(expr) => {
             let p_deriv = derivative(expr, deriv_char);
-            let mut term1 = HashSet::new();
-
+            let mut ret_set = HashSet::new();
             for sub in p_deriv {
-                match sub.get_subs() {
-                    MergeResult::SimpleSub(s_sub) => {
-                        let curr = AntimirovDerivativeElement::new(
-                            Rc::new(GenRegex::Concatenation(
-                                sub.get_expr().clone(),
-                                sub_in(gre, s_sub),
-                            )),
-                            MergeResult::SimpleSub(s_sub.clone()),
-                        );
-                        term1.insert(curr);
-                    }
-                    _ => {}
-                }
+                let s_sub = sub.get_subs();
+                let ret = AntimirovDerivativeElement::new(
+                    Rc::new(GenRegex::Concatenation(
+                        sub.get_expr().clone(),
+                        sub_in(gre, s_sub),
+                    )),
+                    s_sub.clone(),
+                );
+                ret_set.insert(ret);
             }
-
-            term1
+            ret_set
         }
         GenRegex::StringSlice(_, _) => {
             unimplemented!();
@@ -525,62 +507,42 @@ fn merge_derivs_intersect(
     p: &AntimirovDerivativeElement,
     q: &AntimirovDerivativeElement,
 ) -> Option<AntimirovDerivativeElement> {
-    match (p.get_subs(), q.get_subs()) {
-        (MergeResult::SimpleSub(left_elem), MergeResult::SimpleSub(right_elem)) => {
-            let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-            let ret = merge(Rc::new(union_lr));
-            match ret {
-                MergeResult::SimpleSub(_) => {
-                    let left_minus_right =
-                        sub_difference(Rc::new(left_elem.clone()), Rc::new(right_elem.clone())); //TODO: fix sub_diff
-                    let right_minus_left =
-                        sub_difference(Rc::new(right_elem.clone()), Rc::new(left_elem.clone()));
-                    match (left_minus_right, right_minus_left) {
-                        (MergeResult::SimpleSub(l_minus_r), MergeResult::SimpleSub(r_minus_l)) => {
-                            let p_prime_sub = sub_in(p.get_expr(), &r_minus_l);
-                            let q_prime_sub = sub_in(q.get_expr(), &l_minus_r);
-                            let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
-                            let term = AntimirovDerivativeElement::new(final_expr, ret);
-                            Some(term)
-                        }
-                        _ => None,
-                    }
-                }
-                _ => None,
+    let left_elem = p.get_subs();
+    let right_elem = q.get_subs();
+    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
+    let ret = merge(Rc::new(union_lr));
+    if let Some(sub) = ret.into_sub() {
+        // a bit odd we don't use ret here - I think it's correct though?
+        // TODO: fix sub_diff
+        if let Some(l_minus_r) =
+            sub_difference(Rc::new(left_elem.clone()), Rc::new(right_elem.clone())).into_sub()
+        {
+            if let Some(r_minus_l) =
+                sub_difference(Rc::new(right_elem.clone()), Rc::new(left_elem.clone())).into_sub()
+            {
+                let p_prime_sub = sub_in(p.get_expr(), &r_minus_l);
+                let q_prime_sub = sub_in(q.get_expr(), &l_minus_r);
+                let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
+                return Some(AntimirovDerivativeElement::new(final_expr, sub));
             }
         }
-        _ => None,
     }
+    None
 }
 
 fn apply_derivs_concat(
     left_deriv: &AntimirovDerivativeElement,
     right: &Rc<GenRegex>,
 ) -> Option<AntimirovDerivativeElement> {
-    match left_deriv.get_subs() {
-        MergeResult::SimpleSub(simple_sub) => {
-            if let GenRegex::CharExpression(c_expr) = left_deriv.get_expr().as_ref() {
-                if let CharExpression::Literal(lit) = c_expr {
-                    //                    if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
-                    if lit.is_empty() {
-                        let curr = AntimirovDerivativeElement::new(
-                            sub_in(right, simple_sub),
-                            left_deriv.get_subs().clone(),
-                        );
-                        Some(curr)
-                    } else {
-                        let curr = AntimirovDerivativeElement::new(
-                            Rc::new(GenRegex::Concatenation(
-                                left_deriv.get_expr().clone(),
-                                sub_in(right, simple_sub),
-                            )),
-                            left_deriv.get_subs().clone(),
-                        );
-                        Some(curr)
-                    }
-                } else {
-                    None
-                }
+    let simple_sub = left_deriv.get_subs();
+    if let GenRegex::CharExpression(c_expr) = left_deriv.get_expr().as_ref() {
+        if let CharExpression::Literal(lit) = c_expr {
+            // if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
+            if lit.is_empty() {
+                Some(AntimirovDerivativeElement::new(
+                    sub_in(right, simple_sub),
+                    left_deriv.get_subs().clone(),
+                ))
             } else {
                 Some(AntimirovDerivativeElement::new(
                     Rc::new(GenRegex::Concatenation(
@@ -590,8 +552,17 @@ fn apply_derivs_concat(
                     left_deriv.get_subs().clone(),
                 ))
             }
+        } else {
+            None
         }
-        _ => None,
+    } else {
+        Some(AntimirovDerivativeElement::new(
+            Rc::new(GenRegex::Concatenation(
+                left_deriv.get_expr().clone(),
+                sub_in(right, simple_sub),
+            )),
+            left_deriv.get_subs().clone(),
+        ))
     }
 }
 
@@ -599,28 +570,18 @@ fn merge_derivs_concat(
     n_sub: &SimpleSub,
     right: &AntimirovDerivativeElement,
 ) -> Option<AntimirovDerivativeElement> {
-    match right.get_subs() {
-        MergeResult::SimpleSub(right_elem) => {
-            let union_lr: AnySub = n_sub.clone().union(right_elem.clone());
-            let ret = merge(Rc::new(union_lr));
-            match ret {
-                MergeResult::SimpleSub(_) => {
-                    let right_minus_left =
-                        sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone()));
-                    match right_minus_left {
-                        MergeResult::SimpleSub(r_minus_l) => {
-                            let q_prime_sub = sub_in(&right.get_expr(), &r_minus_l);
-                            let term = AntimirovDerivativeElement::new(q_prime_sub, ret);
-                            Some(term)
-                        }
-                        _ => None,
-                    }
-                }
-                _ => None,
-            }
+    let right_elem = right.get_subs();
+    let union_lr: AnySub = n_sub.clone().union(right_elem.clone());
+    let ret = merge(Rc::new(union_lr));
+    if let Some(sub) = ret.into_sub() {
+        if let Some(r_minus_l) =
+            sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone())).into_sub()
+        {
+            let q_prime_sub = sub_in(right.get_expr(), &r_minus_l);
+            return Some(AntimirovDerivativeElement::new(q_prime_sub, sub));
         }
-        _ => None,
     }
+    None
 }
 
 fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
