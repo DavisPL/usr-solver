@@ -1,3 +1,4 @@
+; from GitHub issue:
 (declare-fun a () String)
 (declare-const x String)
 (assert

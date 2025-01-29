@@ -1,3 +1,4 @@
+; from GitHub issue:
 (declare-fun w () String)
 (assert
  (str.in_re w

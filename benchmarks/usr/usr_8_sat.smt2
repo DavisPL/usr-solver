@@ -1,3 +1,4 @@
+; from GitHub issue:
 (declare-fun a () Bool)
 (declare-fun b () Int)
 (declare-fun c () String)
