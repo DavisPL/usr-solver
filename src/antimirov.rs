@@ -682,6 +682,7 @@ fn satisfiable_helper(
         }
         *index += 1;
         for elem in deriv {
+            // TODO: handle range constraint here
             if !visited.contains(elem.get_expr())
                 && satisfiable_helper(elem.get_expr(), index, visited.clone())
             {
