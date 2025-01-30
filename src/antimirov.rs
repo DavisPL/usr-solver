@@ -236,6 +236,29 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     Some(combined_expr)
 }
 
+fn merge_binary(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
+    let union_lr: AnySub = sub1.clone().union(sub2.clone());
+    merge(union_lr)
+}
+
+fn merge_sets(subs1: &HashSet<SimpleSub>, subs2: &HashSet<SimpleSub>) -> HashSet<SimpleSub> {
+    let mut result = HashSet::new();
+    for sub1 in subs1 {
+        for sub2 in subs2 {
+            if let Some(ret) = merge_binary(sub1, sub2) {
+                result.insert(ret);
+            }
+        }
+    }
+    result
+}
+
+fn union_sets(subs1: HashSet<SimpleSub>, subs2: HashSet<SimpleSub>) -> HashSet<SimpleSub> {
+    let mut result = subs1;
+    result.extend(subs2);
+    result
+}
+
 fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<SimpleSub> {
     let mut retsub = merged.clone();
     for char_var in sub.get_char_map().keys() {
@@ -256,8 +279,8 @@ fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<Simp
 }
 
 // Note: no longer used atm in favor of sub_difference_from_merge
-fn sub_difference(sub1: SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
-    if let Some(result) = merge(sub1.union(sub2.clone())) {
+fn sub_difference(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
+    if let Some(result) = merge_binary(sub1, sub2) {
         sub_difference_from_merge(&result, sub2)
     } else {
         None
@@ -501,12 +524,6 @@ pub fn derivative(
             }
             ret_set
         }
-        GenRegex::StringSlice(_, _) => {
-            unimplemented!();
-        }
-        GenRegex::StringIndex(_) => {
-            unimplemented!();
-        }
         GenRegex::Complement(_) => {
             let deriv = brzozowski::derivative(gre, deriv_char);
             AntimirovElement::new(deriv, SimpleSub::empty(), BTreeMap::new()).into_set()
@@ -514,6 +531,12 @@ pub fn derivative(
         GenRegex::IfThenElse(_, _, _) => {
             let deriv = brzozowski::derivative(gre, deriv_char);
             AntimirovElement::new(deriv, SimpleSub::empty(), BTreeMap::new()).into_set()
+        }
+        GenRegex::StringSlice(_, _) => {
+            unimplemented!();
+        }
+        GenRegex::StringIndex(_) => {
+            unimplemented!();
         }
     }
 }
@@ -529,8 +552,7 @@ fn merge_derivs_intersect(
     // Merge subs
     let l_sub = left.get_subs();
     let r_sub = right.get_subs();
-    let union_lr: AnySub = l_sub.clone().union(r_sub.clone());
-    let merged_sub = merge(union_lr)?;
+    let merged_sub = merge_binary(l_sub, r_sub)?;
 
     // Merge range constraints
     let l_range = left.get_ranges();
@@ -552,8 +574,7 @@ fn merge_derivs_intersect(
 
 fn merge_derivs_concat(n_sub: &SimpleSub, right: &AntimirovElement) -> Option<AntimirovElement> {
     let r_sub = right.get_subs();
-    let union_lr: AnySub = n_sub.clone().union(r_sub.clone());
-    let merged_sub = merge(union_lr)?;
+    let merged_sub = merge_binary(n_sub, r_sub)?;
     let r_ranges = right.get_ranges();
 
     let r_minus_l = sub_difference_from_merge(&merged_sub, r_sub)?;
@@ -613,40 +634,14 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             subs
         }
         GenRegex::Union(side1, side2) => {
-            let left_null = nullable(&Rc::clone(side1));
-            let right_null = nullable(&Rc::clone(side2));
-            let union_lr: HashSet<_> = left_null.union(&right_null).cloned().collect();
-            union_lr
+            let left_null = nullable(&side1);
+            let right_null = nullable(&side2);
+            union_sets(left_null, right_null)
         }
-        GenRegex::Intersect(side1, side2) => {
-            let left_null = nullable(&Rc::clone(side1));
-            let right_null = nullable(&Rc::clone(side2));
-            let mut ret_set = HashSet::new();
-            for left_elem in &left_null {
-                for right_elem in &right_null {
-                    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(union_lr);
-                    if let Some(simple_sub) = ret {
-                        ret_set.insert(simple_sub);
-                    }
-                }
-            }
-            ret_set
-        }
-        GenRegex::Concatenation(side1, side2) => {
-            let left_null = nullable(&Rc::clone(side1));
-            let right_null = nullable(&Rc::clone(side2));
-            let mut ret_set = HashSet::new();
-            for left_elem in &left_null {
-                for right_elem in &right_null {
-                    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(union_lr);
-                    if let Some(simple_sub) = ret {
-                        ret_set.insert(simple_sub);
-                    }
-                }
-            }
-            ret_set
+        GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
+            let left_null = nullable(&side1);
+            let right_null = nullable(&side2);
+            merge_sets(&left_null, &right_null)
         }
         GenRegex::Kleene(_) => SimpleSub::empty().into_set(),
         GenRegex::Complement(gre1) => {
@@ -655,26 +650,11 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         }
         GenRegex::IfThenElse(p, g1, g2) => {
             let (left, right) = sub_from_predicate(p);
-            let mut result = HashSet::new();
-            if let Some(left_sub) = left {
-                let left_nullable = nullable(g1);
-                for sub in &left_nullable {
-                    let union_lr: AnySub = left_sub.clone().union(sub.clone());
-                    if let Some(ret) = merge(union_lr) {
-                        result.insert(ret);
-                    }
-                }
-            }
-            if let Some(right_sub) = right {
-                let right_nullable = nullable(g2);
-                for sub in &right_nullable {
-                    let union_lr: AnySub = right_sub.clone().union(sub.clone());
-                    if let Some(ret) = merge(union_lr) {
-                        result.insert(ret);
-                    }
-                }
-            }
-            result
+            let left_nullable = nullable(g1);
+            let right_nullable = nullable(g2);
+            let result1 = merge_sets(&left, &left_nullable);
+            let result2 = merge_sets(&right, &right_nullable);
+            union_sets(result1, result2)
         }
         GenRegex::StringSlice(_, _) => {
             unimplemented!();
@@ -686,6 +666,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
 }
 
 /// Optimization to determine subs for whether the *complement* of a regex is nullable
+/// Returns all subs under which the regex is *not* nullable.
 pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     match gre.as_ref() {
         GenRegex::EmptySet => SimpleSub::empty().into_set(),
@@ -695,7 +676,7 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::CharExpression(c_expr) => SimpleSub::empty().into_set(),
         GenRegex::StringVar(s_var) => {
             // The hard case
-            // Here we just enumerate if we come across the case.
+            // Here we can just enumerate if we come across the case.
             // TODO
             unimplemented!()
             // let mut subs = HashSet::new();
@@ -707,26 +688,15 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         }
         GenRegex::Union(side1, side2) => {
             // Matches logic for GenRegex::Intersection in the regular nullable case
-            let left_null = nullable_complement(&Rc::clone(side1));
-            let right_null = nullable_complement(&Rc::clone(side2));
-            let mut ret_set = HashSet::new();
-            for left_elem in &left_null {
-                for right_elem in &right_null {
-                    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(union_lr);
-                    if let Some(simple_sub) = ret {
-                        ret_set.insert(simple_sub);
-                    }
-                }
-            }
-            ret_set
+            let left_null = nullable_complement(&side1);
+            let right_null = nullable_complement(&side2);
+            merge_sets(&left_null, &right_null)
         }
         GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
             // Matches logic for GenRegex::Union in the regular nullable case
-            let left_null = nullable_complement(&Rc::clone(side1));
-            let right_null = nullable_complement(&Rc::clone(side2));
-            let union_lr: HashSet<_> = left_null.union(&right_null).cloned().collect();
-            union_lr
+            let left_null = nullable_complement(&side1);
+            let right_null = nullable_complement(&side2);
+            union_sets(left_null, right_null)
         }
         GenRegex::Kleene(_) => HashSet::new(),
         GenRegex::Complement(gre1) => {
@@ -735,26 +705,11 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         }
         GenRegex::IfThenElse(p, g1, g2) => {
             let (left, right) = sub_from_predicate(p);
-            let mut result = HashSet::new();
-            if let Some(left_sub) = left {
-                let left_nullable = nullable_complement(g1);
-                for sub in &left_nullable {
-                    let union_lr: AnySub = left_sub.clone().union(sub.clone());
-                    if let Some(ret) = merge(union_lr) {
-                        result.insert(ret);
-                    }
-                }
-            }
-            if let Some(right_sub) = right {
-                let right_nullable = nullable_complement(g2);
-                for sub in &right_nullable {
-                    let union_lr: AnySub = right_sub.clone().union(sub.clone());
-                    if let Some(ret) = merge(union_lr) {
-                        result.insert(ret);
-                    }
-                }
-            }
-            result
+            let left_nullable = nullable_complement(g1);
+            let right_nullable = nullable_complement(g2);
+            let result1 = merge_sets(&left, &left_nullable);
+            let result2 = merge_sets(&right, &right_nullable);
+            union_sets(result1, result2)
         }
         GenRegex::StringSlice(_, _) => {
             unimplemented!();
@@ -765,10 +720,25 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     }
 }
 
-pub fn sub_from_predicate(p: &Predicate) -> (Option<SimpleSub>, Option<SimpleSub>) {
+pub fn sub_from_predicate(p: &Predicate) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
+    match p {
+        Predicate::True => (SimpleSub::empty().into_set(), HashSet::new()),
+        Predicate::False => (HashSet::new(), SimpleSub::empty().into_set()),
+        // And(p1, p2) => {
+
+        // }
+        // Or(Rc<Predicate>, Rc<Predicate>),
+        // Not(Rc<Predicate>),
+        // Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
+        // EqualLength(Rc<StringVar>, i32),
+        // LessThan(Rc<MaybeCharExpression>, char), //Includes Equal to
+        // GreaterThan(Rc<MaybeCharExpression>, char), //Includes Equal to
+        // TODO
+        _ => unimplemented!(),
+    }
     // TODO: Placeholder
     // This implementation is wrong, just seeing if it works
-    (Some(SimpleSub::empty()), Some(SimpleSub::empty()))
+    // (Some(SimpleSub::empty()), Some(SimpleSub::empty()))
 }
 
 /*
