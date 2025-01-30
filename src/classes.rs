@@ -431,8 +431,8 @@ pub enum Predicate {
     False,
     Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
     EqualLength(Rc<StringVar>, i32),
-    //LessThan(Rc<MaybeCharExpression>, char),
-    //GreaterThan(Rc<MaybeCharExpression>, char),
+    LessThan(Rc<MaybeCharExpression>, char), //Includes Equal to
+    GreaterThan(Rc<MaybeCharExpression>, char), //Includes Equal to
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]

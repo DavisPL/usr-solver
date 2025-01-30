@@ -149,10 +149,21 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
         GenRegex::EmptySet => GenRegex::empty_set(),
         GenRegex::Epsilon => GenRegex::empty_set(),
         GenRegex::Sigma => GenRegex::epsilon(),
-        GenRegex::Range(start, end) => {
-            // TODO
-            unimplemented!()
-        }
+        GenRegex::Range(start, end) => {simplifies(&Rc::new(GenRegex::IfThenElse(
+            Rc::new(Predicate::And(
+                Rc::new(Predicate::GreaterThan(
+                    Rc::new(MaybeCharExpression::CharExpression(deriv_char.as_ref().clone())),
+                    *start
+                )),
+                Rc::new(Predicate::LessThan(
+                    Rc::new(MaybeCharExpression::CharExpression(deriv_char.as_ref().clone())),
+                    *end
+                )),
+
+            )),
+            GenRegex::epsilon(),
+            GenRegex::empty_set(),
+        )))}
         GenRegex::CharExpression(c_expr) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
                 Rc::new(MaybeCharExpression::CharExpression(c_expr.clone())),

@@ -139,6 +139,12 @@ impl Display for Predicate {
             Predicate::EqualLength(var, inte) => {
                 write!(f, "|{}| == {}", var, inte)
             }
+            Predicate::LessThan(var, val) =>{
+                write!(f, "{} <= {}", var, val)
+            }
+            Predicate::GreaterThan(var, val) =>{
+                write!(f, "{} >= {}", var, val)
+            }
         }
     }
 }
