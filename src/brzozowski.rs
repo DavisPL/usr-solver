@@ -318,6 +318,24 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
                 (_, Predicate::False) => {
                     Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj)))
                 }
+                (Predicate::True, Predicate::True)=>{
+                    Rc::new(Predicate::True)
+                }
+                (Predicate::True, _) => {
+                    Rc::new(Predicate::Or(
+                        Rc::clone(pred),
+                        Rc::new(Predicate::And(
+                            Rc::new(Predicate::Not(Rc::clone(pred))),
+                            Rc::clone(&false_proj),
+                        )),
+                    ))
+                }
+                (_, Predicate::True) => {
+                    Rc::new(Predicate::Or(
+                        Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj))),
+                        Rc::new(Predicate::Not(Rc::clone(pred)))
+                    ))
+                }
                 _ => Rc::new(Predicate::Or(
                     Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj))),
                     Rc::new(Predicate::And(
@@ -333,6 +351,7 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
             let right_proj = nullable_projection_helper(right);
 
             match (left_proj.as_ref(), right_proj.as_ref()) {
+                (Predicate::True, _) | (_, Predicate::True) => Rc::new(Predicate::True),
                 (Predicate::False, _) => Rc::clone(&right_proj),
                 (_, Predicate::False) => Rc::clone(&left_proj),
                 _ => Rc::new(Predicate::Or(left_proj, right_proj)), //Rewrite as left and
@@ -346,6 +365,8 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 
             match (left_proj.as_ref(), right_proj.as_ref()) {
                 (Predicate::False, _) | (_, Predicate::False) => Rc::new(Predicate::False),
+                (Predicate::True, _) => Rc::clone(&right_proj),
+                (_, Predicate::True) => Rc::clone(&left_proj),
                 _ => Rc::new(Predicate::And(left_proj, right_proj)),
             }
         }

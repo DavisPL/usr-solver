@@ -121,11 +121,11 @@ impl Display for Predicate {
         match self {
             Predicate::And(left, right) => {
                 //let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "({} v {})", left, right)
+                write!(f, "({} ^ {})", left, right)
             }
             Predicate::Or(left, right) => {
                 //let parts: Vec<String> = kids.iter().map(|p| format!("{}", p)).collect();
-                write!(f, "({} ^ {})", left, right)
+                write!(f, "({} v {})", left, right)
                 //write!(f, "({})", parts.join(" OR "))
             }
             Predicate::Not(pred1) => {
