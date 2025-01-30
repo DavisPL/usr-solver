@@ -14,6 +14,7 @@ use lexpr::{self, Value};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
+use std::hash::Hash;
 use std::rc::Rc;
 
 /*
@@ -353,7 +354,7 @@ impl RegexToken {
 enum StringToken {
     Var(String),
     Val(String),
-    Conditional(HashMap<Rc<GenRegex>, Value>),
+    Conditional(HashMap<String, Value>),
 }
 
 pub struct SmtParser {
@@ -1031,7 +1032,13 @@ impl SmtParser {
         match str {
             StringToken::Var(name) => Ok(RegexToken::Val(GenRegex::create_gre_str_var(&name))),
             StringToken::Val(str) => Ok(RegexToken::Val(GenRegex::str_to_re(&str))),
-            StringToken::Conditional(_) => todo!(),
+            StringToken::Conditional(map) => {
+                let mut ret_val=HashMap::new();
+                for (key,val) in map{
+                    ret_val.insert(GenRegex::str_to_re(&key), val);
+                }
+                Ok(RegexToken::Conditional(ret_val))
+            },
         }
     }
 
@@ -1155,6 +1162,10 @@ impl SmtParser {
         if let Some(str) = v.as_str() {
             return Ok(StringToken::Val(str.to_string()));
         }
+        if let Some((head, tail))=v.as_pair(){
+            head.as_symbol().ok_or(SmtParseError::unexpected(head, "ite"))?;
+            return self.parse_ite(tail);
+        }
         if let Some(name) = v.as_symbol() {
             let res = self.func_names.get(name);
             if let Some(s) = res {
@@ -1169,6 +1180,26 @@ impl SmtParser {
             }
         } else {
             Err(SmtParseError::unrecog(v))
+        }
+    }
+
+    fn parse_ite(&mut self, v:&Value)->Result<StringToken,SmtParseError>{
+        // Syntax: (ite (assertion) TrueString FalseString)
+        let args=self.get_args(v)?;
+        if args.len()!=3{
+            return Err(SmtParseError::unexpected(v, "ite must have 3 args."));
+        }
+        let (assertion,true_string,false_string)=(args[0],args[1],args[2]);
+        let true_string=self.parse_string_type(true_string)?;
+        let false_string=self.parse_string_type(false_string)?;
+        match (true_string,false_string){
+            (StringToken::Val(string1),StringToken::Val(string2))=>{
+                let mut ret_val=HashMap::new();
+                ret_val.insert(string1, assertion.clone());
+                ret_val.insert(string2, Value::cons(Value::symbol("not"), Value::cons(assertion.clone(), Value::Null)));
+                Ok(StringToken::Conditional(ret_val))
+            }
+            _=>Err(SmtParseError::Unsupported(format!("Nested ite's and string variables in ite not supported.")))
         }
     }
 
