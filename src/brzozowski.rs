@@ -144,7 +144,7 @@ pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
 }
 
 pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<GenRegex> {
-    println!("taking d({}, {})", gre, deriv_char);
+    // println!("taking d({}, {})", gre, deriv_char);
     match gre.as_ref() {
         GenRegex::EmptySet => GenRegex::empty_set(),
         GenRegex::Epsilon => GenRegex::empty_set(),
@@ -379,16 +379,16 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 }
 pub fn nullable_projection(gre: &Rc<GenRegex>) -> Vec<Vec<Rc<Predicate>>> {
     let nullable_gre = &nullable(gre);
-    println!("{}", nullable_gre);
+    // println!("{}", nullable_gre);
     let nullable_predicates = nullable_projection_helper(nullable_gre);
-    println!("{}", nullable_predicates);
+    // println!("{}", nullable_predicates);
     evaluate_complete(&nullable_predicates)
     //nullable_predicatesEval
 }
 
 pub fn matching(gre: &Rc<GenRegex>, proposed: &str) -> bool {
-    println!("the proposed string is {}", proposed);
-    println!("the proposed gre is {}", gre);
+    // println!("the proposed string is {}", proposed);
+    // println!("the proposed gre is {}", gre);
     let expr = &simplifies(gre);
     if proposed.is_empty() {
         return !matches!(nullable_projection(expr)[0][0].as_ref(), Predicate::False);

@@ -6,11 +6,11 @@
 #![allow(unused_variables)]
 #![allow(clippy::single_match)]
 
-use crate::classes::StringIndex;
 use crate::classes::{
-    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, RangeConstr, SimpleSub, StringVar,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, RangeConstr, SimpleSub, StringIndex, StringVar,
     SubExpr,
 };
+
 use disjoint_sets::UnionFind;
 use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet};
@@ -633,11 +633,8 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
                 for right_elem in &right_null {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
                     let ret = merge(union_lr);
-                    match ret {
-                        Some(simple_sub) => {
-                            ret_set.insert(simple_sub);
-                        }
-                        _ => {}
+                    if let Some(simple_sub) = ret {
+                        ret_set.insert(simple_sub);
                     }
                 }
             }
@@ -651,11 +648,8 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
                 for right_elem in &right_null {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
                     let ret = merge(union_lr);
-                    match ret {
-                        Some(simple_sub) => {
-                            ret_set.insert(simple_sub);
-                        }
-                        _ => {}
+                    if let Some(simple_sub) = ret {
+                        ret_set.insert(simple_sub);
                     }
                 }
             }
