@@ -14,7 +14,6 @@ use lexpr::{self, Value};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
-use std::hash::Hash;
 use std::rc::Rc;
 
 /*
@@ -1833,7 +1832,7 @@ mod tests {
     // TODO: Equality not supported for now
     #[ignore]
     #[test]
-    fn test_passw_eq_sat1() {
+    fn test_equality() {
         let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
         println!("Parsed s-expression: {:?}", smt_result);
 
@@ -1878,6 +1877,13 @@ mod tests {
         let expected = GenRegex::Union(eq1, eq2);
         assert_eq!(gen_regex_unwrapped, expected);
         assert_eq!(brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped)), true);
+    }
+
+    // TODO: Equality not supported for now
+    #[ignore]
+    #[test]
+    fn test_disequality() {
+        assert_unsatisfiable("benchmarks/simple_neq_unsat.smt2")
     }
 
     // TODO
@@ -2011,5 +2017,38 @@ mod tests {
     #[test]
     fn test_not2() {
         assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
+    }
+
+    // Diverging
+    #[ignore]
+    #[test]
+    fn test_passw_complement_1() {
+        assert_satisfiable("benchmarks/passw_complex_sat_1.smt2");
+    }
+
+    // Diverging
+    #[ignore]
+    #[test]
+    fn test_passw_complement_2() {
+        assert_satisfiable("benchmarks/passw_complex_sat_2.smt2");
+    }
+
+    #[test]
+    fn test_passw_complement_3() {
+        assert_satisfiable("benchmarks/passw_sat_4.smt2");
+    }
+
+    // Diverging
+    #[ignore]
+    #[test]
+    fn test_passw_complement_4() {
+        assert_unsatisfiable("benchmarks/passw_very_complex_unsat.smt2");
+    }
+
+    // Diverging
+    #[ignore]
+    #[test]
+    fn test_zelkova_ex() {
+        assert_unsatisfiable("benchmarks/zelkova_unsat.smt2")
     }
 }
