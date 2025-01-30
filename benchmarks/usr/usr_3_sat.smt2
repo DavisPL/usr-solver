@@ -11,5 +11,5 @@
    (re.++ (re.++ (re.* (re.union (str.to_re "a") (str.to_re "b"))) (str.to_re "b")) (str.to_re a))
    (re.* (re.union (str.to_re "a") (str.to_re "b"))))
    (str.to_re "a")))
-  (str.to_re (ite (str.in_re a (str.to_re "b")) "b" "a""b")))))
+  (str.to_re (ite (str.in_re a (str.to_re "b")) "b" "ab")))))
 (check-sat)
