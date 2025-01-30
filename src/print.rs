@@ -210,11 +210,21 @@ impl Display for GenRegexPrintHelper<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.g {
             // Base cases
+            #[cfg(target_os = "macos")]
             GenRegex::EmptySet => {
                 write!(f, "∅")
             }
+            #[cfg(not(target_os = "macos"))]
+            GenRegex::EmptySet => {
+                write!(f, "{{}}")
+            }
+            #[cfg(target_os = "macos")]
             GenRegex::Epsilon => {
                 write!(f, "ε")
+            }
+            #[cfg(not(target_os = "macos"))]
+            GenRegex::Epsilon => {
+                write!(f, "\"\"")
             }
             GenRegex::Sigma => {
                 write!(f, ".")
