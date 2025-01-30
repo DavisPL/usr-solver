@@ -153,25 +153,24 @@ pub struct SubExpr {
 pub struct AntimirovElement {
     deriv_expression: Rc<GenRegex>,
     subs: SimpleSub,
-    range_constraints: BTreeMap<CharVar, RangeConstr>,
 }
 
 impl AntimirovElement {
-    pub fn new(
-        deriv_expression: Rc<GenRegex>,
-        subs: SimpleSub,
-        range_constraints: BTreeMap<CharVar, RangeConstr>,
-    ) -> Self {
+    pub fn new(deriv_expression: Rc<GenRegex>, subs: SimpleSub) -> Self {
         Self {
             deriv_expression,
             subs,
-            range_constraints,
+        }
+    }
+    pub fn new_epsilon() -> Self {
+        Self {
+            deriv_expression: GenRegex::epsilon(),
+            subs: SimpleSub::empty(),
         }
     }
 
     pub fn add_range(&mut self, key: CharVar, start: char, end: char) {
-        let value = RangeConstr::new(start, end);
-        self.range_constraints.insert(key, value);
+        self.subs.add_range(key, start, end);
     }
     pub fn get_expr(&self) -> &Rc<GenRegex> {
         &self.deriv_expression
@@ -180,7 +179,7 @@ impl AntimirovElement {
         &self.subs
     }
     pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
-        &self.range_constraints
+        self.subs.get_ranges()
     }
 
     pub fn into_set(self) -> HashSet<Self> {
@@ -309,6 +308,7 @@ impl SubExpr {
 pub struct AnySub {
     string_to: BTreeMap<StringVar, Vec<SubExpr>>,
     char_to: BTreeMap<CharVar, Vec<CharExpression>>,
+    range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
 }
 
 /// Represents a simple sub (in a normalized form)
@@ -316,6 +316,7 @@ pub struct AnySub {
 pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
+    range_constraints: BTreeMap<CharVar, RangeConstr>,
 }
 
 impl AnySub {
@@ -325,13 +326,41 @@ impl AnySub {
     pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
         &self.char_to
     }
+    pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
+        self.range_constraints.take()
+    }
 }
+
+fn merge_range_constraints(
+    constraints1: &BTreeMap<CharVar, RangeConstr>,
+    constraints2: &BTreeMap<CharVar, RangeConstr>,
+) -> Option<BTreeMap<CharVar, RangeConstr>> {
+    let mut constraints = constraints1.clone();
+    for (key, val) in constraints2 {
+        if let Some(other_val) = constraints.get(key) {
+            if let Some(merged_range) = val.intersect(other_val) {
+                constraints.insert(key.clone(), merged_range);
+            } else {
+                return None;
+            }
+        } else {
+            constraints.insert(key.clone(), val.clone());
+        }
+    }
+    Some(constraints)
+}
+
 impl SimpleSub {
     pub fn new(
         string_to: BTreeMap<StringVar, SubExpr>,
         char_to: BTreeMap<CharVar, CharExpression>,
+        range_constraints: BTreeMap<CharVar, RangeConstr>,
     ) -> Self {
-        SimpleSub { string_to, char_to }
+        SimpleSub {
+            string_to,
+            char_to,
+            range_constraints,
+        }
     }
     pub fn get_str_map(&self) -> &BTreeMap<StringVar, SubExpr> {
         &self.string_to
@@ -366,9 +395,11 @@ impl SimpleSub {
         self.char_to.insert(key, value);
     }
     pub fn empty() -> Self {
+        // Sub with empty HashMaps
         SimpleSub {
-            string_to: BTreeMap::new(), // Empty HashMap
-            char_to: BTreeMap::new(),   // Empty HashMap
+            string_to: BTreeMap::new(),
+            char_to: BTreeMap::new(),
+            range_constraints: BTreeMap::new(),
         }
     }
     pub fn union(self, other: SimpleSub) -> AnySub {
@@ -389,13 +420,30 @@ impl SimpleSub {
             combined_char_to.entry(key).or_default().push(value);
         }
 
+        let range_constrs =
+            merge_range_constraints(&self.range_constraints, &other.range_constraints);
+
         AnySub {
             string_to: combined_string_to,
             char_to: combined_char_to,
+            range_constraints: range_constrs,
         }
     }
     pub fn into_set(self) -> HashSet<SimpleSub> {
         HashSet::from([self])
+    }
+
+    pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
+        &self.range_constraints
+    }
+
+    pub fn set_ranges(&mut self, ranges: BTreeMap<CharVar, RangeConstr>) {
+        self.range_constraints = ranges;
+    }
+
+    pub fn add_range(&mut self, key: CharVar, start: char, end: char) {
+        let value = RangeConstr::new(start, end);
+        self.range_constraints.insert(key, value);
     }
 }
 
