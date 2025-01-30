@@ -6,9 +6,10 @@
 #![allow(unused_variables)]
 #![allow(clippy::single_match)]
 
+use crate::brzozowski;
 use crate::classes::{
-    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, RangeConstr, SimpleSub, StringIndex, StringVar,
-    SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, Predicate, RangeConstr, SimpleSub,
+    StringIndex, StringVar, SubExpr,
 };
 
 use disjoint_sets::UnionFind;
@@ -335,7 +336,11 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
                 None => expr.clone(),
             }
         }
-        GenRegex::StringSlice(string_var, _) => todo!(),
+        GenRegex::StringSlice(string_var, _) => {
+            // TODO: Placeholder
+            // Implement this case
+            expr.clone()
+        }
         GenRegex::Union(gen_regex1, gen_regex2) => Rc::new(GenRegex::Union(
             sub_in(gen_regex1, substitution),
             sub_in(gen_regex2, substitution),
@@ -352,7 +357,11 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
         GenRegex::Complement(gen_regex) => {
             Rc::new(GenRegex::Complement(sub_in(gen_regex, substitution)))
         }
-        GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => todo!(),
+        GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => {
+            // TODO: Placeholder
+            // Implement this case
+            expr.clone()
+        }
     }
 }
 
@@ -499,10 +508,12 @@ pub fn derivative(
             unimplemented!();
         }
         GenRegex::Complement(_) => {
-            unimplemented!();
+            let deriv = brzozowski::derivative(gre, deriv_char);
+            AntimirovElement::new(deriv, SimpleSub::empty(), BTreeMap::new()).into_set()
         }
         GenRegex::IfThenElse(_, _, _) => {
-            unimplemented!();
+            let deriv = brzozowski::derivative(gre, deriv_char);
+            AntimirovElement::new(deriv, SimpleSub::empty(), BTreeMap::new()).into_set()
         }
     }
 }
@@ -592,10 +603,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::Epsilon => SimpleSub::empty().into_set(),
         GenRegex::Sigma => HashSet::new(),
         GenRegex::Range(_, _) => HashSet::new(),
-        GenRegex::CharExpression(c_expr) => match c_expr {
-            CharExpression::CharVar(_) => HashSet::new(),
-            CharExpression::Literal(_) => HashSet::new(),
-        },
+        GenRegex::CharExpression(c_expr) => HashSet::new(),
         GenRegex::StringVar(s_var) => {
             let mut subs = HashSet::new();
             let mut string_to = BTreeMap::new();
@@ -641,19 +649,126 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             ret_set
         }
         GenRegex::Kleene(_) => SimpleSub::empty().into_set(),
+        GenRegex::Complement(gre1) => {
+            // Use complement of the nullable function
+            nullable_complement(gre1)
+        }
+        GenRegex::IfThenElse(p, g1, g2) => {
+            let (left, right) = sub_from_predicate(p);
+            let mut result = HashSet::new();
+            if let Some(left_sub) = left {
+                let left_nullable = nullable(g1);
+                for sub in &left_nullable {
+                    let union_lr: AnySub = left_sub.clone().union(sub.clone());
+                    if let Some(ret) = merge(union_lr) {
+                        result.insert(ret);
+                    }
+                }
+            }
+            if let Some(right_sub) = right {
+                let right_nullable = nullable(g2);
+                for sub in &right_nullable {
+                    let union_lr: AnySub = right_sub.clone().union(sub.clone());
+                    if let Some(ret) = merge(union_lr) {
+                        result.insert(ret);
+                    }
+                }
+            }
+            result
+        }
         GenRegex::StringSlice(_, _) => {
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
             unimplemented!();
         }
-        GenRegex::Complement(_) => {
+    }
+}
+
+/// Optimization to determine subs for whether the *complement* of a regex is nullable
+pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
+    match gre.as_ref() {
+        GenRegex::EmptySet => SimpleSub::empty().into_set(),
+        GenRegex::Epsilon => HashSet::new(),
+        GenRegex::Sigma => SimpleSub::empty().into_set(),
+        GenRegex::Range(_, _) => SimpleSub::empty().into_set(),
+        GenRegex::CharExpression(c_expr) => SimpleSub::empty().into_set(),
+        GenRegex::StringVar(s_var) => {
+            // The hard case
+            // Here we just enumerate if we come across the case.
+            // TODO
+            unimplemented!()
+            // let mut subs = HashSet::new();
+            // let mut string_to = BTreeMap::new();
+            // string_to.insert(s_var.clone(), SubExpr::empty());
+            // let string_sub = SimpleSub::new(string_to, BTreeMap::new());
+            // subs.insert(string_sub);
+            // subs
+        }
+        GenRegex::Union(side1, side2) => {
+            // Matches logic for GenRegex::Intersection in the regular nullable case
+            let left_null = nullable_complement(&Rc::clone(side1));
+            let right_null = nullable_complement(&Rc::clone(side2));
+            let mut ret_set = HashSet::new();
+            for left_elem in &left_null {
+                for right_elem in &right_null {
+                    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
+                    let ret = merge(union_lr);
+                    if let Some(simple_sub) = ret {
+                        ret_set.insert(simple_sub);
+                    }
+                }
+            }
+            ret_set
+        }
+        GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
+            // Matches logic for GenRegex::Union in the regular nullable case
+            let left_null = nullable_complement(&Rc::clone(side1));
+            let right_null = nullable_complement(&Rc::clone(side2));
+            let union_lr: HashSet<_> = left_null.union(&right_null).cloned().collect();
+            union_lr
+        }
+        GenRegex::Kleene(_) => HashSet::new(),
+        GenRegex::Complement(gre1) => {
+            // Flip the negation context
+            nullable(gre1)
+        }
+        GenRegex::IfThenElse(p, g1, g2) => {
+            let (left, right) = sub_from_predicate(p);
+            let mut result = HashSet::new();
+            if let Some(left_sub) = left {
+                let left_nullable = nullable_complement(g1);
+                for sub in &left_nullable {
+                    let union_lr: AnySub = left_sub.clone().union(sub.clone());
+                    if let Some(ret) = merge(union_lr) {
+                        result.insert(ret);
+                    }
+                }
+            }
+            if let Some(right_sub) = right {
+                let right_nullable = nullable_complement(g2);
+                for sub in &right_nullable {
+                    let union_lr: AnySub = right_sub.clone().union(sub.clone());
+                    if let Some(ret) = merge(union_lr) {
+                        result.insert(ret);
+                    }
+                }
+            }
+            result
+        }
+        GenRegex::StringSlice(_, _) => {
             unimplemented!();
         }
-        GenRegex::IfThenElse(_, _, _) => {
+        GenRegex::StringIndex(_) => {
             unimplemented!();
         }
     }
+}
+
+pub fn sub_from_predicate(p: &Predicate) -> (Option<SimpleSub>, Option<SimpleSub>) {
+    // TODO: Placeholder
+    // This implementation is wrong, just seeing if it works
+    (Some(SimpleSub::empty()), Some(SimpleSub::empty()))
 }
 
 /*
