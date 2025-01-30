@@ -311,6 +311,9 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
 
             match (true_proj.as_ref(), false_proj.as_ref()) {
                 (Predicate::False, Predicate::False) => Rc::new(Predicate::False),
+                (Predicate::True, Predicate::True) => Rc::new(Predicate::True),
+                (Predicate::True, Predicate::False) => Rc::clone(pred),
+                (Predicate::False, Predicate::True) => Rc::new(Predicate::Not(Rc::clone(pred))),
                 (Predicate::False, _) => Rc::new(Predicate::And(
                     Rc::new(Predicate::Not(Rc::clone(pred))),
                     Rc::clone(&false_proj),
@@ -318,7 +321,6 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
                 (_, Predicate::False) => {
                     Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj)))
                 }
-                (Predicate::True, Predicate::True) => Rc::new(Predicate::True),
                 (Predicate::True, _) => Rc::new(Predicate::Or(
                     Rc::clone(pred),
                     Rc::new(Predicate::And(
@@ -591,6 +593,70 @@ fn simplify_if_then_else(
             }
         }
     }
+    if let Predicate::And(ref left_pred, ref right_pred) = pred.as_ref() {
+        if let Predicate::GreaterThan(ref left_var, ref left_val) = left_pred.as_ref() {
+            if let Predicate::LessThan(ref right_var, ref right_val) = right_pred.as_ref() {
+                //let inner_pred = Rc::new(Predicate::Not(left_pred.clone()));
+                if (*left_val as u32) == 0{
+                    return simplifies(&Rc::new(GenRegex::IfThenElse(Rc::clone(right_pred), Rc::clone(&simplified_true), Rc::clone(&simplified_false))));
+                }
+                let inner_pred = Rc::new(Predicate::LessThan(left_var.clone(), char::from_u32(*left_val as u32 - 1).expect("Invalid c after subtraction")));
+ 
+
+
+                return simplifies(&Rc::new(GenRegex::IfThenElse(
+                    Rc::clone(right_pred),
+                    Rc::new(GenRegex::IfThenElse(
+                        inner_pred,
+                        Rc::clone(&simplified_false),
+                        Rc::clone(&simplified_true),
+                    )),
+                    Rc::clone(&simplified_false),
+                )));
+            } 
+
+
+        }
+        else if let Predicate::LessThan(ref left_var, ref left_val) = left_pred.as_ref() {
+            if let Predicate::GreaterThan(ref right_var, ref right_val) = right_pred.as_ref() {
+                if (*right_val as u32) == 0{
+                    return simplifies(&Rc::new(GenRegex::IfThenElse(Rc::clone(left_pred), Rc::clone(&simplified_true), Rc::clone(&simplified_false))));
+                }
+                let inner_pred = Rc::new(Predicate::LessThan(right_var.clone(), char::from_u32(*right_val as u32 - 1).expect("Invalid character after subtraction")));
+                return simplifies(&Rc::new(GenRegex::IfThenElse(
+                    Rc::clone(left_pred),
+                    Rc::new(GenRegex::IfThenElse(
+                        inner_pred,
+                        Rc::clone(&simplified_false),
+                        Rc::clone(&simplified_true),
+                    )),
+                    Rc::clone(&simplified_false),
+                )));
+            } 
+
+
+        }
+    }
+    if let GenRegex::IfThenElse(ref outer_pred, ref inner_true, ref inner_false) = &*simplified_true {
+        if outer_pred == pred {
+            return Rc::new(GenRegex::IfThenElse(
+                Rc::clone(outer_pred),
+                Rc::clone(inner_true), 
+                Rc::clone(&simplified_false), 
+            ));
+        }
+    }
+    else if let GenRegex::IfThenElse(ref outer_pred, ref inner_true, ref inner_false) = &*simplified_false {
+        if outer_pred == pred {
+            return Rc::new(GenRegex::IfThenElse(
+                Rc::clone(outer_pred),
+                Rc::clone(&simplified_true), 
+                Rc::clone(inner_false), 
+            ));
+        }
+    }
+
+
 
     Rc::new(GenRegex::IfThenElse(
         Rc::clone(pred),
