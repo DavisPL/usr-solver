@@ -816,21 +816,17 @@ fn sub_from_eq(
     expr2: &Rc<MaybeCharExpression>,
 ) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
     match expr1.as_ref() {
-        MaybeCharExpression::CharExpression(c1) => {
-            match c1 {
-                CharExpression::CharVar(var1) => {
-                    // let mut sub = SimpleSub::empty();
-                    // TODO
-                    unimplemented!()
-                    // sub.set_char_var(var1.clone(), expr2.as_ref().clone());
-                    // (sub.into_set(), HashSet::new())
-                }
-                CharExpression::Literal(_) => {
-                    // TODO
-                    unimplemented!()
-                    // (SimpleSub::empty().into_set(), HashSet::new())
-                }
-            }
+        MaybeCharExpression::CharExpression(CharExpression::CharVar(var)) => {
+            // let mut sub = SimpleSub::empty();
+            // TODO
+            unimplemented!()
+            // sub.set_char_var(var1.clone(), expr2.as_ref().clone());
+            // (sub.into_set(), HashSet::new())
+        }
+        MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
+            // TODO
+            unimplemented!()
+            // (SimpleSub::empty().into_set(), HashSet::new())
         }
         MaybeCharExpression::StringIndex(_) => {
             // TODO
