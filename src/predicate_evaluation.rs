@@ -425,13 +425,23 @@ pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate> {
             Predicate::True => Rc::new(Predicate::False),
             Predicate::False => Rc::new(Predicate::True),
             Predicate::LessThan(var, val) => Rc::new(Predicate::And(
-                    Rc::new(Predicate::GreaterThan(var.clone(), *val)),
-                    Rc::new(Predicate::Not(Rc::new(Predicate::Equals(var.clone(), Rc::new(MaybeCharExpression::CharExpression(CharExpression::Literal(*val)))))
-                                                                   )))),
+                Rc::new(Predicate::GreaterThan(var.clone(), *val)),
+                Rc::new(Predicate::Not(Rc::new(Predicate::Equals(
+                    var.clone(),
+                    Rc::new(MaybeCharExpression::CharExpression(
+                        CharExpression::Literal(*val),
+                    )),
+                )))),
+            )),
             Predicate::GreaterThan(var, val) => Rc::new(Predicate::And(
-                    Rc::new(Predicate::LessThan(var.clone(), *val)),
-                    Rc::new(Predicate::Not(Rc::new(Predicate::Equals(var.clone(), Rc::new(MaybeCharExpression::CharExpression(CharExpression::Literal(*val)))))
-                                                                   )))),
+                Rc::new(Predicate::LessThan(var.clone(), *val)),
+                Rc::new(Predicate::Not(Rc::new(Predicate::Equals(
+                    var.clone(),
+                    Rc::new(MaybeCharExpression::CharExpression(
+                        CharExpression::Literal(*val),
+                    )),
+                )))),
+            )),
 
             _ => Rc::clone(pred),
         },
