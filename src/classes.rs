@@ -426,15 +426,13 @@ impl IndexMut<&StringVar> for SimpleSub {
 pub enum Predicate {
     And(Rc<Predicate>, Rc<Predicate>),
     Or(Rc<Predicate>, Rc<Predicate>),
-    /*Rewrite ideas TODO, would require rewriting DNF conversion for predicate evaluation
-    And(Vec<Rc<Predicate>>),
-    Or(Vec<Rc<Predicate>>),
-     */
     Not(Rc<Predicate>),
     True,
     False,
     Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
     EqualLength(Rc<StringVar>, i32),
+    //LessThan(Rc<MaybeCharExpression>, char),
+    //GreaterThan(Rc<MaybeCharExpression>, char),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
