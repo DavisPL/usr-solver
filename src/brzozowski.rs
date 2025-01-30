@@ -318,24 +318,18 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
                 (_, Predicate::False) => {
                     Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj)))
                 }
-                (Predicate::True, Predicate::True)=>{
-                    Rc::new(Predicate::True)
-                }
-                (Predicate::True, _) => {
-                    Rc::new(Predicate::Or(
-                        Rc::clone(pred),
-                        Rc::new(Predicate::And(
-                            Rc::new(Predicate::Not(Rc::clone(pred))),
-                            Rc::clone(&false_proj),
-                        )),
-                    ))
-                }
-                (_, Predicate::True) => {
-                    Rc::new(Predicate::Or(
-                        Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj))),
-                        Rc::new(Predicate::Not(Rc::clone(pred)))
-                    ))
-                }
+                (Predicate::True, Predicate::True) => Rc::new(Predicate::True),
+                (Predicate::True, _) => Rc::new(Predicate::Or(
+                    Rc::clone(pred),
+                    Rc::new(Predicate::And(
+                        Rc::new(Predicate::Not(Rc::clone(pred))),
+                        Rc::clone(&false_proj),
+                    )),
+                )),
+                (_, Predicate::True) => Rc::new(Predicate::Or(
+                    Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj))),
+                    Rc::new(Predicate::Not(Rc::clone(pred))),
+                )),
                 _ => Rc::new(Predicate::Or(
                     Rc::new(Predicate::And(Rc::clone(pred), Rc::clone(&true_proj))),
                     Rc::new(Predicate::And(
