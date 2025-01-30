@@ -8,8 +8,8 @@
 
 use crate::brzozowski;
 use crate::classes::{
-    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, Predicate, RangeConstr, SimpleSub,
-    StringIndex, StringVar, SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression, Predicate,
+    RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
 };
 
 use disjoint_sets::UnionFind;
@@ -359,11 +359,6 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
                 None => expr.clone(),
             }
         }
-        GenRegex::StringSlice(string_var, _) => {
-            // TODO: Placeholder
-            // Implement this case
-            expr.clone()
-        }
         GenRegex::Union(gen_regex1, gen_regex2) => Rc::new(GenRegex::Union(
             sub_in(gen_regex1, substitution),
             sub_in(gen_regex2, substitution),
@@ -385,6 +380,71 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
             // Implement this case
             expr.clone()
         }
+        GenRegex::StringSlice(string_var, _) => {
+            // TODO: Placeholder
+            // Implement this case
+            expr.clone()
+        }
+    }
+}
+
+fn sub_in_predicate(pred: &Rc<Predicate>, sub: &SimpleSub) -> Rc<Predicate> {
+    match pred.as_ref() {
+        Predicate::True => Rc::clone(pred),
+        Predicate::False => Rc::clone(pred),
+        Predicate::Not(p) => Rc::new(Predicate::Not(sub_in_predicate(p, sub))),
+        Predicate::And(p1, p2) => Rc::new(Predicate::And(
+            sub_in_predicate(p1, sub),
+            sub_in_predicate(p2, sub),
+        )),
+        Predicate::Or(p1, p2) => Rc::new(Predicate::Or(
+            sub_in_predicate(p1, sub),
+            sub_in_predicate(p2, sub),
+        )),
+        Predicate::Equals(expr1, expr2) => {
+            let new_expr1 = sub_in_maybe_char_expr(expr1, sub);
+            let new_expr2 = sub_in_maybe_char_expr(expr2, sub);
+            Rc::new(Predicate::Equals(new_expr1, new_expr2))
+        }
+        Predicate::LessThan(expr, c) => {
+            let new_expr = sub_in_maybe_char_expr(expr, sub);
+            Rc::new(Predicate::LessThan(new_expr, *c))
+        }
+        Predicate::GreaterThan(expr, c) => {
+            let new_expr = sub_in_maybe_char_expr(expr, sub);
+            Rc::new(Predicate::LessThan(new_expr, *c))
+        }
+        Predicate::EqualLength(var, len) => {
+            // TODO
+            unimplemented!()
+            // let new_var = sub_in_string_var(var, sub);
+            // Rc::new(Predicate::EqualLength(new_var, *len))
+        }
+    }
+}
+
+fn sub_in_maybe_char_expr(expr: &MaybeCharExpression, sub: &SimpleSub) -> Rc<MaybeCharExpression> {
+    match expr {
+        MaybeCharExpression::CharExpression(c_expr) => {
+            let new_expr = sub_in_char_expr(c_expr, sub);
+            Rc::new(MaybeCharExpression::CharExpression(new_expr))
+        }
+        MaybeCharExpression::StringIndex(string_index) => {
+            // TODO
+            unimplemented!()
+            // let new_var = sub_in_string_var(&string_index.var, sub);
+            // Rc::new(MaybeCharExpression::StringIndex(StringIndex {
+            //     var: new_var,
+            //     index: string_index.index,
+            // }))
+        }
+    }
+}
+
+fn sub_in_char_expr(expr: &CharExpression, sub: &SimpleSub) -> CharExpression {
+    match expr {
+        CharExpression::CharVar(var) => sub.get_char_var(var).unwrap_or(expr).clone(),
+        CharExpression::Literal(_) => expr.clone(),
     }
 }
 
@@ -724,21 +784,64 @@ pub fn sub_from_predicate(p: &Predicate) -> (HashSet<SimpleSub>, HashSet<SimpleS
     match p {
         Predicate::True => (SimpleSub::empty().into_set(), HashSet::new()),
         Predicate::False => (HashSet::new(), SimpleSub::empty().into_set()),
-        // And(p1, p2) => {
-
-        // }
-        // Or(Rc<Predicate>, Rc<Predicate>),
-        // Not(Rc<Predicate>),
-        // Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
-        // EqualLength(Rc<StringVar>, i32),
-        // LessThan(Rc<MaybeCharExpression>, char), //Includes Equal to
-        // GreaterThan(Rc<MaybeCharExpression>, char), //Includes Equal to
-        // TODO
-        _ => unimplemented!(),
+        Predicate::Not(p) => {
+            let (left, right) = sub_from_predicate(p);
+            (right, left)
+        }
+        Predicate::And(p1, p2) => {
+            let (left1, right1) = sub_from_predicate(p1);
+            let (left2, right2) = sub_from_predicate(p2);
+            (merge_sets(&left1, &left2), union_sets(right1, right2))
+        }
+        Predicate::Or(p1, p2) => {
+            let (left1, right1) = sub_from_predicate(p1);
+            let (left2, right2) = sub_from_predicate(p2);
+            (union_sets(left1, left2), merge_sets(&right1, &right2))
+        }
+        Predicate::Equals(expr1, expr2) => sub_from_eq(expr1, expr2),
+        Predicate::EqualLength(var, len) => sub_from_eq_len(var, len),
+        Predicate::LessThan(expr, c) => {
+            // TODO: Best to handle this as range constraints
+            unimplemented!()
+        }
+        Predicate::GreaterThan(expr, c) => {
+            // TODO: Best to handle this as range constraints
+            unimplemented!()
+        }
     }
-    // TODO: Placeholder
-    // This implementation is wrong, just seeing if it works
-    // (Some(SimpleSub::empty()), Some(SimpleSub::empty()))
+}
+
+fn sub_from_eq(
+    expr1: &Rc<MaybeCharExpression>,
+    expr2: &Rc<MaybeCharExpression>,
+) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
+    match expr1.as_ref() {
+        MaybeCharExpression::CharExpression(c1) => {
+            match c1 {
+                CharExpression::CharVar(var1) => {
+                    // let mut sub = SimpleSub::empty();
+                    // TODO
+                    unimplemented!()
+                    // sub.set_char_var(var1.clone(), expr2.as_ref().clone());
+                    // (sub.into_set(), HashSet::new())
+                }
+                CharExpression::Literal(_) => {
+                    // TODO
+                    unimplemented!()
+                    // (SimpleSub::empty().into_set(), HashSet::new())
+                }
+            }
+        }
+        MaybeCharExpression::StringIndex(_) => {
+            // TODO
+            unimplemented!()
+        }
+    }
+}
+
+pub fn sub_from_eq_len(var: &StringVar, len: &i32) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
+    // TODO
+    unimplemented!()
 }
 
 /*
