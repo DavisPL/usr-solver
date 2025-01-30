@@ -29,6 +29,13 @@ impl SatChecker {
             } else {
                 let deriv = derivative(&layer.gre, &self.get_fresh_var(layer.depth));
                 for ele in deriv {
+                    // Check range
+                    let range = ele.get_ranges();
+                    for (var, range) in range {
+                        // TODO: Placeholder
+                        eprintln!("TODO: handle range constraint {} on {}", range, var);
+                        // For now, ignore and continue
+                    }
                     if !visited.contains(ele.get_expr()) {
                         sat_stack.push_back(DerivativeDepth {
                             gre: ele.get_expr().clone(),

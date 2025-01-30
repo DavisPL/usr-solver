@@ -8,101 +8,17 @@
 
 use crate::classes::StringIndex;
 use crate::classes::{
-    AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MergeResult, SimpleSub,
-    StringVar, SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, RangeConstr, SimpleSub, StringVar,
+    SubExpr,
 };
-//use crate::classes::Pair;
-//use crate::classes::Subs::Sub;
-//use crate::brzozowski;
 use disjoint_sets::UnionFind;
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /*
-    Some placeholder functions and types
-
-    NB: There's a bit of shady design going on with converting GenRegex to Strings and back,
-    and using things like &key[4..key.len() - 1] to extract the name of a StringVar.
-    These are not super extensible, we should instead use custom types for things like charvars and
-    stringvars that will support these operations more directly.
-
-    The below will help transition in that direction by wrapping the GenRegex (when used as a string)
-    in a type GenRegexId which supports the necessary operations.
+    Union-find functions
 */
-
-// Use String for IDs
-//#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-//struct GenRegexId(String);
-
-// Function used to inset GenRegexes into a HashMap.
-// TBD: This should probably be replaced by using Hash directly on
-// GenRegex, which should be more efficient.
-//fn gre_id(gre: &Rc<GenRegex>) -> GenRegexId {
-// Use ToString for now
-//GenRegexId(gre)
-//}
-
-//impl GenRegexId {
-fn is_char_var(gre: &Rc<GenRegex>) -> bool {
-    if let GenRegex::CharExpression(c_expr) = gre.as_ref() {
-        match c_expr {
-            CharExpression::Literal(_) => false,
-            CharExpression::CharVar(_) => true,
-        }
-    } else {
-        false
-    }
-    //self.0.starts_with("char(") && self.0.ends_with(")")
-}
-
-fn get_char_var(gre: &Rc<GenRegex>) -> Option<CharExpression> {
-    if is_char_var(gre) {
-        if let GenRegex::CharExpression(c_expr) = gre.as_ref() {
-            Some(c_expr.clone())
-        } else {
-            None
-        }
-        //let name = &self.0[5..self.0.len() - 1];
-        //Some(CharExpression::CharVar(name.to_string()))
-    } else {
-        None
-    }
-}
-
-/*fn into_gre_char_expr(gre: &Rc<GenRegex>) -> GenRegex {
-    GenRegex::CharExpression(Rc::new(CharExpression::Literal(gre.0)))
-}*/
-
-fn is_string_var(gre: &Rc<GenRegex>) -> bool {
-    matches!(gre.as_ref(), GenRegex::StringVar(_))
-}
-
-fn get_string_var(gre: &Rc<GenRegex>) -> Option<StringVar> {
-    if is_string_var(gre) {
-        if let GenRegex::StringVar(s_var) = gre.as_ref() {
-            Some(s_var.clone())
-        } else {
-            None
-        }
-    } else {
-        None
-    }
-}
-//}
-
-type GenRegexPairSet = BTreeSet<(Rc<GenRegex>, Rc<GenRegex>)>;
-type GenRegexHashSet = HashSet<(Rc<GenRegex>, Rc<GenRegex>)>;
-type GenRegexHashMap = HashMap<Rc<GenRegex>, Rc<GenRegex>>;
-type GenRegexBoolHashMap = HashMap<Rc<GenRegex>, bool>;
-type OuterSet = HashSet<(Rc<GenRegex>, GenRegexPairSet)>;
-
-/*
-    Main functions
-*/
-
-//TODO: DEbug
 
 fn union_over_set(
     union_find: &mut UnionFind<usize>,
@@ -153,7 +69,8 @@ fn union_over_set(
     }
     true
 }
-fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
+
+fn count_union_elems(substitutions: &AnySub) -> usize {
     /*let mut char_vars: HashSet<CharExpression> = HashSet::new();
     for sub in substitutions.get_str_map().values(){
         for sub_expr in sub{
@@ -181,7 +98,11 @@ fn count_union_elems(substitutions: &Rc<AnySub>) -> usize {
     count
 }
 
-fn merge(substitutions: Rc<AnySub>) -> MergeResult {
+/*
+    Substitution operations: merge, difference, and sub_in
+*/
+
+fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
 
@@ -209,7 +130,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
                     for (j, item_j) in eq_exprs.iter().enumerate() {
                         if i != j {
                             if ind < item_j.head_length() {
-                                return MergeResult::Bottom;
+                                return None;
                             } else {
                                 continue;
                             }
@@ -236,7 +157,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
                 &mut id_to_expr,
                 &mut canonical_map,
             ) {
-                return MergeResult::Bottom;
+                return None;
             } //TODO: Union everything together here (add in union_find element)
         }
     }
@@ -267,7 +188,7 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
             &mut id_to_expr,
             &mut canonical_map,
         ) {
-            return MergeResult::Bottom;
+            return None;
         }
         char_set = char_set.union(&temp_set).cloned().collect();
     }
@@ -311,33 +232,37 @@ fn merge(substitutions: Rc<AnySub>) -> MergeResult {
         }
         combined_expr.set_string_var(var.clone(), eq_exprs[0].clone());
     }
-    MergeResult::SimpleSub(combined_expr)
+    Some(combined_expr)
 }
 
-fn sub_difference(sub1: Rc<SimpleSub>, sub2: Rc<SimpleSub>) -> MergeResult {
-    if let MergeResult::SimpleSub(result) =
-        merge(Rc::new(sub1.as_ref().clone().union(sub2.as_ref().clone())))
-    {
-        let mut retsub = result.clone();
-        for char_var in sub2.get_char_map().keys() {
-            retsub.remove_char_map(char_var);
-        }
-        for (string_var, sub_expr1) in result.get_str_map() {
-            if let Some(sub_expr2) = sub2.get_string_var(string_var) {
-                retsub.remove_str_map(string_var);
-                if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
-                    retsub.get_char_map_mut().append(sub.get_char_map_mut());
-                    retsub.get_str_map_mut().append(sub.get_str_map_mut());
-                } else {
-                    return MergeResult::Bottom;
-                }
+fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<SimpleSub> {
+    let mut retsub = merged.clone();
+    for char_var in sub.get_char_map().keys() {
+        retsub.remove_char_map(char_var);
+    }
+    for (string_var, sub_expr1) in merged.get_str_map() {
+        if let Some(sub_expr2) = sub.get_string_var(string_var) {
+            retsub.remove_str_map(string_var);
+            if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
+                retsub.get_char_map_mut().append(sub.get_char_map_mut());
+                retsub.get_str_map_mut().append(sub.get_str_map_mut());
+            } else {
+                return None;
             }
         }
-        MergeResult::SimpleSub(retsub)
+    }
+    Some(retsub)
+}
+
+// Note: no longer used atm in favor of sub_difference_from_merge
+fn sub_difference(sub1: SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
+    if let Some(result) = merge(sub1.union(sub2.clone())) {
+        sub_difference_from_merge(&result, sub2)
     } else {
-        MergeResult::Bottom
+        None
     }
 }
+
 fn sub_expr_match(
     sub_expr1: &SubExpr,
     sub_expr2: &SubExpr,
@@ -369,216 +294,6 @@ fn sub_expr_match(
         retval.set_char_var(key.clone(), head1.clone());
     }
     Some(retval)
-}
-pub fn derivative(
-    gre: &Rc<GenRegex>,
-    deriv_char: &Rc<CharExpression>,
-) -> HashSet<AntimirovDerivativeElement> {
-    // println!("taking d({}, {})", gre, deriv_char);
-
-    match gre.as_ref() {
-        GenRegex::EmptySet => HashSet::new(),
-        GenRegex::Epsilon => HashSet::new(),
-        GenRegex::Sigma => HashSet::from([AntimirovDerivativeElement::new(
-            GenRegex::epsilon(),
-            SimpleSub::empty(),
-        )]),
-        GenRegex::Range(char1, char2) => {
-            let mut result =
-                AntimirovDerivativeElement::new(GenRegex::epsilon(), SimpleSub::empty());
-            match deriv_char.as_ref() {
-                CharExpression::Literal(literal) => {
-                    if literal < char1 || literal > char2 {
-                        return HashSet::new();
-                    }
-                }
-                CharExpression::CharVar(deriv_var) => {
-                    result.add_range(deriv_var.clone(), *char1, *char2);
-                }
-            }
-
-            HashSet::from([result])
-        }
-        GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
-            (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
-                if deriv_lit == literal_value {
-                    HashSet::from([AntimirovDerivativeElement::new(
-                        GenRegex::epsilon(),
-                        SimpleSub::empty(),
-                    )])
-                } else {
-                    HashSet::new()
-                }
-            }
-            (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
-                let mut char_to = BTreeMap::new();
-                char_to.insert(d_var.clone(), c_expr.clone());
-                let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
-                AntimirovDerivativeElement::set_from_merge(GenRegex::epsilon(), subs)
-            }
-            (_, CharExpression::CharVar(c_var)) => {
-                let mut char_to = BTreeMap::new();
-                char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
-                let subs = MergeResult::SimpleSub(SimpleSub::new(BTreeMap::new(), char_to));
-                AntimirovDerivativeElement::set_from_merge(GenRegex::epsilon(), subs)
-            }
-        },
-        GenRegex::StringVar(string_var) => {
-            let head = vec![deriv_char.as_ref().clone()];
-
-            let subexpr = SubExpr::new(head, true);
-
-            let mut string_to = BTreeMap::new();
-            string_to.insert(string_var.clone(), subexpr);
-
-            let substitution = SimpleSub::new(string_to, BTreeMap::new());
-
-            HashSet::from([AntimirovDerivativeElement::new(gre.clone(), substitution)])
-        }
-        GenRegex::Union(side1, side2) => {
-            let side1_deriv = derivative(side1, deriv_char);
-            let side2_deriv = derivative(side2, deriv_char);
-            side1_deriv.union(&side2_deriv).cloned().collect()
-        }
-        GenRegex::Intersect(left, right) => {
-            let p_deriv = derivative(left, deriv_char);
-            let q_deriv = derivative(right, deriv_char);
-            let mut ret_set = HashSet::new();
-            for p_sub in p_deriv {
-                for q_sub in &q_deriv {
-                    if let Some(ret) = merge_derivs_intersect(&p_sub, q_sub) {
-                        ret_set.insert(ret);
-                    }
-                }
-            }
-            ret_set
-        }
-        GenRegex::Concatenation(left, right) => {
-            let left_deriv = derivative(left, deriv_char);
-            let mut ret_set = HashSet::new();
-            for sub in left_deriv {
-                if let Some(ret) = apply_derivs_concat(&sub, right) {
-                    ret_set.insert(ret);
-                }
-            }
-
-            let p_nullable = nullable(left);
-            if !p_nullable.is_empty() {
-                let right_deriv = derivative(right, deriv_char);
-                for n_sub in p_nullable {
-                    for q_sub in &right_deriv {
-                        if let Some(ret) = merge_derivs_concat(&n_sub, q_sub) {
-                            ret_set.insert(ret);
-                        }
-                    }
-                }
-            }
-
-            ret_set
-        }
-        GenRegex::Kleene(expr) => {
-            let p_deriv = derivative(expr, deriv_char);
-            let mut ret_set = HashSet::new();
-            for sub in p_deriv {
-                let s_sub = sub.get_subs();
-                let ret = AntimirovDerivativeElement::new(
-                    Rc::new(GenRegex::Concatenation(
-                        sub.get_expr().clone(),
-                        sub_in(gre, s_sub),
-                    )),
-                    s_sub.clone(),
-                );
-                ret_set.insert(ret);
-            }
-            ret_set
-        }
-        GenRegex::StringSlice(_, _) => {
-            unimplemented!();
-        }
-        GenRegex::StringIndex(_) => {
-            unimplemented!();
-        }
-        GenRegex::Complement(_) => {
-            unimplemented!();
-        }
-        GenRegex::IfThenElse(_, _, _) => {
-            unimplemented!();
-        }
-    }
-}
-
-fn merge_derivs_intersect(
-    p: &AntimirovDerivativeElement,
-    q: &AntimirovDerivativeElement,
-) -> Option<AntimirovDerivativeElement> {
-    let left_elem = p.get_subs();
-    let right_elem = q.get_subs();
-    let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-    let ret = merge(Rc::new(union_lr));
-    if let Some(sub) = ret.into_sub() {
-        // a bit odd we don't use ret here - I think it's correct though?
-        // TODO: fix sub_diff
-        if let Some(l_minus_r) =
-            sub_difference(Rc::new(left_elem.clone()), Rc::new(right_elem.clone())).into_sub()
-        {
-            if let Some(r_minus_l) =
-                sub_difference(Rc::new(right_elem.clone()), Rc::new(left_elem.clone())).into_sub()
-            {
-                let p_prime_sub = sub_in(p.get_expr(), &r_minus_l);
-                let q_prime_sub = sub_in(q.get_expr(), &l_minus_r);
-                let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
-                return Some(AntimirovDerivativeElement::new(final_expr, sub));
-            }
-        }
-    }
-    None
-}
-
-fn apply_derivs_concat(
-    left_deriv: &AntimirovDerivativeElement,
-    right: &Rc<GenRegex>,
-) -> Option<AntimirovDerivativeElement> {
-    let simple_sub = left_deriv.get_subs();
-    if let GenRegex::CharExpression(c_expr) = left_deriv.get_expr().as_ref() {
-        if let CharExpression::Literal(lit) = c_expr {
-            // if let GenRegex::CharExpression(CharExpression::Literal(lit)) = sub.0.as_ref() {
-            Some(AntimirovDerivativeElement::new(
-                Rc::new(GenRegex::Concatenation(
-                    left_deriv.get_expr().clone(),
-                    sub_in(right, simple_sub),
-                )),
-                left_deriv.get_subs().clone(),
-            ))
-        } else {
-            None
-        }
-    } else {
-        Some(AntimirovDerivativeElement::new(
-            Rc::new(GenRegex::Concatenation(
-                left_deriv.get_expr().clone(),
-                sub_in(right, simple_sub),
-            )),
-            left_deriv.get_subs().clone(),
-        ))
-    }
-}
-
-fn merge_derivs_concat(
-    n_sub: &SimpleSub,
-    right: &AntimirovDerivativeElement,
-) -> Option<AntimirovDerivativeElement> {
-    let right_elem = right.get_subs();
-    let union_lr: AnySub = n_sub.clone().union(right_elem.clone());
-    let ret = merge(Rc::new(union_lr));
-    if let Some(sub) = ret.into_sub() {
-        if let Some(r_minus_l) =
-            sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone())).into_sub()
-        {
-            let q_prime_sub = sub_in(right.get_expr(), &r_minus_l);
-            return Some(AntimirovDerivativeElement::new(q_prime_sub, sub));
-        }
-    }
-    None
 }
 
 fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
@@ -641,59 +356,235 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     }
 }
 
-pub fn satisfiable(expr: &Rc<GenRegex>) -> bool {
-    let mut ind = 0;
-    satisfiable_helper(expr, &mut ind, HashSet::new())
-}
-pub fn satisfiable_helper(
-    expr: &Rc<GenRegex>,
-    index: &mut i32,
-    mut visited: HashSet<GenRegex>,
-) -> bool {
-    println!("Checking sat: {} (index {})", expr, index);
-    visited.insert(expr.as_ref().clone());
-    if nullable(expr).is_empty() {
-        let new_name = "f".to_owned() + &index.to_string();
-        let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
-        let deriv = derivative(expr, &c_var);
-        if deriv.is_empty() {
-            return false;
+fn merge_range_constraints(
+    constraints1: &BTreeMap<CharVar, RangeConstr>,
+    constraints2: &BTreeMap<CharVar, RangeConstr>,
+) -> Option<BTreeMap<CharVar, RangeConstr>> {
+    let mut constraints = constraints1.clone();
+    for (key, val) in constraints2 {
+        if let Some(existing_constr) = constraints.get(key) {
+            return None;
         }
-        *index += 1;
-        for elem in deriv {
-            if !visited.contains(elem.get_expr())
-                && satisfiable_helper(elem.get_expr(), index, visited.clone())
-            {
-                return true;
+        constraints.insert(key.clone(), val.clone());
+    }
+    Some(constraints)
+}
+
+/*
+    The main derivative operation
+*/
+
+pub fn derivative(
+    gre: &Rc<GenRegex>,
+    deriv_char: &Rc<CharExpression>,
+) -> HashSet<AntimirovElement> {
+    // println!("taking d({}, {})", gre, deriv_char);
+
+    match gre.as_ref() {
+        GenRegex::EmptySet => HashSet::new(),
+        GenRegex::Epsilon => HashSet::new(),
+        GenRegex::Sigma => {
+            AntimirovElement::new(GenRegex::epsilon(), SimpleSub::empty(), BTreeMap::new())
+                .into_set()
+        }
+        GenRegex::Range(char1, char2) => {
+            let mut result =
+                AntimirovElement::new(GenRegex::epsilon(), SimpleSub::empty(), BTreeMap::new());
+            match deriv_char.as_ref() {
+                CharExpression::Literal(literal) => {
+                    if literal < char1 || literal > char2 {
+                        return HashSet::new();
+                    }
+                }
+                CharExpression::CharVar(deriv_var) => {
+                    result.add_range(deriv_var.clone(), *char1, *char2);
+                }
             }
+
+            result.into_set()
         }
-        return false;
-    }
-    true
-}
-pub fn matching(expr: &Rc<GenRegex>, proposed: &str) -> bool {
-    if proposed.is_empty() {
-        return !nullable(expr).is_empty();
-    }
-    let first_char = proposed.chars().next().unwrap();
-    let tail = &proposed[1..];
-    let literal = Rc::new(CharExpression::Literal(first_char));
-    let deriv = derivative(expr, &literal);
-    if deriv.is_empty() {
-        return false;
-    }
-    for elem in deriv {
-        if matching(elem.get_expr(), tail) {
-            return true;
+        GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
+            (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
+                if deriv_lit == literal_value {
+                    AntimirovElement::new(GenRegex::epsilon(), SimpleSub::empty(), BTreeMap::new())
+                        .into_set()
+                } else {
+                    HashSet::new()
+                }
+            }
+            (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
+                let mut char_to = BTreeMap::new();
+                char_to.insert(d_var.clone(), c_expr.clone());
+                let subs = SimpleSub::new(BTreeMap::new(), char_to);
+                AntimirovElement::new(GenRegex::epsilon(), subs, BTreeMap::new()).into_set()
+            }
+            (_, CharExpression::CharVar(c_var)) => {
+                let mut char_to = BTreeMap::new();
+                char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
+                let subs = SimpleSub::new(BTreeMap::new(), char_to);
+                AntimirovElement::new(GenRegex::epsilon(), subs, BTreeMap::new()).into_set()
+            }
+        },
+        GenRegex::StringVar(string_var) => {
+            let head = vec![deriv_char.as_ref().clone()];
+
+            let subexpr = SubExpr::new(head, true);
+
+            let mut string_to = BTreeMap::new();
+            string_to.insert(string_var.clone(), subexpr);
+
+            let substitution = SimpleSub::new(string_to, BTreeMap::new());
+
+            AntimirovElement::new(gre.clone(), substitution, BTreeMap::new()).into_set()
+        }
+        GenRegex::Union(side1, side2) => {
+            let side1_deriv = derivative(side1, deriv_char);
+            let side2_deriv = derivative(side2, deriv_char);
+            side1_deriv.union(&side2_deriv).cloned().collect()
+        }
+        GenRegex::Intersect(left, right) => {
+            let p_deriv = derivative(left, deriv_char);
+            let q_deriv = derivative(right, deriv_char);
+            let mut ret_set = HashSet::new();
+            for p_sub in &p_deriv {
+                for q_sub in &q_deriv {
+                    if let Some(ret) = merge_derivs_intersect(p_sub, q_sub) {
+                        ret_set.insert(ret);
+                    }
+                }
+            }
+            ret_set
+        }
+        GenRegex::Concatenation(left, right) => {
+            let left_deriv = derivative(left, deriv_char);
+            let mut ret_set = HashSet::new();
+            for sub in &left_deriv {
+                if let Some(ret) = apply_deriv_concat(sub, right) {
+                    ret_set.insert(ret);
+                }
+            }
+
+            let p_nullable = nullable(left);
+            if !p_nullable.is_empty() {
+                let right_deriv = derivative(right, deriv_char);
+                for n_sub in &p_nullable {
+                    for q_sub in &right_deriv {
+                        if let Some(ret) = merge_derivs_concat(n_sub, q_sub) {
+                            ret_set.insert(ret);
+                        }
+                    }
+                }
+            }
+
+            ret_set
+        }
+        GenRegex::Kleene(expr) => {
+            let p_derivs = derivative(expr, deriv_char);
+            let mut ret_set = HashSet::new();
+            for p_deriv in &p_derivs {
+                let ret = apply_deriv_kleene(p_deriv, gre);
+                ret_set.insert(ret);
+            }
+            ret_set
+        }
+        GenRegex::StringSlice(_, _) => {
+            unimplemented!();
+        }
+        GenRegex::StringIndex(_) => {
+            unimplemented!();
+        }
+        GenRegex::Complement(_) => {
+            unimplemented!();
+        }
+        GenRegex::IfThenElse(_, _, _) => {
+            unimplemented!();
         }
     }
-    false
 }
+
+/*
+    Derivative helpers
+*/
+
+fn merge_derivs_intersect(
+    left: &AntimirovElement,
+    right: &AntimirovElement,
+) -> Option<AntimirovElement> {
+    // Merge subs
+    let l_sub = left.get_subs();
+    let r_sub = right.get_subs();
+    let union_lr: AnySub = l_sub.clone().union(r_sub.clone());
+    let merged_sub = merge(union_lr)?;
+
+    // Merge range constraints
+    let l_range = left.get_ranges();
+    let r_range = right.get_ranges();
+    let constraints = merge_range_constraints(l_range, r_range)?;
+
+    // Compute the difference and apply needed remaining subs in left and right
+    let l_minus_r = sub_difference_from_merge(&merged_sub, r_sub)?;
+    let r_minus_l = sub_difference_from_merge(&merged_sub, l_sub)?;
+    // let l_minus_r = sub_difference(Rc::new(l_sub.clone()), Rc::new(r_sub.clone()))?;
+    // let r_minus_l = sub_difference(Rc::new(r_sub.clone()), Rc::new(l_sub.clone()))?;
+    let l_expr = left.get_expr();
+    let r_expr = right.get_expr();
+    let p_prime_sub = sub_in(l_expr, &r_minus_l);
+    let q_prime_sub = sub_in(r_expr, &l_minus_r);
+    let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
+    Some(AntimirovElement::new(final_expr, merged_sub, constraints))
+}
+
+fn merge_derivs_concat(n_sub: &SimpleSub, right: &AntimirovElement) -> Option<AntimirovElement> {
+    let r_sub = right.get_subs();
+    let union_lr: AnySub = n_sub.clone().union(r_sub.clone());
+    let merged_sub = merge(union_lr)?;
+    let r_ranges = right.get_ranges();
+
+    let r_minus_l = sub_difference_from_merge(&merged_sub, r_sub)?;
+    // let r_r_minus_l = sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone()))?;
+    let result = sub_in(right.get_expr(), &r_minus_l);
+    Some(AntimirovElement::new(result, merged_sub, r_ranges.clone()))
+}
+
+fn apply_deriv_concat(
+    left_deriv: &AntimirovElement,
+    right: &Rc<GenRegex>,
+) -> Option<AntimirovElement> {
+    let l_expr = left_deriv.get_expr();
+    let l_sub = left_deriv.get_subs();
+    let l_ranges = left_deriv.get_ranges();
+    Some(AntimirovElement::new(
+        Rc::new(GenRegex::Concatenation(
+            l_expr.clone(),
+            sub_in(right, l_sub),
+        )),
+        l_sub.clone(),
+        l_ranges.clone(),
+    ))
+}
+
+fn apply_deriv_kleene(left_deriv: &AntimirovElement, right: &Rc<GenRegex>) -> AntimirovElement {
+    let l_expr = left_deriv.get_expr();
+    let l_sub = left_deriv.get_subs();
+    let l_ranges = left_deriv.get_ranges();
+    AntimirovElement::new(
+        Rc::new(GenRegex::Concatenation(
+            l_expr.clone(),
+            sub_in(right, l_sub),
+        )),
+        l_sub.clone(),
+        l_ranges.clone(),
+    )
+}
+
+/*
+    Nullable
+*/
 
 pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
-        GenRegex::Epsilon => HashSet::from([SimpleSub::empty()]),
+        GenRegex::Epsilon => SimpleSub::empty().into_set(),
         GenRegex::Sigma => HashSet::new(),
         GenRegex::Range(_, _) => HashSet::new(),
         GenRegex::CharExpression(c_expr) => match c_expr {
@@ -721,9 +612,9 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             for left_elem in &left_null {
                 for right_elem in &right_null {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(Rc::new(union_lr));
+                    let ret = merge(union_lr);
                     match ret {
-                        MergeResult::SimpleSub(simple_sub) => {
+                        Some(simple_sub) => {
                             ret_set.insert(simple_sub);
                         }
                         _ => {}
@@ -739,9 +630,9 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             for left_elem in &left_null {
                 for right_elem in &right_null {
                     let union_lr: AnySub = left_elem.clone().union(right_elem.clone());
-                    let ret = merge(Rc::new(union_lr));
+                    let ret = merge(union_lr);
                     match ret {
-                        MergeResult::SimpleSub(simple_sub) => {
+                        Some(simple_sub) => {
                             ret_set.insert(simple_sub);
                         }
                         _ => {}
@@ -750,7 +641,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             }
             ret_set
         }
-        GenRegex::Kleene(_) => HashSet::from([SimpleSub::empty()]),
+        GenRegex::Kleene(_) => SimpleSub::empty().into_set(),
         GenRegex::StringSlice(_, _) => {
             unimplemented!();
         }
@@ -764,6 +655,62 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             unimplemented!();
         }
     }
+}
+
+/*
+    Top-level functions: satisfiable and matching
+*/
+
+pub fn satisfiable(expr: &Rc<GenRegex>) -> bool {
+    let mut ind = 0;
+    satisfiable_helper(expr, &mut ind, HashSet::new())
+}
+
+fn satisfiable_helper(
+    expr: &Rc<GenRegex>,
+    index: &mut i32,
+    mut visited: HashSet<GenRegex>,
+) -> bool {
+    println!("Checking sat: {} (index {})", expr, index);
+    visited.insert(expr.as_ref().clone());
+    if nullable(expr).is_empty() {
+        let new_name = "f".to_owned() + &index.to_string();
+        let c_var = Rc::new(CharExpression::CharVar(CharVar { name: new_name }));
+        let deriv = derivative(expr, &c_var);
+        if deriv.is_empty() {
+            return false;
+        }
+        *index += 1;
+        for elem in deriv {
+            // TODO: handle range constraint here
+            if !visited.contains(elem.get_expr())
+                && satisfiable_helper(elem.get_expr(), index, visited.clone())
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    true
+}
+
+pub fn matching(expr: &Rc<GenRegex>, proposed: &str) -> bool {
+    if proposed.is_empty() {
+        return !nullable(expr).is_empty();
+    }
+    let first_char = proposed.chars().next().unwrap();
+    let tail = &proposed[1..];
+    let literal = Rc::new(CharExpression::Literal(first_char));
+    let deriv = derivative(expr, &literal);
+    if deriv.is_empty() {
+        return false;
+    }
+    for elem in deriv {
+        if matching(elem.get_expr(), tail) {
+            return true;
+        }
+    }
+    false
 }
 
 /*fn assign_unique_ids(

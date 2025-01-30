@@ -111,11 +111,14 @@ impl GenRegex {
         retval
     }
     pub fn re_range(start: char, end: char) -> Rc<GenRegex> {
-        let mut retval = GenRegex::create_gre_char_lit(end);
-        for c in (start..=end).rev().skip(1) {
-            retval = GenRegex::union(&GenRegex::create_gre_char_lit(c), &retval)
-        }
-        retval
+        // WITH RANGE OPTIMIZATION:
+        Rc::new(GenRegex::Range(start, end))
+        // OLD IMPL:
+        // let mut retval = GenRegex::create_gre_char_lit(end);
+        // for c in (start..=end).rev().skip(1) {
+        //     retval = GenRegex::union(&GenRegex::create_gre_char_lit(c), &retval)
+        // }
+        // retval
     }
     pub fn caret(n: u64, gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         if n == 0 {
@@ -140,69 +143,28 @@ impl GenRegex {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum MergeResult {
-    SimpleSub(SimpleSub),
-    Bottom,
-}
-
-impl MergeResult {
-    pub fn into_sub(self) -> Option<SimpleSub> {
-        match self {
-            MergeResult::SimpleSub(sub) => Some(sub),
-            MergeResult::Bottom => None,
-        }
-    }
-    pub fn is_sub(&self) -> bool {
-        matches!(self, MergeResult::SimpleSub(_))
-    }
-}
-
-/*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum Subs {
-    EmptySub,
-    Sub(Rc<Pair>)
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum Pair {
-    Combined(Rc<Pair>, Rc<Pair>),
-    StringTo(Rc<StringVar>, Rc<SubExpr>),
-    CharTo(Rc<CharExpression>, Rc<CharExpression>)
-}*/
-
-/*#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum SubExpr {
-    Combined(Rc<CharExpression>, Rc<SubExpr>),
-    EmptyString,
-    StringVar(Rc<StringVar>),
-}*/
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct SubExpr {
     head: Vec<CharExpression>,
     tail_is_string_var: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct AntimirovDerivativeElement {
+pub struct AntimirovElement {
     deriv_expression: Rc<GenRegex>,
     subs: SimpleSub,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
 }
 
-impl AntimirovDerivativeElement {
-    pub fn new(deriv_expression: Rc<GenRegex>, subs: SimpleSub) -> Self {
-        AntimirovDerivativeElement {
+impl AntimirovElement {
+    pub fn new(
+        deriv_expression: Rc<GenRegex>,
+        subs: SimpleSub,
+        range_constraints: BTreeMap<CharVar, RangeConstr>,
+    ) -> Self {
+        Self {
             deriv_expression,
             subs,
-            range_constraints: BTreeMap::new(),
-        }
-    }
-    pub fn set_from_merge(deriv_expression: Rc<GenRegex>, subs: MergeResult) -> HashSet<Self> {
-        if let Some(sub) = subs.into_sub() {
-            HashSet::from([Self::new(deriv_expression, sub)])
-        } else {
-            HashSet::new()
+            range_constraints,
         }
     }
 
@@ -217,7 +179,11 @@ impl AntimirovDerivativeElement {
         &self.subs
     }
     pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
-        unimplemented!()
+        &self.range_constraints
+    }
+
+    pub fn into_set(self) -> HashSet<Self> {
+        HashSet::from([self])
     }
 }
 
@@ -351,6 +317,12 @@ impl AnySub {
     }
 }
 impl SimpleSub {
+    pub fn new(
+        string_to: BTreeMap<StringVar, SubExpr>,
+        char_to: BTreeMap<CharVar, CharExpression>,
+    ) -> Self {
+        SimpleSub { string_to, char_to }
+    }
     pub fn get_str_map(&self) -> &BTreeMap<StringVar, SubExpr> {
         &self.string_to
     }
@@ -412,11 +384,8 @@ impl SimpleSub {
             char_to: combined_char_to,
         }
     }
-    pub fn new(
-        string_to: BTreeMap<StringVar, SubExpr>,
-        char_to: BTreeMap<CharVar, CharExpression>,
-    ) -> Self {
-        SimpleSub { string_to, char_to }
+    pub fn into_set(self) -> HashSet<SimpleSub> {
+        HashSet::from([self])
     }
 }
 
@@ -457,15 +426,13 @@ impl IndexMut<&StringVar> for SimpleSub {
 pub enum Predicate {
     And(Rc<Predicate>, Rc<Predicate>),
     Or(Rc<Predicate>, Rc<Predicate>),
-    /*Rewrite ideas TODO, would require rewriting DNF conversion for predicate evaluation
-    And(Vec<Rc<Predicate>>),
-    Or(Vec<Rc<Predicate>>),
-     */
     Not(Rc<Predicate>),
     True,
     False,
     Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
     EqualLength(Rc<StringVar>, i32),
+    LessThan(Rc<MaybeCharExpression>, char), //Includes Equal to
+    GreaterThan(Rc<MaybeCharExpression>, char), //Includes Equal to
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]

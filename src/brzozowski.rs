@@ -149,10 +149,21 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
         GenRegex::EmptySet => GenRegex::empty_set(),
         GenRegex::Epsilon => GenRegex::empty_set(),
         GenRegex::Sigma => GenRegex::epsilon(),
-        GenRegex::Range(start, end) => {
-            // TODO
-            unimplemented!()
-        }
+        GenRegex::Range(start, end) => {simplifies(&Rc::new(GenRegex::IfThenElse(
+            Rc::new(Predicate::And(
+                Rc::new(Predicate::GreaterThan(
+                    Rc::new(MaybeCharExpression::CharExpression(deriv_char.as_ref().clone())),
+                    *start
+                )),
+                Rc::new(Predicate::LessThan(
+                    Rc::new(MaybeCharExpression::CharExpression(deriv_char.as_ref().clone())),
+                    *end
+                )),
+
+            )),
+            GenRegex::epsilon(),
+            GenRegex::empty_set(),
+        )))}
         GenRegex::CharExpression(c_expr) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::Equals(
                 Rc::new(MaybeCharExpression::CharExpression(c_expr.clone())),
@@ -289,12 +300,7 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::new(Predicate::False),
         GenRegex::Epsilon => Rc::new(Predicate::True),
-
-        GenRegex::CharExpression(c_expr) => match c_expr {
-            CharExpression::CharVar(_name) => Rc::new(Predicate::False),
-            CharExpression::Literal(_value) => Rc::new(Predicate::True),
-        },
-
+        GenRegex::CharExpression(c_expr) => Rc::new(Predicate::False),
         GenRegex::IfThenElse(pred, true_expr, false_expr) => {
             let true_proj = nullable_projection_helper(true_expr);
             let false_proj = nullable_projection_helper(false_expr);
@@ -347,7 +353,7 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
         GenRegex::StringVar(_) => Rc::new(Predicate::False),
         GenRegex::StringIndex(_) => Rc::new(Predicate::False),
         GenRegex::StringSlice(_, _) => Rc::new(Predicate::False),
-        GenRegex::Kleene(_) => Rc::new(Predicate::False),
+        GenRegex::Kleene(_) => Rc::new(Predicate::True),
         GenRegex::Range(_, _) => Rc::new(Predicate::False),
     }
 }

@@ -3,8 +3,8 @@
 //!
 
 use crate::classes::{
-    AntimirovDerivativeElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression,
-    MergeResult, Predicate, RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
+    AntimirovElement, AnySub, CharExpression, CharVar, GenRegex, MaybeCharExpression, Predicate,
+    RangeConstr, SimpleSub, StringIndex, StringVar, SubExpr,
 };
 use std::fmt::{self, Display};
 
@@ -14,15 +14,6 @@ impl Display for SubExpr {
             write!(f, "{}", val)?;
         }
         write!(f, "{}", self.get_tail())
-    }
-}
-impl fmt::Display for MergeResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            MergeResult::Bottom => write!(f, "\\bot"),
-            MergeResult::SimpleSub(s) => write!(f, "{}", s),
-            // MergeResult::RangeSub(s) => write!(f, "{}", s),
-        }
     }
 }
 impl Display for AnySub {
@@ -71,7 +62,7 @@ impl Display for RangeConstr {
     }
 }
 
-impl Display for AntimirovDerivativeElement {
+impl Display for AntimirovElement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {}", self.get_expr(), self.get_subs())?;
         for (var, range) in self.get_ranges() {
@@ -147,6 +138,12 @@ impl Display for Predicate {
             }
             Predicate::EqualLength(var, inte) => {
                 write!(f, "|{}| == {}", var, inte)
+            }
+            Predicate::LessThan(var, val) =>{
+                write!(f, "{} <= {}", var, val)
+            }
+            Predicate::GreaterThan(var, val) =>{
+                write!(f, "{} >= {}", var, val)
             }
         }
     }

@@ -1,4 +1,4 @@
-; from GitHub issue:
+; from GitHub issue: https://github.com/Z3Prover/z3/issues/5140
 (set-logic ALL)
 (declare-fun a () String)
 (assert
