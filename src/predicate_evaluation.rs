@@ -111,13 +111,16 @@ pub fn evaluate_conjunction(
     all_preds: &Vec<Rc<Predicate>>,
     union_find: &mut UnionFind,
     id_map: &mut HashMap<MaybeCharExpression, i32>,
-    //string_map: &mut HashMap<i32, String>,
+    lit_map: &mut HashMap<i32, char>,
     map: &mut HashMap<i32, i32>,
 ) -> Vec<Rc<Predicate>> {
     let mut final_preds = Vec::new();
     let mut not_equality_preds = HashSet::new();
     let mut length_preds: HashMap<String, i32> = HashMap::new();
     let not_allowed_lengths: HashMap<String, HashSet<i32>> = HashMap::new();
+    let mut char_ranges: HashMap<MaybeCharExpression, (Option<char>, Option<char>)> =
+        HashMap::new();
+
     let mut equalities = HashSet::new();
 
     for p in all_preds {
@@ -140,6 +143,36 @@ pub fn evaluate_conjunction(
                 return vec![Rc::new(Predicate::False)];
                 //return Rc::new(Predicate::False);
             }
+            Predicate::LessThan(var, end) => {
+                let entry = char_ranges
+                    .entry(var.as_ref().clone())
+                    .or_insert((None, None));
+                if entry.1.is_none() || *end < entry.1.unwrap() {
+                    if let Some(start) = entry.0 {
+                        if start > *end {
+                            return vec![Rc::new(Predicate::False)];
+                        }
+                        entry.1 = Some(*end);
+                    } else {
+                        entry.1 = Some(*end);
+                    }
+                }
+            }
+            Predicate::GreaterThan(var, start) => {
+                let entry = char_ranges
+                    .entry(var.as_ref().clone())
+                    .or_insert((None, None));
+                if entry.0.is_none() || *start > entry.0.unwrap() {
+                    if let Some(end) = entry.0 {
+                        if *start > end {
+                            return vec![Rc::new(Predicate::False)];
+                        }
+                        entry.0 = Some(*start);
+                    } else {
+                        entry.0 = Some(*start);
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -150,14 +183,16 @@ pub fn evaluate_conjunction(
             leftId = id_map[left];
             rightId = id_map[right];
             match left.as_ref() {
-                MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
+                MaybeCharExpression::CharExpression(CharExpression::Literal(lit_char)) => {
                     map.insert(leftId, leftId);
+                    lit_map.insert(leftId, *lit_char);
                 }
                 _ => {}
             }
             match right.as_ref() {
-                MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
+                MaybeCharExpression::CharExpression(CharExpression::Literal(lit_char)) => {
                     map.insert(rightId, rightId);
+                    lit_map.insert(rightId, *lit_char);
                 }
                 _ => {}
             }
@@ -185,7 +220,54 @@ pub fn evaluate_conjunction(
             }
         }
     }
-    // TODO: is this needed?
+    for (var, (start, end)) in &char_ranges {
+        let var_id = union_find.find(id_map[var] as usize);
+
+        if let Some(lit_id) = map.get(&(var_id as i32)) {
+            let lit = lit_map[lit_id];
+            if let (Some(s), Some(e)) = (start, end) {
+                if lit < *s || lit > *e {
+                    return vec![Rc::new(Predicate::False)];
+                } else {
+                    continue;
+                }
+            } else {
+                if let Some(s) = start {
+                    if lit < *s {
+                        return vec![Rc::new(Predicate::False)];
+                    }
+                }
+
+                if let Some(e) = end {
+                    if lit > *e {
+                        return vec![Rc::new(Predicate::False)];
+                    }
+                }
+
+                continue;
+            }
+        } else {
+            // If the value is not in the map, create a summarized predicate with start and end
+            if let (Some(s), Some(e)) = (start, end) {
+                let summarized = Rc::new(Predicate::And(
+                    Rc::new(Predicate::LessThan(Rc::new(var.clone()), *e)),
+                    Rc::new(Predicate::GreaterThan(Rc::new(var.clone()), *s)),
+                ));
+                final_preds.push(summarized);
+            } else {
+                if let Some(s) = start {
+                    let summarized = Rc::new(Predicate::GreaterThan(Rc::new(var.clone()), *s));
+                    final_preds.push(summarized);
+                }
+                if let Some(e) = end {
+                    let summarized = Rc::new(Predicate::LessThan(Rc::new(var.clone()), *e));
+                    final_preds.push(summarized);
+                }
+                continue;
+            }
+        }
+    }
+
     // let cant_equal_chars: HashMap<String, HashSet<String>> = HashMap::new();
     for not_pred in not_equality_preds {
         if let Predicate::Not(inner) = not_pred.as_ref() {
@@ -280,8 +362,15 @@ fn evaluate(
     let mut final_set = Vec::new();
     for conjunct in pred {
         let mut canonical_map: HashMap<i32, i32> = HashMap::new();
+        let mut lit_map: HashMap<i32, char> = HashMap::new();
         let mut uf: UnionFind<usize> = UnionFind::new(id_map.len() + 1);
-        let p_eval = evaluate_conjunction(&conjunct.clone(), &mut uf, id_map, &mut canonical_map);
+        let p_eval = evaluate_conjunction(
+            &conjunct.clone(),
+            &mut uf,
+            id_map,
+            &mut lit_map,
+            &mut canonical_map,
+        );
         if p_eval.len() == 1 {
             match p_eval[0].as_ref() {
                 Predicate::True => {
@@ -425,13 +514,23 @@ pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate> {
             Predicate::True => Rc::new(Predicate::False),
             Predicate::False => Rc::new(Predicate::True),
             Predicate::LessThan(var, val) => Rc::new(Predicate::And(
-                    Rc::new(Predicate::GreaterThan(var.clone(), *val)),
-                    Rc::new(Predicate::Not(Rc::new(Predicate::Equals(var.clone(), Rc::new(MaybeCharExpression::CharExpression(CharExpression::Literal(*val)))))
-                                                                   )))),
+                Rc::new(Predicate::GreaterThan(var.clone(), *val)),
+                Rc::new(Predicate::Not(Rc::new(Predicate::Equals(
+                    var.clone(),
+                    Rc::new(MaybeCharExpression::CharExpression(
+                        CharExpression::Literal(*val),
+                    )),
+                )))),
+            )),
             Predicate::GreaterThan(var, val) => Rc::new(Predicate::And(
-                    Rc::new(Predicate::LessThan(var.clone(), *val)),
-                    Rc::new(Predicate::Not(Rc::new(Predicate::Equals(var.clone(), Rc::new(MaybeCharExpression::CharExpression(CharExpression::Literal(*val)))))
-                                                                   )))),
+                Rc::new(Predicate::LessThan(var.clone(), *val)),
+                Rc::new(Predicate::Not(Rc::new(Predicate::Equals(
+                    var.clone(),
+                    Rc::new(MaybeCharExpression::CharExpression(
+                        CharExpression::Literal(*val),
+                    )),
+                )))),
+            )),
 
             _ => Rc::clone(pred),
         },
