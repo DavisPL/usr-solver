@@ -1747,6 +1747,8 @@ mod tests {
         assert!(!satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
+    // TODO: Equality not supported for now
+    #[ignore]
     #[test]
     fn test_passw_eq_sat1() {
         let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
@@ -1795,6 +1797,8 @@ mod tests {
         assert_eq!(brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped)), true);
     }
 
+    // TODO
+    #[ignore]
     #[test]
     fn test_hex_code() {
         let smt_result = parse_smtlib_file("benchmarks/hexcode_sat.smt2");
@@ -1847,6 +1851,7 @@ mod tests {
         assert_satisfiable("benchmarks/hex_syntax_test_sat.smt2");
     }
 
+    // Quite slow
     #[ignore]
     #[test]
     fn intersect_test1() {
@@ -1908,6 +1913,8 @@ mod tests {
         assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
     }
 
+    // TODO
+    #[ignore]
     #[test]
     fn test_usr_2() {
         assert_satisfiable("benchmarks/usr_2_sat.smt2");

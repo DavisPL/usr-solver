@@ -3,6 +3,7 @@
 //! Main GenRegex class and subclasses
 //!
 
+use std::cmp::{max, min};
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Index;
 use std::ops::IndexMut;
@@ -204,6 +205,15 @@ impl RangeConstr {
     }
     pub fn get_end(&self) -> &char {
         &self.end
+    }
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
+        let start = max(self.start, other.start);
+        let end = min(self.end, other.end);
+        if start < end {
+            Some(Self { start, end })
+        } else {
+            None
+        }
     }
 }
 
