@@ -4,6 +4,6 @@
  (str.in_re a
  (re.++
   (str.to_re
-  (ite (str.in_re a (re.++ (str.to_re "\u\u\u\u\u") (re.* re.allchar))) a "\u\u\u\u\u"))
+  (ite (str.in_re a (re.++ (str.to_re "00000") (re.* re.allchar))) a "00000"))
   (re.* re.allchar))))
 (check-sat)
