@@ -58,7 +58,7 @@ impl Display for SimpleSub {
 
 impl Display for RangeConstr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{}, {}]", self.get_start(), self.get_end())
+        write!(f, "[{}-{}]", self.get_start(), self.get_end())
     }
 }
 
@@ -220,7 +220,7 @@ impl Display for GenRegexPrintHelper<'_> {
                 write!(f, ".")
             }
             GenRegex::Range(char1, char2) => {
-                write!(f, "[{}, {}]", char1, char2)
+                write!(f, "[{}-{}]", char1, char2)
             }
             GenRegex::StringVar(var) => {
                 // Use Display on StringVar

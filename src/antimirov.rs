@@ -362,10 +362,15 @@ fn merge_range_constraints(
 ) -> Option<BTreeMap<CharVar, RangeConstr>> {
     let mut constraints = constraints1.clone();
     for (key, val) in constraints2 {
-        if let Some(existing_constr) = constraints.get(key) {
-            return None;
+        if let Some(other_val) = constraints.get(key) {
+            if let Some(merged_range) = val.intersect(other_val) {
+                constraints.insert(key.clone(), merged_range);
+            } else {
+                return None;
+            }
+        } else {
+            constraints.insert(key.clone(), val.clone());
         }
-        constraints.insert(key.clone(), val.clone());
     }
     Some(constraints)
 }
