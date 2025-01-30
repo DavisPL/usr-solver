@@ -11,7 +11,7 @@ use regex::Regex;
 
 use lexpr::{self, Value};
 
-use std::collections::{hash_map, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::rc::Rc;
@@ -1006,7 +1006,19 @@ impl SmtParser {
 
     fn parse_re_range(&self, v: &Value) -> Result<RegexToken, SmtParseError> {
         // Syntax (re.range char1 char2)
-        Err(SmtParseError::Unimplemented(format!("Need to implement re.range")))
+        let (char1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        // println!("{}, 2{}, tail {}", char1, char2, tail);
+        expect_null(tail)?;
+        let char1 = self.parse_char_obj(char1)?.to_string();
+        let char2 = self.parse_char_obj(char2)?.to_string();
+        if char1.chars().count() != 1 || char2.chars().count() != 1 {
+            return Err(SmtParseError::unrecog(v));
+        }
+        if let (Some(char1), Some(char2)) = (char1.chars().next(), char2.chars().next()) {
+            return Ok(RegexToken::Val(GenRegex::re_range(char1, char2)));
+        }
+        Err(SmtParseError::unrecog(v))
     }
 
     fn parse_re_func(&mut self, func: &Value, args: &Value) -> Result<RegexToken, SmtParseError> {
