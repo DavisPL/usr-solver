@@ -694,13 +694,13 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             subs
         }
         GenRegex::Union(side1, side2) => {
-            let left_null = nullable(&side1);
-            let right_null = nullable(&side2);
+            let left_null = nullable(side1);
+            let right_null = nullable(side2);
             union_sets(left_null, right_null)
         }
         GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
-            let left_null = nullable(&side1);
-            let right_null = nullable(&side2);
+            let left_null = nullable(side1);
+            let right_null = nullable(side2);
             merge_sets(&left_null, &right_null)
         }
         GenRegex::Kleene(_) => SimpleSub::empty().into_set(),
@@ -748,14 +748,14 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         }
         GenRegex::Union(side1, side2) => {
             // Matches logic for GenRegex::Intersection in the regular nullable case
-            let left_null = nullable_complement(&side1);
-            let right_null = nullable_complement(&side2);
+            let left_null = nullable_complement(side1);
+            let right_null = nullable_complement(side2);
             merge_sets(&left_null, &right_null)
         }
         GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
             // Matches logic for GenRegex::Union in the regular nullable case
-            let left_null = nullable_complement(&side1);
-            let right_null = nullable_complement(&side2);
+            let left_null = nullable_complement(side1);
+            let right_null = nullable_complement(side2);
             union_sets(left_null, right_null)
         }
         GenRegex::Kleene(_) => HashSet::new(),
