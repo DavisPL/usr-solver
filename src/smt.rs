@@ -1386,7 +1386,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
 
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
     #[test]
@@ -1425,7 +1425,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
 
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), false);
+        assert!(!satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
     #[test]
@@ -1464,7 +1464,7 @@ mod tests {
             Rc::new(expected_intersection_1),
             Rc::new(expected_intersection_2),
         );
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
 
         assert_eq!(gen_regex_unwrapped, expected);
     }
@@ -1492,7 +1492,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
 
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
     #[test]
@@ -1520,7 +1520,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
 
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
     #[test]
@@ -1583,7 +1583,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
 
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
     #[test]
     fn test_date_2() {
@@ -1663,7 +1663,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
 
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
     #[test]
@@ -1703,7 +1703,7 @@ mod tests {
         let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
         assert_eq!(gen_regex_unwrapped, expected);
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped)));
     }
 
     #[test]
@@ -1744,7 +1744,7 @@ mod tests {
 
         assert_eq!(gen_regex_unwrapped, expected);
 
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), false);
+        assert!(!satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
     #[test]
@@ -1839,7 +1839,7 @@ mod tests {
         );
 
         assert_eq!(gen_regex_unwrapped, expected);
-        assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
+        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
     }
 
     #[test]
