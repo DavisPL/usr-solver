@@ -255,48 +255,6 @@ impl Index<usize> for SubExpr {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.head[index]
-        /*if index < self.head.len() {
-            &Some(self.head[index])
-        } else {
-            // Return a reference to None when the index is out of bounds.
-            &None
-        }*/
-    }
-}
-
-/// Represents any sub, not necessarily simple (e.g. x -> y, y -> x)
-#[derive(Debug, Eq, PartialEq, Hash)]
-pub struct AnySub {
-    string_to: BTreeMap<StringVar, Vec<SubExpr>>,
-    char_to: BTreeMap<CharVar, Vec<CharExpression>>,
-    range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
-}
-
-impl AnySub {
-    pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {
-        &self.string_to
-    }
-    pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
-        &self.char_to
-    }
-    pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
-        self.range_constraints.take()
-    }
-}
-
-/// Represents a simple sub (in a normalized form)
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct SimpleSub {
-    string_to: BTreeMap<StringVar, SubExpr>,
-    char_to: BTreeMap<CharVar, CharExpression>,
-    range_constraints: BTreeMap<CharVar, RangeConstr>,
-}
-
-impl Index<&StringVar> for SimpleSub {
-    type Output = SubExpr;
-
-    fn index(&self, _index: &StringVar) -> &Self::Output {
-        unimplemented!()
     }
 }
 
@@ -359,6 +317,42 @@ impl SubExpr {
             head,
             tail_is_string_var,
         }
+    }
+}
+
+/// Represents any sub, not necessarily simple (e.g. x -> y, y -> x)
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub struct AnySub {
+    string_to: BTreeMap<StringVar, Vec<SubExpr>>,
+    char_to: BTreeMap<CharVar, Vec<CharExpression>>,
+    range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
+}
+
+impl AnySub {
+    pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {
+        &self.string_to
+    }
+    pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
+        &self.char_to
+    }
+    pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
+        self.range_constraints.take()
+    }
+}
+
+/// Represents a simple sub (in a normalized form)
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub struct SimpleSub {
+    string_to: BTreeMap<StringVar, SubExpr>,
+    char_to: BTreeMap<CharVar, CharExpression>,
+    range_constraints: BTreeMap<CharVar, RangeConstr>,
+}
+
+impl Index<&StringVar> for SimpleSub {
+    type Output = SubExpr;
+
+    fn index(&self, _index: &StringVar) -> &Self::Output {
+        unimplemented!()
     }
 }
 
@@ -484,6 +478,7 @@ pub enum Predicate {
     False,
     Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
     EqualLength(Rc<StringVar>, i32),
+    // TODO: rename to LessThanEq, GreaterThanEq
     LessThan(Rc<MaybeCharExpression>, char), //Includes Equal to
     GreaterThan(Rc<MaybeCharExpression>, char), //Includes Equal to
 }
