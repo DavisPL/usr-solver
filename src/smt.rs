@@ -727,21 +727,11 @@ impl SmtParser {
         expect_null(tail)?;
         //Chooses behavior based on string and regex tokens
         let str_tok = self.parse_string_type(string)?;
-        println!("var_names: {:?}", self.str_var_names);
-        let string = match str_tok {
-            StringToken::Var(var_name) => GenRegex::create_gre_str_var(&var_name),
-            StringToken::Val(string) => GenRegex::str_to_re(&string),
-            StringToken::Conditional{..} => {
-                return Err(SmtParseError::Unsupported(format!(
-                    "Ite String in str.in_re is currently unsupported."
-                )));
-            }
-        };
         let regex_tok = self.parse_reglan_type(regex)?;
-        self.parse_str_in_re_helper(&regex_tok, string)
+        self.parse_str_in_re_helper(&regex_tok, &str_tok)
     }
 
-    fn parse_str_in_re_helper(&mut self,re_tok:&RegexToken, string:Rc<GenRegex>)->Result<Rc<GenRegex>, SmtParseError>{
+    fn parse_str_in_re_helper(&mut self,re_tok:&RegexToken, string:&StringToken)->Result<Rc<GenRegex>, SmtParseError>{
         match re_tok{
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
                 "RegLan variable in str.in_re needs to be initialzied beforehand."
@@ -753,7 +743,21 @@ impl SmtParser {
                 } else {
                     gen_regex.clone()
                 };
-                Ok(GenRegex::intersect(&string, &gen_regex))
+                match string {
+                    StringToken::Var(var_name) => Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&var_name), &gen_regex)),
+                    StringToken::Val(string) => Ok(GenRegex::intersect(&GenRegex::str_to_re(&string), &gen_regex)),
+                    StringToken::Conditional { assertion, true_string, false_string } => {
+                        let saved_not_flag=self.not_flag;
+                        self.not_flag=false;
+                        let t=self.parse_assert_arg(assertion)?;
+                        self.not_flag=true;
+                        let f=self.parse_assert_arg(assertion)?;
+                        self.not_flag=saved_not_flag;
+                        let t=GenRegex::concat(&t, &self.parse_str_in_re_helper(re_tok,&true_string)?);
+                        let f=GenRegex::concat(&f, &self.parse_str_in_re_helper(re_tok,&false_string)?);
+                        Ok(GenRegex::union(&t, &f))
+                    },
+                }
             }
             RegexToken::Conditional{assertion,true_re,false_re} => {
                 //Remember to do not_flag stuff
@@ -763,8 +767,8 @@ impl SmtParser {
                 self.not_flag=true;
                 let f=self.parse_assert_arg(assertion)?;
                 self.not_flag=saved_not_flag;
-                let t=GenRegex::concat(&t, &self.parse_str_in_re_helper(&true_re, string.clone())?);
-                let f=GenRegex::concat(&f, &self.parse_str_in_re_helper(&false_re, string.clone())?);
+                let t=GenRegex::concat(&t, &self.parse_str_in_re_helper(true_re, string)?);
+                let f=GenRegex::concat(&f, &self.parse_str_in_re_helper(false_re, string)?);
                 Ok(GenRegex::union(&t, &f))
             }
         }
@@ -1003,22 +1007,23 @@ impl SmtParser {
         Ok(cur)
     }
 
-    fn parse_str_to_re(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
-        fn strtok_to_retok(s:&StringToken)->RegexToken{
-            match s{
-                StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(&name)),
-                StringToken::Val(str) => RegexToken::Val(GenRegex::str_to_re(&str)),
-                StringToken::Conditional { assertion, true_string, false_string } => {
-                    RegexToken::Conditional { assertion:assertion.clone(),
-                        true_re: Rc::new(strtok_to_retok(true_string.as_ref())), false_re: Rc::new(strtok_to_retok(false_string.as_ref())) }
-                },
-            }
+    fn strtok_to_retok(&self, s:&StringToken)->RegexToken{
+        match s{
+            StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(&name)),
+            StringToken::Val(str) => RegexToken::Val(GenRegex::str_to_re(&str)),
+            StringToken::Conditional { assertion, true_string, false_string } => {
+                RegexToken::Conditional { assertion:assertion.clone(),
+                    true_re: Rc::new(self.strtok_to_retok(true_string.as_ref())), false_re: Rc::new(self.strtok_to_retok(false_string.as_ref())) }
+            },
         }
+    }
+
+    fn parse_str_to_re(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         // (str.to_re "String")
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
         let str = self.parse_string_type(str)?;
-        Ok(strtok_to_retok(&str))
+        Ok(self.strtok_to_retok(&str))
     }
 
     fn parse_re_range(&self, v: &Value) -> Result<RegexToken, SmtParseError> {
