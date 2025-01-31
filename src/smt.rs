@@ -169,182 +169,168 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
 
 enum RegexToken {
     Val(Rc<GenRegex>),
-    Conditional(HashMap<Rc<GenRegex>, Value>),
+    Conditional{assertion: Value,true_re: Rc<RegexToken>,false_re:Rc<RegexToken>},
     Var(String),
 }
 impl RegexToken {
-    fn token_mix(
-        tok1: &RegexToken,
-        tok2: &RegexToken,
-    ) -> HashMap<(Rc<GenRegex>, Rc<GenRegex>), Option<Value>> {
-        let mut ret_val: HashMap<(Rc<GenRegex>, Rc<GenRegex>), Option<Value>> = HashMap::new();
-        match (tok1, tok2) {
-            (RegexToken::Val(re1), RegexToken::Val(re2)) => {
-                ret_val.insert((re1.clone(), re2.clone()), None);
-            }
-            (RegexToken::Conditional(map1), RegexToken::Conditional(map2)) => {
-                for (key1, val1) in map1.iter() {
-                    for (key2, val2) in map2.iter() {
-                        ret_val.insert(
-                            (key1.clone(), key2.clone()),
-                            Some(Value::cons(
-                                Value::symbol("and"),
-                                Value::cons(val1.clone(), Value::cons(val2.clone(), Value::Null)),
-                            )),
-                        );
-                    }
+    fn diff(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
+        match tok1{
+            RegexToken::Val(gen_regex1) => {
+                match tok2{
+                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::diff(gen_regex1, gen_regex2))),
+                    RegexToken::Conditional { assertion, true_re, false_re } => {
+                        let true_re=Rc::new(RegexToken::diff(tok1, true_re)?);
+                        let false_re=Rc::new(RegexToken::diff(tok1, false_re)?);
+                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+                    },
+                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
                 }
-            }
-            (RegexToken::Val(re), RegexToken::Conditional(map)) => {
-                for (key, val) in map.iter() {
-                    ret_val.insert((re.clone(), key.clone()), Some(val.clone()));
+            },
+            RegexToken::Conditional { assertion, true_re, false_re } => {
+                let true_re=Rc::new(RegexToken::diff(true_re, tok2)?);
+                let false_re=Rc::new(RegexToken::diff(false_re, tok2)?);
+                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+            },
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+        }
+    }
+    fn concat(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
+        match tok1{
+            RegexToken::Val(gen_regex1) => {
+                match tok2{
+                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::concat(gen_regex1, gen_regex2))),
+                    RegexToken::Conditional { assertion, true_re, false_re } => {
+                        let true_re=Rc::new(RegexToken::concat(tok1, true_re)?);
+                        let false_re=Rc::new(RegexToken::concat(tok1, false_re)?);
+                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+                    },
+                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
                 }
-            }
-            (RegexToken::Conditional(map), RegexToken::Val(re)) => {
-                for (key, val) in map.iter() {
-                    ret_val.insert((key.clone(), re.clone()), Some(val.clone()));
+            },
+            RegexToken::Conditional { assertion, true_re, false_re } => {
+                let true_re=Rc::new(RegexToken::concat(true_re, tok2)?);
+                let false_re=Rc::new(RegexToken::concat(false_re, tok2)?);
+                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+            },
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+        }
+    }
+    fn union(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
+        match tok1{
+            RegexToken::Val(gen_regex1) => {
+                match tok2{
+                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::union(gen_regex1, gen_regex2))),
+                    RegexToken::Conditional { assertion, true_re, false_re } => {
+                        let true_re=Rc::new(RegexToken::union(tok1, true_re)?);
+                        let false_re=Rc::new(RegexToken::union(tok1, false_re)?);
+                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+                    },
+                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
                 }
-            }
-            (_, RegexToken::Var(_)) | (RegexToken::Var(_), _) => (),
-        };
-        ret_val
+            },
+            RegexToken::Conditional { assertion, true_re, false_re } => {
+                let true_re=Rc::new(RegexToken::union(true_re, tok2)?);
+                let false_re=Rc::new(RegexToken::union(false_re, tok2)?);
+                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+            },
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+        }
     }
-    fn diff(tok1: RegexToken, tok2: RegexToken) -> Result<RegexToken, SmtParseError> {
-        let mixed = RegexToken::token_mix(&tok1, &tok2);
-        if mixed.len() == 1 {
-            let pair = mixed.keys().next().unwrap();
-            return Ok(RegexToken::Val(GenRegex::intersect(
-                &pair.0,
-                &GenRegex::complement(&pair.1),
-            )));
+    fn inter(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
+        match tok1{
+            RegexToken::Val(gen_regex1) => {
+                match tok2{
+                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::intersect(gen_regex1, gen_regex2))),
+                    RegexToken::Conditional { assertion, true_re, false_re } => {
+                        let true_re=Rc::new(RegexToken::inter(tok1, true_re)?);
+                        let false_re=Rc::new(RegexToken::inter(tok1, false_re)?);
+                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+                    },
+                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+                }
+            },
+            RegexToken::Conditional { assertion, true_re, false_re } => {
+                let true_re=Rc::new(RegexToken::inter(true_re, tok2)?);
+                let false_re=Rc::new(RegexToken::inter(false_re, tok2)?);
+                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
+            },
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
         }
-        let mut ret_map: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-        for (key, val) in mixed.iter() {
-            ret_map.insert(
-                GenRegex::intersect(&key.0, &GenRegex::complement(&key.1)),
-                val.clone().unwrap(),
-            );
-        }
-        Ok(RegexToken::Conditional(ret_map))
     }
-    fn concat(tok1: RegexToken, tok2: RegexToken) -> Result<RegexToken, SmtParseError> {
-        let mixed = RegexToken::token_mix(&tok1, &tok2);
-        if mixed.len() == 1 {
-            let pair = mixed.keys().next().unwrap();
-            return Ok(RegexToken::Val(GenRegex::concat(&pair.0, &pair.1)));
-        }
-        let mut ret_map: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-        for (key, val) in mixed.iter() {
-            ret_map.insert(GenRegex::concat(&key.0, &key.1), val.clone().unwrap());
-        }
-        Ok(RegexToken::Conditional(ret_map))
-    }
-    fn union(tok1: RegexToken, tok2: RegexToken) -> Result<RegexToken, SmtParseError> {
-        let mixed = RegexToken::token_mix(&tok1, &tok2);
-        if mixed.len() == 1 {
-            let pair = mixed.keys().next().unwrap();
-            return Ok(RegexToken::Val(GenRegex::union(&pair.0, &pair.1)));
-        }
-        let mut ret_map: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-        for (key, val) in mixed.iter() {
-            ret_map.insert(GenRegex::union(&key.0, &key.1), val.clone().unwrap());
-        }
-        Ok(RegexToken::Conditional(ret_map))
-    }
-    fn inter(tok1: RegexToken, tok2: RegexToken) -> Result<RegexToken, SmtParseError> {
-        let mixed = RegexToken::token_mix(&tok1, &tok2);
-        if mixed.len() == 1 {
-            let pair = mixed.keys().next().unwrap();
-            return Ok(RegexToken::Val(GenRegex::intersect(&pair.0, &pair.1)));
-        }
-        let mut ret_map: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-        for (key, val) in mixed.iter() {
-            ret_map.insert(GenRegex::intersect(&key.0, &key.1), val.clone().unwrap());
-        }
-        Ok(RegexToken::Conditional(ret_map))
-    }
-    fn caret(num: u64, tok: RegexToken) -> Result<RegexToken, SmtParseError> {
+    fn caret(num: u64, tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::caret(num, &gen_regex))),
-            RegexToken::Conditional(hash_map) => {
-                let mut ret_val: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-                for (key, val) in hash_map {
-                    ret_val.insert(GenRegex::caret(num, &key), val);
-                }
-                Ok(RegexToken::Conditional(ret_val))
+            RegexToken::Conditional{ assertion, true_re, false_re } => {
+                let true_re=Rc::new(RegexToken::caret(num, true_re)?);
+                let false_re=Rc::new(RegexToken::caret(num, false_re)?);
+                Ok(RegexToken::Conditional { assertion: assertion.clone(), true_re, false_re })
             }
             RegexToken::Var(_) => todo!(),
         }
     }
-    fn tok_loop(num1: u64, num2: u64, tok: RegexToken) -> Result<RegexToken, SmtParseError> {
+    fn tok_loop(num1: u64, num2: u64, tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => {
                 Ok(RegexToken::Val(GenRegex::re_loop(num1, num2, &gen_regex)))
             }
-            RegexToken::Conditional(hash_map) => {
-                let mut ret_val: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-                for (key, val) in hash_map {
-                    ret_val.insert(GenRegex::re_loop(num1, num2, &key), val);
-                }
-                Ok(RegexToken::Conditional(ret_val))
+            RegexToken::Conditional{ assertion, true_re, false_re } => {
+                let true_re=Rc::new(RegexToken::tok_loop(num1,num2, true_re)?);
+                let false_re=Rc::new(RegexToken::tok_loop(num1,num2, false_re)?);
+                Ok(RegexToken::Conditional { assertion: assertion.clone(), true_re, false_re })
             }
             RegexToken::Var(_) => todo!(),
         }
     }
-    fn star(tok: RegexToken) -> Result<RegexToken, SmtParseError> {
+    fn star(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::star(&gen_regex))),
-            RegexToken::Conditional(hash_map) => {
-                let mut ret_val: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-                for (key, val) in hash_map {
-                    ret_val.insert(GenRegex::star(&key), val);
-                }
-                Ok(RegexToken::Conditional(ret_val))
+            RegexToken::Conditional{ assertion, true_re, false_re } => {
+                let assertion=assertion.clone();
+                let true_re=Rc::new(RegexToken::star(&true_re)?);
+                let false_re=Rc::new(RegexToken::star(&false_re)?);
+                Ok(RegexToken::Conditional { assertion, true_re, false_re })
             }
             RegexToken::Var(_) => todo!(),
         }
     }
-    fn plus(tok: RegexToken) -> Result<RegexToken, SmtParseError> {
+    fn plus(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::concat(
                 &gen_regex,
                 &GenRegex::star(&gen_regex),
             ))),
-            RegexToken::Conditional(hash_map) => {
-                let mut ret_val: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-                for (key, val) in hash_map {
-                    ret_val.insert(GenRegex::concat(&key, &GenRegex::star(&key)), val);
-                }
-                Ok(RegexToken::Conditional(ret_val))
+            RegexToken::Conditional{ assertion, true_re, false_re } => {
+                let assertion=assertion.clone();
+                let true_re=Rc::new(RegexToken::plus(&true_re)?);
+                let false_re=Rc::new(RegexToken::plus(&false_re)?);
+                Ok(RegexToken::Conditional { assertion, true_re, false_re })
             }
             RegexToken::Var(_) => todo!(),
         }
     }
-    fn comp(tok: RegexToken) -> Result<RegexToken, SmtParseError> {
+    fn comp(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::complement(&gen_regex))),
-            RegexToken::Conditional(hash_map) => {
-                let mut ret_val: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-                for (key, val) in hash_map {
-                    ret_val.insert(GenRegex::complement(&key), val);
-                }
-                Ok(RegexToken::Conditional(ret_val))
+            RegexToken::Conditional{ assertion, true_re, false_re } => {
+                let assertion=assertion.clone();
+                let true_re=Rc::new(RegexToken::comp(&true_re)?);
+                let false_re=Rc::new(RegexToken::comp(&false_re)?);
+                Ok(RegexToken::Conditional { assertion, true_re, false_re })
             }
             RegexToken::Var(_) => todo!(),
         }
     }
-    fn opt(tok: RegexToken) -> Result<RegexToken, SmtParseError> {
+    fn opt(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::union(
                 &gen_regex,
                 &GenRegex::epsilon(),
             ))),
-            RegexToken::Conditional(hash_map) => {
-                let mut ret_val: HashMap<Rc<GenRegex>, Value> = HashMap::new();
-                for (key, val) in hash_map {
-                    ret_val.insert(GenRegex::concat(&key, &GenRegex::epsilon()), val);
-                }
-                Ok(RegexToken::Conditional(ret_val))
+            RegexToken::Conditional{ assertion, true_re, false_re } => {
+                let assertion=assertion.clone();
+                let true_re=Rc::new(RegexToken::opt(&true_re)?);
+                let false_re=Rc::new(RegexToken::opt(&false_re)?);
+                Ok(RegexToken::Conditional { assertion, true_re, false_re })
             }
             RegexToken::Var(_) => todo!(),
         }
@@ -353,7 +339,7 @@ impl RegexToken {
 enum StringToken {
     Var(String),
     Val(String),
-    Conditional(HashMap<String, Value>),
+    Conditional{assertion:Value, true_string: Rc<StringToken>, false_string: Rc<StringToken>},
 }
 
 pub struct SmtParser {
@@ -745,47 +731,41 @@ impl SmtParser {
         let string = match str_tok {
             StringToken::Var(var_name) => GenRegex::create_gre_str_var(&var_name),
             StringToken::Val(string) => GenRegex::str_to_re(&string),
-            StringToken::Conditional(_) => {
+            StringToken::Conditional{..} => {
                 return Err(SmtParseError::Unsupported(format!(
                     "Ite String in str.in_re is currently unsupported."
                 )));
             }
         };
         let regex_tok = self.parse_reglan_type(regex)?;
-        match regex_tok {
+        self.parse_str_in_re_helper(&regex_tok, string)
+    }
+
+    fn parse_str_in_re_helper(&mut self,re_tok:&RegexToken, string:Rc<GenRegex>)->Result<Rc<GenRegex>, SmtParseError>{
+        match re_tok{
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
                 "RegLan variable in str.in_re needs to be initialzied beforehand."
             ))),
             RegexToken::Val(gen_regex) => {
                 let gen_regex = if self.not_flag {
                     self.brzozowski_flag = true;
-                    GenRegex::complement(&gen_regex)
+                    GenRegex::complement(gen_regex)
                 } else {
-                    gen_regex
+                    gen_regex.clone()
                 };
                 Ok(GenRegex::intersect(&string, &gen_regex))
             }
-            RegexToken::Conditional(maps) => {
-                let mut ret_val: Vec<Rc<GenRegex>> = Vec::new();
-                for re in maps.keys() {
-                    let gen_regex = if self.not_flag {
-                        self.brzozowski_flag = true;
-                        GenRegex::complement(re)
-                    } else {
-                        re.clone()
-                    };
-                    let saved_not_flag = self.not_flag;
-                    self.not_flag = false;
-                    let assertion = self.parse_assert_arg(
-                        maps.get(re).expect("str.in_re: You shouldn't be here."),
-                    )?;
-                    self.not_flag = saved_not_flag;
-                    ret_val.push(GenRegex::concat(
-                        &GenRegex::intersect(&string, &gen_regex),
-                        &assertion,
-                    ));
-                }
-                Ok(GenRegex::union_many(&ret_val))
+            RegexToken::Conditional{assertion,true_re,false_re} => {
+                //Remember to do not_flag stuff
+                let saved_not_flag=self.not_flag;
+                self.not_flag=false;
+                let t=self.parse_assert_arg(assertion)?;
+                self.not_flag=true;
+                let f=self.parse_assert_arg(assertion)?;
+                self.not_flag=saved_not_flag;
+                let t=GenRegex::concat(&t, &self.parse_str_in_re_helper(&true_re, string.clone())?);
+                let f=GenRegex::concat(&f, &self.parse_str_in_re_helper(&false_re, string.clone())?);
+                Ok(GenRegex::union(&t, &f))
             }
         }
     }
@@ -958,7 +938,7 @@ impl SmtParser {
         }
         let mut cur = regex_args.pop().unwrap();
         while let Some(next) = regex_args.pop() {
-            cur = RegexToken::union(next, cur).unwrap();
+            cur = RegexToken::union(&next, &cur).unwrap();
         }
         Ok(cur)
     }
@@ -969,7 +949,7 @@ impl SmtParser {
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        RegexToken::diff(self.parse_regex(regex1)?, self.parse_regex(regex2)?)
+        RegexToken::diff(&self.parse_regex(regex1)?, &self.parse_regex(regex2)?)
     }
 
     fn parse_re_inter(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
@@ -984,7 +964,7 @@ impl SmtParser {
         }
         let mut cur = regex_args.pop().unwrap();
         while let Some(next) = regex_args.pop() {
-            cur = RegexToken::inter(next, cur).unwrap();
+            cur = RegexToken::inter(&next, &cur).unwrap();
         }
         Ok(cur)
     }
@@ -994,7 +974,7 @@ impl SmtParser {
         // Returns R*
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        RegexToken::star(self.parse_regex(regex)?)
+        RegexToken::star(&self.parse_regex(regex)?)
     }
 
     fn parse_re_all(&self) -> Result<RegexToken, SmtParseError> {
@@ -1018,27 +998,27 @@ impl SmtParser {
         }
         let mut cur = regex_args.pop().unwrap();
         while let Some(next) = regex_args.pop() {
-            cur = RegexToken::concat(next, cur).unwrap();
+            cur = RegexToken::concat(&next, &cur).unwrap();
         }
         Ok(cur)
     }
 
     fn parse_str_to_re(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
+        fn strtok_to_retok(s:&StringToken)->RegexToken{
+            match s{
+                StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(&name)),
+                StringToken::Val(str) => RegexToken::Val(GenRegex::str_to_re(&str)),
+                StringToken::Conditional { assertion, true_string, false_string } => {
+                    RegexToken::Conditional { assertion:assertion.clone(),
+                        true_re: Rc::new(strtok_to_retok(true_string.as_ref())), false_re: Rc::new(strtok_to_retok(false_string.as_ref())) }
+                },
+            }
+        }
         // (str.to_re "String")
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
         let str = self.parse_string_type(str)?;
-        match str {
-            StringToken::Var(name) => Ok(RegexToken::Val(GenRegex::create_gre_str_var(&name))),
-            StringToken::Val(str) => Ok(RegexToken::Val(GenRegex::str_to_re(&str))),
-            StringToken::Conditional(map) => {
-                let mut ret_val = HashMap::new();
-                for (key, val) in map {
-                    ret_val.insert(GenRegex::str_to_re(&key), val);
-                }
-                Ok(RegexToken::Conditional(ret_val))
-            }
-        }
+        Ok(strtok_to_retok(&str))
     }
 
     fn parse_re_range(&self, v: &Value) -> Result<RegexToken, SmtParseError> {
@@ -1105,7 +1085,7 @@ impl SmtParser {
             "Integer for re.loop should be positive.".to_string(),
         ))?;
         let regex_base = self.parse_regex(regex)?;
-        RegexToken::caret(p1, regex_base)
+        RegexToken::caret(p1, &regex_base)
     }
 
     fn parse_re_loop(
@@ -1124,7 +1104,7 @@ impl SmtParser {
             "Integer for re.loop should be positive.".to_string(),
         ))?;
         let regex_base = self.parse_regex(regex)?;
-        RegexToken::tok_loop(p1, p2, regex_base)
+        RegexToken::tok_loop(p1, p2, &regex_base)
     }
 
     fn parse_re_allchar(&self) -> Result<RegexToken, SmtParseError> {
@@ -1135,19 +1115,19 @@ impl SmtParser {
         self.brzozowski_flag = true;
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        RegexToken::comp(self.parse_regex(regex)?)
+        RegexToken::comp(&self.parse_regex(regex)?)
     }
 
     fn parse_re_opt(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        RegexToken::opt(self.parse_regex(regex)?)
+        RegexToken::opt(&self.parse_regex(regex)?)
     }
 
     fn parse_re_plus(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        RegexToken::plus(self.parse_regex(regex)?)
+        RegexToken::plus(&self.parse_regex(regex)?)
     }
 
     /*
@@ -1192,23 +1172,7 @@ impl SmtParser {
         let (assertion, true_string, false_string) = (args[0], args[1], args[2]);
         let true_string = self.parse_string_type(true_string)?;
         let false_string = self.parse_string_type(false_string)?;
-        match (true_string, false_string) {
-            (StringToken::Val(string1), StringToken::Val(string2)) => {
-                let mut ret_val = HashMap::new();
-                ret_val.insert(string1, assertion.clone());
-                ret_val.insert(
-                    string2,
-                    Value::cons(
-                        Value::symbol("not"),
-                        Value::cons(assertion.clone(), Value::Null),
-                    ),
-                );
-                Ok(StringToken::Conditional(ret_val))
-            }
-            _ => Err(SmtParseError::Unsupported(format!(
-                "Nested ite's and string variables in ite not supported."
-            ))),
-        }
+        Ok(StringToken::Conditional { assertion: assertion.clone(), true_string: Rc::new(true_string), false_string: Rc::new(false_string) })
     }
 
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
