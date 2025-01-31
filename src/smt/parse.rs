@@ -300,7 +300,7 @@ impl RegexToken {
     }
     fn caret(num: u64, tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
-            RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::caret(num, &gen_regex))),
+            RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::caret(num, gen_regex))),
             RegexToken::Conditional {
                 assertion,
                 true_re,
@@ -320,7 +320,7 @@ impl RegexToken {
     fn tok_loop(num1: u64, num2: u64, tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => {
-                Ok(RegexToken::Val(GenRegex::re_loop(num1, num2, &gen_regex)))
+                Ok(RegexToken::Val(GenRegex::re_loop(num1, num2, gen_regex)))
             }
             RegexToken::Conditional {
                 assertion,
@@ -340,15 +340,15 @@ impl RegexToken {
     }
     fn star(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
-            RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::star(&gen_regex))),
+            RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::star(gen_regex))),
             RegexToken::Conditional {
                 assertion,
                 true_re,
                 false_re,
             } => {
                 let assertion = assertion.clone();
-                let true_re = Rc::new(RegexToken::star(&true_re)?);
-                let false_re = Rc::new(RegexToken::star(&false_re)?);
+                let true_re = Rc::new(RegexToken::star(true_re)?);
+                let false_re = Rc::new(RegexToken::star(false_re)?);
                 Ok(RegexToken::Conditional {
                     assertion,
                     true_re,
@@ -361,8 +361,8 @@ impl RegexToken {
     fn plus(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::concat(
-                &gen_regex,
-                &GenRegex::star(&gen_regex),
+                gen_regex,
+                &GenRegex::star(gen_regex),
             ))),
             RegexToken::Conditional {
                 assertion,
@@ -370,8 +370,8 @@ impl RegexToken {
                 false_re,
             } => {
                 let assertion = assertion.clone();
-                let true_re = Rc::new(RegexToken::plus(&true_re)?);
-                let false_re = Rc::new(RegexToken::plus(&false_re)?);
+                let true_re = Rc::new(RegexToken::plus(true_re)?);
+                let false_re = Rc::new(RegexToken::plus(false_re)?);
                 Ok(RegexToken::Conditional {
                     assertion,
                     true_re,
@@ -383,15 +383,15 @@ impl RegexToken {
     }
     fn comp(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
-            RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::complement(&gen_regex))),
+            RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::complement(gen_regex))),
             RegexToken::Conditional {
                 assertion,
                 true_re,
                 false_re,
             } => {
                 let assertion = assertion.clone();
-                let true_re = Rc::new(RegexToken::comp(&true_re)?);
-                let false_re = Rc::new(RegexToken::comp(&false_re)?);
+                let true_re = Rc::new(RegexToken::comp(true_re)?);
+                let false_re = Rc::new(RegexToken::comp(false_re)?);
                 Ok(RegexToken::Conditional {
                     assertion,
                     true_re,
@@ -404,7 +404,7 @@ impl RegexToken {
     fn opt(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::union(
-                &gen_regex,
+                gen_regex,
                 &GenRegex::epsilon(),
             ))),
             RegexToken::Conditional {
@@ -413,8 +413,8 @@ impl RegexToken {
                 false_re,
             } => {
                 let assertion = assertion.clone();
-                let true_re = Rc::new(RegexToken::opt(&true_re)?);
-                let false_re = Rc::new(RegexToken::opt(&false_re)?);
+                let true_re = Rc::new(RegexToken::opt(true_re)?);
+                let false_re = Rc::new(RegexToken::opt(false_re)?);
                 Ok(RegexToken::Conditional {
                     assertion,
                     true_re,
@@ -842,11 +842,11 @@ impl SmtParser {
                 };
                 match string {
                     StringToken::Var(var_name) => Ok(GenRegex::intersect(
-                        &GenRegex::create_gre_str_var(&var_name),
+                        &GenRegex::create_gre_str_var(var_name),
                         &gen_regex,
                     )),
                     StringToken::Val(string) => Ok(GenRegex::intersect(
-                        &GenRegex::str_to_re(&string),
+                        &GenRegex::str_to_re(string),
                         &gen_regex,
                     )),
                     StringToken::Conditional {
@@ -862,11 +862,11 @@ impl SmtParser {
                         self.not_flag = saved_not_flag;
                         let t = GenRegex::concat(
                             &t,
-                            &self.parse_str_in_re_helper(re_tok, &true_string)?,
+                            &self.parse_str_in_re_helper(re_tok, true_string)?,
                         );
                         let f = GenRegex::concat(
                             &f,
-                            &self.parse_str_in_re_helper(re_tok, &false_string)?,
+                            &self.parse_str_in_re_helper(re_tok, false_string)?,
                         );
                         Ok(GenRegex::union(&t, &f))
                     }
@@ -1124,18 +1124,18 @@ impl SmtParser {
         Ok(cur)
     }
 
-    fn strtok_to_retok(&self, s: &StringToken) -> RegexToken {
+    fn strtok_to_retok(s: &StringToken) -> RegexToken {
         match s {
-            StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(&name)),
-            StringToken::Val(str) => RegexToken::Val(GenRegex::str_to_re(&str)),
+            StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(name)),
+            StringToken::Val(str) => RegexToken::Val(GenRegex::str_to_re(str)),
             StringToken::Conditional {
                 assertion,
                 true_string,
                 false_string,
             } => RegexToken::Conditional {
                 assertion: assertion.clone(),
-                true_re: Rc::new(self.strtok_to_retok(true_string.as_ref())),
-                false_re: Rc::new(self.strtok_to_retok(false_string.as_ref())),
+                true_re: Rc::new(Self::strtok_to_retok(true_string.as_ref())),
+                false_re: Rc::new(Self::strtok_to_retok(false_string.as_ref())),
             },
         }
     }
@@ -1145,7 +1145,7 @@ impl SmtParser {
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
         let str = self.parse_string_type(str)?;
-        Ok(self.strtok_to_retok(&str))
+        Ok(Self::strtok_to_retok(&str))
     }
 
     fn parse_re_range(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
@@ -1428,6 +1428,16 @@ impl SmtParser {
         Err(SmtParseError::Unimplemented(
             "Symbol S-expression".to_string(),
         ))
+    }
+}
+
+/*
+    Trait implementations
+*/
+
+impl Default for SmtParser {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

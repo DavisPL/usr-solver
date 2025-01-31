@@ -9,6 +9,7 @@ use crate::types::regex::GenRegex;
 use std::collections::{HashSet, VecDeque};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct SatChecker {}
 
 // Stores a regex and at what depth of derivative it was found.
@@ -57,5 +58,15 @@ impl SatChecker {
     fn get_fresh_var(&mut self, id: i32) -> Rc<CharExpression> {
         let var_name = format!("f.{}", id);
         Rc::new(CharExpression::CharVar(CharVar { name: var_name }))
+    }
+}
+
+/*
+    Trait implementations
+*/
+
+impl Default for SatChecker {
+    fn default() -> Self {
+        Self::new()
     }
 }
