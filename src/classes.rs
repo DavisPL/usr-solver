@@ -92,7 +92,9 @@ impl GenRegex {
             GenRegex::concat(&args[0].clone(), &GenRegex::concat_many(&args[1..]))
         }
     }
-
+    pub fn diff(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex>{
+        GenRegex::intersect(gre1, &GenRegex::complement(gre2))
+    }
     pub fn star(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Kleene(gre.clone()))
     }
