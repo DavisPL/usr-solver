@@ -237,7 +237,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
                 _ => {}
             }
         }
-        combined_expr.set_string_var(var.clone(), eq_exprs[0].clone());
+        combined_expr.set_str_var(var.clone(), eq_exprs[0].clone());
     }
 
     // Include range constraints
@@ -275,7 +275,7 @@ fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<Simp
         retsub.remove_char_map(char_var);
     }
     for (string_var, sub_expr1) in merged.get_str_map() {
-        if let Some(sub_expr2) = sub.get_string_var(string_var) {
+        if let Some(sub_expr2) = sub.get_str_var(string_var) {
             retsub.remove_str_map(string_var);
             if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
                 retsub.get_char_map_mut().append(sub.get_char_map_mut());
@@ -306,10 +306,10 @@ fn sub_expr_match(
     if sub_expr1.is_empty() && sub_expr2.is_empty() {
         return Some(retval);
     } else if sub_expr1.head_length() == 0 && sub_expr1.get_tail() {
-        retval.set_string_var(str_var.clone(), sub_expr2.clone());
+        retval.set_str_var(str_var.clone(), sub_expr2.clone());
         return Some(retval);
     } else if sub_expr2.head_length() == 0 && sub_expr2.get_tail() {
-        retval.set_string_var(str_var.clone(), sub_expr1.clone());
+        retval.set_str_var(str_var.clone(), sub_expr1.clone());
         return Some(retval);
     } else if sub_expr1.is_empty() || sub_expr2.is_empty() {
         return None;
@@ -346,12 +346,12 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
             },
             CharExpression::Literal(_) => expr.clone(),
         },
-        GenRegex::StringVar(string_var) => match substitution.get_string_var(string_var) {
+        GenRegex::StringVar(string_var) => match substitution.get_str_var(string_var) {
             Some(value) => value.to_gen_regex(string_var),
             None => expr.clone(),
         },
         GenRegex::StringIndex(string_index) => {
-            match substitution.get_string_var(&string_index.var) {
+            match substitution.get_str_var(&string_index.var) {
                 Some(value) => {
                     let index = string_index.index as usize;
                     let length = value.get_head().len();
