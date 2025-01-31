@@ -6,8 +6,11 @@
 #![allow(non_snake_case)]
 #![allow(clippy::single_match)]
 
-use crate::classes::{CharExpression, MaybeCharExpression, Predicate, StringIndex, StringVar};
+use crate::types::expr::{CharExpression, MaybeCharExpression, StringIndex, StringVar};
+use crate::types::predicate::Predicate;
+
 use disjoint_sets::UnionFind;
+
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 

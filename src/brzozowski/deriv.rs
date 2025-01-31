@@ -5,10 +5,11 @@
 // TODO: fix and remove
 #![allow(unused_variables)]
 
-use crate::classes::{
-    CharExpression, CharVar, GenRegex, MaybeCharExpression, Predicate, StringIndex,
-};
-use crate::predicate_evaluation::evaluate_complete;
+use super::predicate_evaluation::evaluate_complete;
+use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex};
+use crate::types::predicate::Predicate;
+use crate::types::regex::GenRegex;
+
 use std::collections::HashSet;
 use std::rc::Rc;
 

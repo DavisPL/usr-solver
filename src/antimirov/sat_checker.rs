@@ -1,5 +1,11 @@
-use crate::antimirov::{derivative, nullable};
-use crate::classes::{CharExpression, CharVar, GenRegex};
+/*
+    Satisfiability checker using Antimirov derivatives
+*/
+
+use super::deriv::{derivative, nullable};
+use crate::types::expr::{CharExpression, CharVar};
+use crate::types::regex::GenRegex;
+
 use std::collections::{HashSet, VecDeque};
 use std::rc::Rc;
 

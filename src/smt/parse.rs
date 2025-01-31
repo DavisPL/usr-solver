@@ -5,9 +5,8 @@
 // TODO fix
 #![allow(clippy::useless_format)]
 
-use super::classes::GenRegex;
-
-use regex::Regex;
+use super::util::{hex_to_char, parse_unicode_escape};
+use crate::types::regex::GenRegex;
 
 use lexpr::{self, Value};
 
@@ -101,48 +100,6 @@ fn expect_symbol(v: &Value) -> Result<&str, SmtParseError> {
     v.as_symbol().ok_or(SmtParseError::unexpected(v, "symbol"))
 }
 
-fn hex_to_char(number: u64) -> Result<char, SmtParseError> {
-    char::from_u32(number as u32).ok_or(SmtParseError::FileError(format!(
-        "Invalid hex value: {}",
-        number
-    )))
-}
-
-fn parse_unicode_escape(text: &str) -> Result<String, SmtParseError> {
-    fn replace_all<E>(
-        re: &Regex,
-        haystack: &str,
-        replacement: impl Fn(&regex::Captures) -> Result<String, E>,
-    ) -> Result<String, E> {
-        let mut new = String::with_capacity(haystack.len());
-        let mut last_match = 0;
-        for caps in re.captures_iter(haystack) {
-            let m = caps.get(0).unwrap();
-            new.push_str(&haystack[last_match..m.start()]);
-            new.push_str(&replacement(&caps)?);
-            last_match = m.end();
-        }
-        new.push_str(&haystack[last_match..]);
-        Ok(new)
-    }
-    // Regex pattern for unicode escapes \u{Hex}
-    // Does not check invalid hex
-    let unicode_escape_re = Regex::new(r"\\u\{([0-9A-Fa-f]+)\}").unwrap();
-
-    replace_all(&unicode_escape_re, text, |caps: &regex::Captures| {
-        // Unwrap is okay since regex check between 0-f for hex
-        let hex_value = u32::from_str_radix(&caps[1], 16).unwrap();
-        match char::from_u32(hex_value) {
-            Some(v) => Ok(v.to_string()),
-            // Error on invalid hex
-            None => Err(SmtParseError::FileError(format!(
-                "Bad hex in unicode escape {:?}",
-                hex_value
-            ))),
-        }
-    })
-}
-
 fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
     let v = lexpr::from_str(smt_string)?;
     Ok(v)
@@ -169,101 +126,193 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
 
 enum RegexToken {
     Val(Rc<GenRegex>),
-    Conditional{assertion: Value,true_re: Rc<RegexToken>,false_re:Rc<RegexToken>},
+    Conditional {
+        assertion: Value,
+        true_re: Rc<RegexToken>,
+        false_re: Rc<RegexToken>,
+    },
     Var(String),
 }
 impl RegexToken {
     fn diff(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
-        match tok1{
-            RegexToken::Val(gen_regex1) => {
-                match tok2{
-                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::diff(gen_regex1, gen_regex2))),
-                    RegexToken::Conditional { assertion, true_re, false_re } => {
-                        let true_re=Rc::new(RegexToken::diff(tok1, true_re)?);
-                        let false_re=Rc::new(RegexToken::diff(tok1, false_re)?);
-                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-                    },
-                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+        match tok1 {
+            RegexToken::Val(gen_regex1) => match tok2 {
+                RegexToken::Val(gen_regex2) => {
+                    Ok(RegexToken::Val(GenRegex::diff(gen_regex1, gen_regex2)))
                 }
+                RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                } => {
+                    let true_re = Rc::new(RegexToken::diff(tok1, true_re)?);
+                    let false_re = Rc::new(RegexToken::diff(tok1, false_re)?);
+                    Ok(RegexToken::Conditional {
+                        assertion: assertion.clone(),
+                        true_re,
+                        false_re,
+                    })
+                }
+                RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                    "RegLan operations not supported with variables."
+                ))),
             },
-            RegexToken::Conditional { assertion, true_re, false_re } => {
-                let true_re=Rc::new(RegexToken::diff(true_re, tok2)?);
-                let false_re=Rc::new(RegexToken::diff(false_re, tok2)?);
-                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-            },
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let true_re = Rc::new(RegexToken::diff(true_re, tok2)?);
+                let false_re = Rc::new(RegexToken::diff(false_re, tok2)?);
+                Ok(RegexToken::Conditional {
+                    assertion: assertion.clone(),
+                    true_re,
+                    false_re,
+                })
+            }
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                "RegLan operations not supported with variables."
+            ))),
         }
     }
     fn concat(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
-        match tok1{
-            RegexToken::Val(gen_regex1) => {
-                match tok2{
-                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::concat(gen_regex1, gen_regex2))),
-                    RegexToken::Conditional { assertion, true_re, false_re } => {
-                        let true_re=Rc::new(RegexToken::concat(tok1, true_re)?);
-                        let false_re=Rc::new(RegexToken::concat(tok1, false_re)?);
-                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-                    },
-                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+        match tok1 {
+            RegexToken::Val(gen_regex1) => match tok2 {
+                RegexToken::Val(gen_regex2) => {
+                    Ok(RegexToken::Val(GenRegex::concat(gen_regex1, gen_regex2)))
                 }
+                RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                } => {
+                    let true_re = Rc::new(RegexToken::concat(tok1, true_re)?);
+                    let false_re = Rc::new(RegexToken::concat(tok1, false_re)?);
+                    Ok(RegexToken::Conditional {
+                        assertion: assertion.clone(),
+                        true_re,
+                        false_re,
+                    })
+                }
+                RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                    "RegLan operations not supported with variables."
+                ))),
             },
-            RegexToken::Conditional { assertion, true_re, false_re } => {
-                let true_re=Rc::new(RegexToken::concat(true_re, tok2)?);
-                let false_re=Rc::new(RegexToken::concat(false_re, tok2)?);
-                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-            },
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let true_re = Rc::new(RegexToken::concat(true_re, tok2)?);
+                let false_re = Rc::new(RegexToken::concat(false_re, tok2)?);
+                Ok(RegexToken::Conditional {
+                    assertion: assertion.clone(),
+                    true_re,
+                    false_re,
+                })
+            }
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                "RegLan operations not supported with variables."
+            ))),
         }
     }
     fn union(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
-        match tok1{
-            RegexToken::Val(gen_regex1) => {
-                match tok2{
-                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::union(gen_regex1, gen_regex2))),
-                    RegexToken::Conditional { assertion, true_re, false_re } => {
-                        let true_re=Rc::new(RegexToken::union(tok1, true_re)?);
-                        let false_re=Rc::new(RegexToken::union(tok1, false_re)?);
-                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-                    },
-                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+        match tok1 {
+            RegexToken::Val(gen_regex1) => match tok2 {
+                RegexToken::Val(gen_regex2) => {
+                    Ok(RegexToken::Val(GenRegex::union(gen_regex1, gen_regex2)))
                 }
+                RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                } => {
+                    let true_re = Rc::new(RegexToken::union(tok1, true_re)?);
+                    let false_re = Rc::new(RegexToken::union(tok1, false_re)?);
+                    Ok(RegexToken::Conditional {
+                        assertion: assertion.clone(),
+                        true_re,
+                        false_re,
+                    })
+                }
+                RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                    "RegLan operations not supported with variables."
+                ))),
             },
-            RegexToken::Conditional { assertion, true_re, false_re } => {
-                let true_re=Rc::new(RegexToken::union(true_re, tok2)?);
-                let false_re=Rc::new(RegexToken::union(false_re, tok2)?);
-                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-            },
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let true_re = Rc::new(RegexToken::union(true_re, tok2)?);
+                let false_re = Rc::new(RegexToken::union(false_re, tok2)?);
+                Ok(RegexToken::Conditional {
+                    assertion: assertion.clone(),
+                    true_re,
+                    false_re,
+                })
+            }
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                "RegLan operations not supported with variables."
+            ))),
         }
     }
     fn inter(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
-        match tok1{
-            RegexToken::Val(gen_regex1) => {
-                match tok2{
-                    RegexToken::Val(gen_regex2) => Ok(RegexToken::Val(GenRegex::intersect(gen_regex1, gen_regex2))),
-                    RegexToken::Conditional { assertion, true_re, false_re } => {
-                        let true_re=Rc::new(RegexToken::inter(tok1, true_re)?);
-                        let false_re=Rc::new(RegexToken::inter(tok1, false_re)?);
-                        Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-                    },
-                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+        match tok1 {
+            RegexToken::Val(gen_regex1) => match tok2 {
+                RegexToken::Val(gen_regex2) => {
+                    Ok(RegexToken::Val(GenRegex::intersect(gen_regex1, gen_regex2)))
                 }
+                RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                } => {
+                    let true_re = Rc::new(RegexToken::inter(tok1, true_re)?);
+                    let false_re = Rc::new(RegexToken::inter(tok1, false_re)?);
+                    Ok(RegexToken::Conditional {
+                        assertion: assertion.clone(),
+                        true_re,
+                        false_re,
+                    })
+                }
+                RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                    "RegLan operations not supported with variables."
+                ))),
             },
-            RegexToken::Conditional { assertion, true_re, false_re } => {
-                let true_re=Rc::new(RegexToken::inter(true_re, tok2)?);
-                let false_re=Rc::new(RegexToken::inter(false_re, tok2)?);
-                Ok(RegexToken::Conditional { assertion:assertion.clone(), true_re, false_re })
-            },
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("RegLan operations not supported with variables."))),
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let true_re = Rc::new(RegexToken::inter(true_re, tok2)?);
+                let false_re = Rc::new(RegexToken::inter(false_re, tok2)?);
+                Ok(RegexToken::Conditional {
+                    assertion: assertion.clone(),
+                    true_re,
+                    false_re,
+                })
+            }
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                "RegLan operations not supported with variables."
+            ))),
         }
     }
     fn caret(num: u64, tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::caret(num, &gen_regex))),
-            RegexToken::Conditional{ assertion, true_re, false_re } => {
-                let true_re=Rc::new(RegexToken::caret(num, true_re)?);
-                let false_re=Rc::new(RegexToken::caret(num, false_re)?);
-                Ok(RegexToken::Conditional { assertion: assertion.clone(), true_re, false_re })
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let true_re = Rc::new(RegexToken::caret(num, true_re)?);
+                let false_re = Rc::new(RegexToken::caret(num, false_re)?);
+                Ok(RegexToken::Conditional {
+                    assertion: assertion.clone(),
+                    true_re,
+                    false_re,
+                })
             }
             RegexToken::Var(_) => todo!(),
         }
@@ -273,10 +322,18 @@ impl RegexToken {
             RegexToken::Val(gen_regex) => {
                 Ok(RegexToken::Val(GenRegex::re_loop(num1, num2, &gen_regex)))
             }
-            RegexToken::Conditional{ assertion, true_re, false_re } => {
-                let true_re=Rc::new(RegexToken::tok_loop(num1,num2, true_re)?);
-                let false_re=Rc::new(RegexToken::tok_loop(num1,num2, false_re)?);
-                Ok(RegexToken::Conditional { assertion: assertion.clone(), true_re, false_re })
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let true_re = Rc::new(RegexToken::tok_loop(num1, num2, true_re)?);
+                let false_re = Rc::new(RegexToken::tok_loop(num1, num2, false_re)?);
+                Ok(RegexToken::Conditional {
+                    assertion: assertion.clone(),
+                    true_re,
+                    false_re,
+                })
             }
             RegexToken::Var(_) => todo!(),
         }
@@ -284,11 +341,19 @@ impl RegexToken {
     fn star(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::star(&gen_regex))),
-            RegexToken::Conditional{ assertion, true_re, false_re } => {
-                let assertion=assertion.clone();
-                let true_re=Rc::new(RegexToken::star(&true_re)?);
-                let false_re=Rc::new(RegexToken::star(&false_re)?);
-                Ok(RegexToken::Conditional { assertion, true_re, false_re })
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let assertion = assertion.clone();
+                let true_re = Rc::new(RegexToken::star(&true_re)?);
+                let false_re = Rc::new(RegexToken::star(&false_re)?);
+                Ok(RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                })
             }
             RegexToken::Var(_) => todo!(),
         }
@@ -299,11 +364,19 @@ impl RegexToken {
                 &gen_regex,
                 &GenRegex::star(&gen_regex),
             ))),
-            RegexToken::Conditional{ assertion, true_re, false_re } => {
-                let assertion=assertion.clone();
-                let true_re=Rc::new(RegexToken::plus(&true_re)?);
-                let false_re=Rc::new(RegexToken::plus(&false_re)?);
-                Ok(RegexToken::Conditional { assertion, true_re, false_re })
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let assertion = assertion.clone();
+                let true_re = Rc::new(RegexToken::plus(&true_re)?);
+                let false_re = Rc::new(RegexToken::plus(&false_re)?);
+                Ok(RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                })
             }
             RegexToken::Var(_) => todo!(),
         }
@@ -311,11 +384,19 @@ impl RegexToken {
     fn comp(tok: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(RegexToken::Val(GenRegex::complement(&gen_regex))),
-            RegexToken::Conditional{ assertion, true_re, false_re } => {
-                let assertion=assertion.clone();
-                let true_re=Rc::new(RegexToken::comp(&true_re)?);
-                let false_re=Rc::new(RegexToken::comp(&false_re)?);
-                Ok(RegexToken::Conditional { assertion, true_re, false_re })
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let assertion = assertion.clone();
+                let true_re = Rc::new(RegexToken::comp(&true_re)?);
+                let false_re = Rc::new(RegexToken::comp(&false_re)?);
+                Ok(RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                })
             }
             RegexToken::Var(_) => todo!(),
         }
@@ -326,11 +407,19 @@ impl RegexToken {
                 &gen_regex,
                 &GenRegex::epsilon(),
             ))),
-            RegexToken::Conditional{ assertion, true_re, false_re } => {
-                let assertion=assertion.clone();
-                let true_re=Rc::new(RegexToken::opt(&true_re)?);
-                let false_re=Rc::new(RegexToken::opt(&false_re)?);
-                Ok(RegexToken::Conditional { assertion, true_re, false_re })
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
+                let assertion = assertion.clone();
+                let true_re = Rc::new(RegexToken::opt(&true_re)?);
+                let false_re = Rc::new(RegexToken::opt(&false_re)?);
+                Ok(RegexToken::Conditional {
+                    assertion,
+                    true_re,
+                    false_re,
+                })
             }
             RegexToken::Var(_) => todo!(),
         }
@@ -339,7 +428,11 @@ impl RegexToken {
 enum StringToken {
     Var(String),
     Val(String),
-    Conditional{assertion:Value, true_string: Rc<StringToken>, false_string: Rc<StringToken>},
+    Conditional {
+        assertion: Value,
+        true_string: Rc<StringToken>,
+        false_string: Rc<StringToken>,
+    },
 }
 
 pub struct SmtParser {
@@ -731,8 +824,12 @@ impl SmtParser {
         self.parse_str_in_re_helper(&regex_tok, &str_tok)
     }
 
-    fn parse_str_in_re_helper(&mut self,re_tok:&RegexToken, string:&StringToken)->Result<Rc<GenRegex>, SmtParseError>{
-        match re_tok{
+    fn parse_str_in_re_helper(
+        &mut self,
+        re_tok: &RegexToken,
+        string: &StringToken,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
+        match re_tok {
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
                 "RegLan variable in str.in_re needs to be initialzied beforehand."
             ))),
@@ -744,31 +841,51 @@ impl SmtParser {
                     gen_regex.clone()
                 };
                 match string {
-                    StringToken::Var(var_name) => Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&var_name), &gen_regex)),
-                    StringToken::Val(string) => Ok(GenRegex::intersect(&GenRegex::str_to_re(&string), &gen_regex)),
-                    StringToken::Conditional { assertion, true_string, false_string } => {
-                        let saved_not_flag=self.not_flag;
-                        self.not_flag=false;
-                        let t=self.parse_assert_arg(assertion)?;
-                        self.not_flag=true;
-                        let f=self.parse_assert_arg(assertion)?;
-                        self.not_flag=saved_not_flag;
-                        let t=GenRegex::concat(&t, &self.parse_str_in_re_helper(re_tok,&true_string)?);
-                        let f=GenRegex::concat(&f, &self.parse_str_in_re_helper(re_tok,&false_string)?);
+                    StringToken::Var(var_name) => Ok(GenRegex::intersect(
+                        &GenRegex::create_gre_str_var(&var_name),
+                        &gen_regex,
+                    )),
+                    StringToken::Val(string) => Ok(GenRegex::intersect(
+                        &GenRegex::str_to_re(&string),
+                        &gen_regex,
+                    )),
+                    StringToken::Conditional {
+                        assertion,
+                        true_string,
+                        false_string,
+                    } => {
+                        let saved_not_flag = self.not_flag;
+                        self.not_flag = false;
+                        let t = self.parse_assert_arg(assertion)?;
+                        self.not_flag = true;
+                        let f = self.parse_assert_arg(assertion)?;
+                        self.not_flag = saved_not_flag;
+                        let t = GenRegex::concat(
+                            &t,
+                            &self.parse_str_in_re_helper(re_tok, &true_string)?,
+                        );
+                        let f = GenRegex::concat(
+                            &f,
+                            &self.parse_str_in_re_helper(re_tok, &false_string)?,
+                        );
                         Ok(GenRegex::union(&t, &f))
-                    },
+                    }
                 }
             }
-            RegexToken::Conditional{assertion,true_re,false_re} => {
+            RegexToken::Conditional {
+                assertion,
+                true_re,
+                false_re,
+            } => {
                 //Remember to do not_flag stuff
-                let saved_not_flag=self.not_flag;
-                self.not_flag=false;
-                let t=self.parse_assert_arg(assertion)?;
-                self.not_flag=true;
-                let f=self.parse_assert_arg(assertion)?;
-                self.not_flag=saved_not_flag;
-                let t=GenRegex::concat(&t, &self.parse_str_in_re_helper(true_re, string)?);
-                let f=GenRegex::concat(&f, &self.parse_str_in_re_helper(false_re, string)?);
+                let saved_not_flag = self.not_flag;
+                self.not_flag = false;
+                let t = self.parse_assert_arg(assertion)?;
+                self.not_flag = true;
+                let f = self.parse_assert_arg(assertion)?;
+                self.not_flag = saved_not_flag;
+                let t = GenRegex::concat(&t, &self.parse_str_in_re_helper(true_re, string)?);
+                let f = GenRegex::concat(&f, &self.parse_str_in_re_helper(false_re, string)?);
                 Ok(GenRegex::union(&t, &f))
             }
         }
@@ -1007,13 +1124,18 @@ impl SmtParser {
         Ok(cur)
     }
 
-    fn strtok_to_retok(&self, s:&StringToken)->RegexToken{
-        match s{
+    fn strtok_to_retok(&self, s: &StringToken) -> RegexToken {
+        match s {
             StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(&name)),
             StringToken::Val(str) => RegexToken::Val(GenRegex::str_to_re(&str)),
-            StringToken::Conditional { assertion, true_string, false_string } => {
-                RegexToken::Conditional { assertion:assertion.clone(),
-                    true_re: Rc::new(self.strtok_to_retok(true_string.as_ref())), false_re: Rc::new(self.strtok_to_retok(false_string.as_ref())) }
+            StringToken::Conditional {
+                assertion,
+                true_string,
+                false_string,
+            } => RegexToken::Conditional {
+                assertion: assertion.clone(),
+                true_re: Rc::new(self.strtok_to_retok(true_string.as_ref())),
+                false_re: Rc::new(self.strtok_to_retok(false_string.as_ref())),
             },
         }
     }
@@ -1034,14 +1156,16 @@ impl SmtParser {
         expect_null(tail)?;
         let char1 = self.parse_string_type(char1)?;
         let char2 = self.parse_string_type(char2)?;
-        match (char1,char2){
-            (StringToken::Val(char1),StringToken::Val(char2))=>{
+        match (char1, char2) {
+            (StringToken::Val(char1), StringToken::Val(char2)) => {
                 if let (Some(char1), Some(char2)) = (char1.chars().next(), char2.chars().next()) {
                     return Ok(RegexToken::Val(GenRegex::re_range(char1, char2)));
                 }
                 Err(SmtParseError::unrecog(v))
             }
-            _=>Err(SmtParseError::Unimplemented(format!("No String variables in re.range yet.")))
+            _ => Err(SmtParseError::Unimplemented(format!(
+                "No String variables in re.range yet."
+            ))),
         }
     }
 
@@ -1149,14 +1273,17 @@ impl SmtParser {
             return Ok(StringToken::Val(str.to_string()));
         }
         if let Some((head, tail)) = v.as_pair() {
-            return match head.as_symbol().ok_or(SmtParseError::unexpected(head, "parse_string_type: symbol"))?{
-                "ite"=>self.parse_ite(tail),
-                "_"=>{
-                    let c=self.parse_char_obj(tail)?;
+            return match head
+                .as_symbol()
+                .ok_or(SmtParseError::unexpected(head, "parse_string_type: symbol"))?
+            {
+                "ite" => self.parse_ite(tail),
+                "_" => {
+                    let c = self.parse_char_obj(tail)?;
                     Ok(StringToken::Val(c.to_string()))
-                },
-                _=> Err(SmtParseError::unrecog(head)),
-            }
+                }
+                _ => Err(SmtParseError::unrecog(head)),
+            };
         }
         if let Some(name) = v.as_symbol() {
             let res = self.func_names.get(name);
@@ -1184,7 +1311,11 @@ impl SmtParser {
         let (assertion, true_string, false_string) = (args[0], args[1], args[2]);
         let true_string = self.parse_string_type(true_string)?;
         let false_string = self.parse_string_type(false_string)?;
-        Ok(StringToken::Conditional { assertion: assertion.clone(), true_string: Rc::new(true_string), false_string: Rc::new(false_string) })
+        Ok(StringToken::Conditional {
+            assertion: assertion.clone(),
+            true_string: Rc::new(true_string),
+            false_string: Rc::new(false_string),
+        })
     }
 
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
@@ -1314,700 +1445,3 @@ impl SmtParser {
 //     let v = parse_smtlib_file(file_path)?;
 //     parse_genregex(&v)
 // }
-
-/*
-    Unit tests
-*/
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::antimirov::satisfiable;
-    // use crate::antimirov_sat::SatChecker;
-    use crate::brzozowski;
-    use crate::classes::{CharExpression, GenRegex, StringVar};
-
-    // Helper function
-    // TODO: Update some of the other tests to use this
-    // Run the SMT2 file and assert that satisfiable() returns as expected
-    fn assert_smt2_file_helper(filepath: &str, expected: bool) {
-        // Read the file and parse as s-expression
-        let smt_result = parse_smtlib_file(filepath);
-        println!("Parsed s-expression: {:?}", smt_result);
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        // Get result
-        let result: bool = if parser.use_brzozowski() {
-            brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped))
-        } else {
-            satisfiable(&Rc::new(gen_regex_unwrapped))
-            // TBD
-            // let mut sat_check = SatChecker::new();
-            // sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
-        };
-        assert_eq!(result, expected);
-    }
-
-    fn assert_satisfiable(filepath: &str) {
-        assert_smt2_file_helper(filepath, true);
-    }
-
-    fn assert_unsatisfiable(filepath: &str) {
-        assert_smt2_file_helper(filepath, false);
-    }
-
-    #[test]
-    fn s_expr_test() {
-        // Basic unit test for parsing SMTLib files
-        // Note that we have to add the beginning '(' and ending ')' to the string
-        // so that it makes a single S-expression.
-
-        let smt_string = r#"
-(
-(set-logic QF_S)
-;---
-; .NET regular expressions restricted to 7-bit characters
-; membership in intersection of
-; .*(monday|tuesday|wednesday|thursday|friday|saturday|sunday).*
-; .*(january|february|march|april|may|june|july|august|september|october|november|december).*
-; [!-~]*
-;---
-(declare-const x String)
-(assert (str.in_re x (re.inter (re.inter (re.++ (re.++ re.all (re.union (re.union (re.union (re.union (re.union (re.union (str.to_re "monday") (str.to_re "tuesday")) (str.to_re "wednesday")) (str.to_re "thursday")) (str.to_re "friday")) (str.to_re "saturday")) (str.to_re "sunday"))) re.all) (re.++ (re.++ re.all (re.union (re.union (re.union (re.union (re.union (re.union (re.union (re.union (re.union (re.union (re.union (str.to_re "january") (str.to_re "february")) (str.to_re "march")) (str.to_re "april")) (str.to_re "may")) (str.to_re "june")) (str.to_re "july")) (str.to_re "august")) (str.to_re "september")) (str.to_re "october")) (str.to_re "november")) (str.to_re "december"))) re.all)) (re.* (re.range "!" "~")))))
-(check-sat)
-;(get-model)
-)
-"#;
-
-        println!("{}", smt_string);
-        let v = lexpr::from_str(smt_string).unwrap();
-        println!("{:?}", v);
-
-        // Uncomment to view output
-        // assert!(false);
-    }
-
-    #[test]
-    fn test_simple_1() {
-        // Load the file simple1.smt2
-        // Parse as s-expression
-        let smt_result = parse_smtlib_file("benchmarks/simple1_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        // Expected output
-        let expected = GenRegex::Intersect(
-            Rc::new(GenRegex::StringVar(StringVar {
-                name: "x".to_string(),
-            })),
-            Rc::new(GenRegex::Concatenation(
-                Rc::new(GenRegex::CharExpression(CharExpression::Literal('a'))),
-                Rc::new(GenRegex::CharExpression(CharExpression::Literal('b'))),
-            )),
-        );
-
-        assert_eq!(gen_regex_unwrapped, expected);
-
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-
-    #[test]
-    fn test_simple_2() {
-        let smt_result = parse_smtlib_file("benchmarks/simple2_unsat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        // Expected output
-        let expected_str_var = GenRegex::StringVar(StringVar {
-            name: "x".to_string(),
-        });
-        let expected_intersection_1 = GenRegex::Intersect(
-            Rc::new(expected_str_var.clone()),
-            Rc::new(GenRegex::CharExpression(CharExpression::Literal('a'))),
-        );
-        let expected_intersection_2 = GenRegex::Intersect(
-            Rc::new(expected_str_var),
-            Rc::new(GenRegex::CharExpression(CharExpression::Literal('b'))),
-        );
-
-        let expected = GenRegex::Concatenation(
-            Rc::new(expected_intersection_1),
-            Rc::new(expected_intersection_2),
-        );
-
-        assert_eq!(gen_regex_unwrapped, expected);
-
-        assert!(!satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-
-    #[test]
-    fn test_simple_3() {
-        let smt_result = parse_smtlib_file("benchmarks/simple3_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        // Expected output
-        let expected_str_var_x = GenRegex::StringVar(StringVar {
-            name: "x".to_string(),
-        });
-        let expected_str_var_y = GenRegex::StringVar(StringVar {
-            name: "y".to_string(),
-        });
-        let expected_intersection_1 = GenRegex::Intersect(
-            Rc::new(expected_str_var_x),
-            Rc::new(GenRegex::CharExpression(CharExpression::Literal('a'))),
-        );
-        let expected_intersection_2 = GenRegex::Intersect(
-            Rc::new(expected_str_var_y),
-            Rc::new(GenRegex::CharExpression(CharExpression::Literal('b'))),
-        );
-
-        let expected = GenRegex::Concatenation(
-            Rc::new(expected_intersection_1),
-            Rc::new(expected_intersection_2),
-        );
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-
-        assert_eq!(gen_regex_unwrapped, expected);
-    }
-
-    #[test]
-    fn test_range() {
-        let smt_result = parse_smtlib_file("benchmarks/range1_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        let expected = GenRegex::Intersect(
-            GenRegex::create_gre_str_var("x"),
-            GenRegex::re_range('0', '9'),
-        );
-
-        assert_eq!(gen_regex_unwrapped, expected);
-
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-
-    #[test]
-    fn test_re_all() {
-        let smt_result = parse_smtlib_file("benchmarks/re_all_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        let union = GenRegex::union(
-            &GenRegex::create_gre_char_lit('a'),
-            &GenRegex::create_gre_char_lit('b'),
-        );
-        let regex = GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
-        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
-
-        assert_eq!(gen_regex_unwrapped, expected);
-
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-
-    #[test]
-    fn test_date() {
-        let smt_result = parse_smtlib_file("benchmarks/date_sat.smt2");
-        println!("Parsed s-expression: {:?}\n", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        let dot_star = GenRegex::star(&GenRegex::create_sigma());
-        let mut days_of_the_week: Vec<Rc<GenRegex>> = Vec::new();
-        days_of_the_week.push(GenRegex::str_to_re("monday"));
-        days_of_the_week.push(GenRegex::str_to_re("tuesday"));
-        days_of_the_week.push(GenRegex::str_to_re("wednesday"));
-        days_of_the_week.push(GenRegex::str_to_re("thursday"));
-        days_of_the_week.push(GenRegex::str_to_re("friday"));
-        days_of_the_week.push(GenRegex::str_to_re("saturday"));
-        days_of_the_week.push(GenRegex::str_to_re("sunday"));
-        let mut union_days = days_of_the_week[0].clone();
-        for v in &days_of_the_week[1..] {
-            union_days = GenRegex::union(&union_days, v);
-        }
-        let mut months: Vec<Rc<GenRegex>> = Vec::new();
-        months.push(GenRegex::str_to_re("january"));
-        months.push(GenRegex::str_to_re("february"));
-        months.push(GenRegex::str_to_re("march"));
-        months.push(GenRegex::str_to_re("april"));
-        months.push(GenRegex::str_to_re("may"));
-        months.push(GenRegex::str_to_re("june"));
-        months.push(GenRegex::str_to_re("july"));
-        months.push(GenRegex::str_to_re("august"));
-        months.push(GenRegex::str_to_re("september"));
-        months.push(GenRegex::str_to_re("october"));
-        months.push(GenRegex::str_to_re("november"));
-        months.push(GenRegex::str_to_re("december"));
-        let mut union_months = months[0].clone();
-        for v in &months[1..] {
-            union_months = GenRegex::union(&union_months, v);
-        }
-        let first = GenRegex::concat(
-            &GenRegex::concat(&dot_star.clone(), &union_days),
-            &dot_star.clone(),
-        );
-        let second = GenRegex::concat(
-            &GenRegex::concat(&dot_star.clone(), &union_months),
-            &dot_star.clone(),
-        );
-        let third = GenRegex::star(&GenRegex::re_range('!', '~'));
-        let regex = GenRegex::intersect(&&GenRegex::intersect(&first, &second), &third);
-        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
-
-        assert_eq!(gen_regex_unwrapped, expected);
-
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-    #[test]
-    fn test_date_2() {
-        fn create_case_insensitive(word: &str) -> Rc<GenRegex> {
-            //init first character of word
-            let first_char = word.chars().next().unwrap();
-            let mut curr_regex = GenRegex::str_to_re(&first_char.to_uppercase().to_string());
-            let lower = GenRegex::str_to_re(&first_char.to_lowercase().to_string());
-            curr_regex = GenRegex::union(&curr_regex, &lower);
-
-            //iterate over word and add union of upper and lowercase versions
-            for c in word[1..].chars() {
-                let lower = GenRegex::str_to_re(&c.to_lowercase().to_string());
-                let upper = GenRegex::str_to_re(&c.to_uppercase().to_string());
-                let char_union = GenRegex::union(&upper, &lower);
-
-                curr_regex = GenRegex::concat(&curr_regex, &char_union);
-            }
-
-            curr_regex
-        }
-        let smt_result = parse_smtlib_file("benchmarks/date2_sat.smt2");
-        println!("Parsed s-expression: {:?}\n", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        let dot_star = GenRegex::star(&GenRegex::create_sigma());
-        let mut days_of_the_week: Vec<Rc<GenRegex>> = Vec::new();
-        days_of_the_week.push(create_case_insensitive("monday"));
-        days_of_the_week.push(create_case_insensitive("tuesday"));
-        days_of_the_week.push(create_case_insensitive("wednesday"));
-        days_of_the_week.push(create_case_insensitive("thursday"));
-        days_of_the_week.push(create_case_insensitive("friday"));
-        days_of_the_week.push(create_case_insensitive("saturday"));
-        days_of_the_week.push(create_case_insensitive("sunday"));
-        let mut union_days = days_of_the_week[0].clone();
-        for v in &days_of_the_week[1..] {
-            union_days = GenRegex::union(&union_days, v);
-        }
-        let mut months: Vec<Rc<GenRegex>> = Vec::new();
-        months.push(create_case_insensitive("january"));
-        months.push(create_case_insensitive("february"));
-        months.push(create_case_insensitive("march"));
-        months.push(create_case_insensitive("april"));
-        months.push(create_case_insensitive("may"));
-        months.push(create_case_insensitive("june"));
-        months.push(create_case_insensitive("july"));
-        months.push(create_case_insensitive("august"));
-        months.push(create_case_insensitive("september"));
-        months.push(create_case_insensitive("october"));
-        months.push(create_case_insensitive("november"));
-        months.push(create_case_insensitive("december"));
-        let mut union_months = months[0].clone();
-        for v in &months[1..] {
-            union_months = GenRegex::union(&union_months, v);
-        }
-        let first = GenRegex::concat(
-            &GenRegex::concat(&dot_star.clone(), &union_days),
-            &dot_star.clone(),
-        );
-        let second = GenRegex::concat(
-            &GenRegex::concat(&dot_star.clone(), &union_months),
-            &dot_star.clone(),
-        );
-        //let third = GenRegex::star(&GenRegex::re_range(&'!', &'~'));
-        let regex = GenRegex::intersect(&first, &second);
-        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
-
-        assert_eq!(gen_regex_unwrapped, expected);
-
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-
-    #[test]
-    fn test_passw_sat1() {
-        let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        let dot_star = GenRegex::star(&GenRegex::create_sigma());
-        let first = GenRegex::concat(
-            &GenRegex::concat(&dot_star, &GenRegex::re_range('a', 'z')),
-            &dot_star,
-        );
-        let second = GenRegex::concat(
-            &GenRegex::concat(&dot_star, &GenRegex::re_range('A', 'Z')),
-            &dot_star,
-        );
-        let third = GenRegex::concat(
-            &GenRegex::concat(&dot_star, &GenRegex::re_range('0', '9')),
-            &dot_star,
-        );
-        let fourth = GenRegex::re_loop(0, 3, &GenRegex::re_range('!', '~'));
-        let regex = GenRegex::intersect(
-            &GenRegex::intersect(&GenRegex::intersect(&first, &second), &third),
-            &fourth,
-        );
-        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
-
-        assert_eq!(gen_regex_unwrapped, expected);
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped)));
-    }
-
-    #[test]
-    fn test_passw_unsat1() {
-        let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        let dot_star = GenRegex::star(&GenRegex::create_sigma());
-        let first = GenRegex::concat(
-            &GenRegex::concat(&dot_star, &GenRegex::re_range('a', 'z')),
-            &dot_star,
-        );
-        let second = GenRegex::concat(
-            &GenRegex::concat(&dot_star, &GenRegex::re_range('A', 'Z')),
-            &dot_star,
-        );
-        let third = GenRegex::concat(
-            &GenRegex::concat(&dot_star, &GenRegex::re_range('0', '9')),
-            &dot_star,
-        );
-        let fourth = GenRegex::star(&GenRegex::re_range(':', '~'));
-        let regex = GenRegex::intersect(
-            &GenRegex::intersect(&GenRegex::intersect(&first, &second), &third),
-            &fourth,
-        );
-        let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
-
-        assert_eq!(gen_regex_unwrapped, expected);
-
-        assert!(!satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-
-    // TODO: Equality not supported for now
-    #[ignore]
-    #[test]
-    fn test_equality() {
-        let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-
-        let dot_star = GenRegex::star(&GenRegex::create_sigma());
-        let one = GenRegex::concat_many(&vec![
-            dot_star.clone(),
-            GenRegex::re_range('a', 'z'),
-            dot_star.clone(),
-        ]);
-        let two = GenRegex::concat_many(&vec![
-            dot_star.clone(),
-            GenRegex::re_range('0', '9'),
-            dot_star.clone(),
-        ]);
-        let three = GenRegex::concat_many(&vec![
-            dot_star.clone(),
-            GenRegex::re_range('A', 'Z'),
-            dot_star.clone(),
-        ]);
-        let four = GenRegex::re_loop(8, 20, &GenRegex::create_sigma());
-        let five = GenRegex::star(&GenRegex::re_range('A', 'z'));
-        let together = GenRegex::intersect_many(&vec![
-            one.clone(),
-            two.clone(),
-            three.clone(),
-            four.clone(),
-            five.clone(),
-        ]);
-        let eq1 = GenRegex::intersect(&GenRegex::empty_set(), &GenRegex::complement(&together));
-        let eq2 = GenRegex::intersect(&GenRegex::complement(&GenRegex::empty_set()), &together);
-        let expected = GenRegex::Union(eq1, eq2);
-        assert_eq!(gen_regex_unwrapped, expected);
-        assert_eq!(brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped)), true);
-    }
-
-    // TODO: Equality not supported for now
-    #[ignore]
-    #[test]
-    fn test_disequality() {
-        assert_unsatisfiable("benchmarks/simple_neq_unsat.smt2")
-    }
-
-    // TODO
-    #[ignore]
-    #[test]
-    fn test_hex_code() {
-        let smt_result = parse_smtlib_file("benchmarks/hexcode_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-        assert_eq!(
-            brzozowski::satisfiable(&Rc::new(gen_regex_unwrapped.clone())),
-            true
-        );
-    }
-
-    #[test]
-    fn test_simple_hex() {
-        println!("A number{:?}", hex_to_char(0));
-        let smt_result = parse_smtlib_file("benchmarks/simplehex_sat.smt2");
-        println!("Parsed s-expression: {:?}", smt_result);
-
-        assert!(smt_result.is_ok());
-        let s_expr = smt_result.unwrap();
-
-        // Parse the s-expression as a GenRegex
-        let mut parser = SmtParser::new();
-        let gen_regex = parser.parse_s_expr(&s_expr);
-        println!("Parsed GenRegex: {:?}", gen_regex);
-
-        assert!(gen_regex.is_ok());
-        let gen_regex_unwrapped = gen_regex.unwrap();
-        let hex = hex_to_char(0x0).unwrap();
-        let expected = GenRegex::Intersect(
-            GenRegex::create_gre_str_var("x"),
-            GenRegex::re_range(hex, '/'),
-        );
-
-        assert_eq!(gen_regex_unwrapped, expected);
-        assert!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())));
-    }
-
-    #[test]
-    fn unicode_hex_test() {
-        assert_satisfiable("benchmarks/hex_syntax_test_sat.smt2");
-    }
-
-    // Quite slow
-    #[ignore]
-    #[test]
-    fn intersect_test1() {
-        assert_satisfiable("benchmarks/intersect_0_0_sat.smt2");
-    }
-
-    #[test]
-    fn test_reglan_var() {
-        assert_satisfiable("benchmarks/reglan_var_test_sat.smt2");
-    }
-
-    #[test]
-    fn test_let_1() {
-        assert_satisfiable("benchmarks/simple_let_sat_1.smt2");
-    }
-
-    #[test]
-    fn test_let_2() {
-        assert_satisfiable("benchmarks/simple_let_sat_2.smt2");
-    }
-
-    #[test]
-    fn test_let_3() {
-        assert_satisfiable("benchmarks/simple_let_sat_3.smt2");
-    }
-
-    #[test]
-    fn test_let_4() {
-        assert_satisfiable("benchmarks/simple_let_sat_4.smt2");
-    }
-
-    #[test]
-    fn test_let_5() {
-        assert_satisfiable("benchmarks/date_format_days_sat.smt2");
-    }
-
-    #[test]
-    fn test_define_fun1() {
-        assert_satisfiable("benchmarks/simple_definefun_sat_1.smt2");
-    }
-
-    #[test]
-    fn test_define_fun2() {
-        assert_satisfiable("benchmarks/simple_definefun_sat_2.smt2");
-    }
-
-    #[test]
-    fn test_loops_1() {
-        assert_satisfiable("benchmarks/deadloop1_sat.smt2");
-    }
-
-    #[test]
-    fn test_loops_2() {
-        assert_unsatisfiable("benchmarks/det_blowup_unsat_3.smt2");
-    }
-
-    #[test]
-    fn test_loops_3() {
-        assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
-    }
-
-    // TODO
-    #[ignore]
-    #[test]
-    fn test_usr_2() {
-        assert_satisfiable("benchmarks/usr_2_sat.smt2");
-    }
-
-    #[test]
-    fn test_not1() {
-        assert_satisfiable("benchmarks/simple_not_sat_1.smt2");
-    }
-
-    #[test]
-    fn test_not2() {
-        assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
-    }
-
-    // Diverging
-    #[ignore]
-    #[test]
-    fn test_passw_complement_1() {
-        assert_satisfiable("benchmarks/passw_complex_sat_1.smt2");
-    }
-
-    // Diverging
-    #[ignore]
-    #[test]
-    fn test_passw_complement_2() {
-        assert_satisfiable("benchmarks/passw_complex_sat_2.smt2");
-    }
-
-    #[test]
-    fn test_passw_complement_3() {
-        assert_satisfiable("benchmarks/passw_sat_4.smt2");
-    }
-
-    // Diverging
-    #[ignore]
-    #[test]
-    fn test_passw_complement_4() {
-        assert_unsatisfiable("benchmarks/passw_very_complex_unsat.smt2");
-    }
-
-    // Diverging
-    #[ignore]
-    #[test]
-    fn test_zelkova_ex() {
-        assert_unsatisfiable("benchmarks/zelkova_unsat.smt2")
-    }
-}
