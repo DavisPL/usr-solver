@@ -1026,21 +1026,23 @@ impl SmtParser {
         Ok(self.strtok_to_retok(&str))
     }
 
-    fn parse_re_range(&self, v: &Value) -> Result<RegexToken, SmtParseError> {
+    fn parse_re_range(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         // Syntax (re.range char1 char2)
         let (char1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         // println!("{}, 2{}, tail {}", char1, char2, tail);
         expect_null(tail)?;
-        let char1 = self.parse_char_obj(char1)?.to_string();
-        let char2 = self.parse_char_obj(char2)?.to_string();
-        if char1.chars().count() != 1 || char2.chars().count() != 1 {
-            return Err(SmtParseError::unrecog(v));
+        let char1 = self.parse_string_type(char1)?;
+        let char2 = self.parse_string_type(char2)?;
+        match (char1,char2){
+            (StringToken::Val(char1),StringToken::Val(char2))=>{
+                if let (Some(char1), Some(char2)) = (char1.chars().next(), char2.chars().next()) {
+                    return Ok(RegexToken::Val(GenRegex::re_range(char1, char2)));
+                }
+                Err(SmtParseError::unrecog(v))
+            }
+            _=>Err(SmtParseError::Unimplemented(format!("No String variables in re.range yet.")))
         }
-        if let (Some(char1), Some(char2)) = (char1.chars().next(), char2.chars().next()) {
-            return Ok(RegexToken::Val(GenRegex::re_range(char1, char2)));
-        }
-        Err(SmtParseError::unrecog(v))
     }
 
     fn parse_re_func(&mut self, func: &Value, args: &Value) -> Result<RegexToken, SmtParseError> {
@@ -1147,9 +1149,14 @@ impl SmtParser {
             return Ok(StringToken::Val(str.to_string()));
         }
         if let Some((head, tail)) = v.as_pair() {
-            head.as_symbol()
-                .ok_or(SmtParseError::unexpected(head, "ite"))?;
-            return self.parse_ite(tail);
+            return match head.as_symbol().ok_or(SmtParseError::unexpected(head, "parse_string_type: symbol"))?{
+                "ite"=>self.parse_ite(tail),
+                "_"=>{
+                    let c=self.parse_char_obj(tail)?;
+                    Ok(StringToken::Val(c.to_string()))
+                },
+                _=> Err(SmtParseError::unrecog(head)),
+            }
         }
         if let Some(name) = v.as_symbol() {
             let res = self.func_names.get(name);
@@ -1181,27 +1188,10 @@ impl SmtParser {
     }
 
     fn parse_char_obj(&self, v: &Value) -> Result<char, SmtParseError> {
-        // println!("char_obj: {:?}", v);
-        if v.is_string() {
-            if v.as_str().unwrap().chars().count() == 1 {
-                let v_char = v.as_str().unwrap().chars().next().unwrap();
-                Ok(v_char)
-            } else {
-                println!("test");
-                Err(SmtParseError::bad_literal(v))
-            }
-        } else if v.is_cons() {
-            // Removes underscore
-            // TODO: validate initial characters
-            let (_underscore, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-            let (_, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-            let (hex, _tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
-            let hex_val = hex.as_u64().ok_or(SmtParseError::bad_literal(hex))?;
-            hex_to_char(hex_val)
-        } else {
-            println!("testiing");
-            Err(SmtParseError::bad_literal(v))
-        }
+        let (_char, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (hex, _tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let hex_val = hex.as_u64().ok_or(SmtParseError::bad_literal(hex))?;
+        hex_to_char(hex_val)
     }
 
     fn parse_str_at(&self, v: &Value) -> Result<String, SmtParseError> {
