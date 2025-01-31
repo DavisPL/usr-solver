@@ -2,7 +2,8 @@
 //! Substitution terms, used for Antimirov derivatives
 //!
 
-use crate::types::expr::{CharExpression, CharVar, StringVar};
+use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex, StringVar};
+use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;
 
 use std::cmp::{max, min};
@@ -396,5 +397,362 @@ impl Display for AntimirovElement {
             write!(f, ", {}: {}", var, range)?;
         }
         write!(f, ")")
+    }
+}
+
+/*
+    Substitution operations: merge, difference, and sub_in
+*/
+
+use super::union_find::{count_union_elems, union_over_set, UnionFind};
+use std::collections::HashMap;
+
+fn merge(substitutions: AnySub) -> Option<SimpleSub> {
+    // Take range constraints
+    // If merge was unsuccessful, return None
+    let mut substitutions = substitutions;
+    let range_constrs = substitutions.take_ranges()?;
+    let substitutions = substitutions;
+
+    let mut str_eq_class = substitutions.get_str_map().clone();
+    let char_eq_class = substitutions.get_char_map().clone();
+
+    //let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
+    let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
+    let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
+    let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
+    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions) + 1);
+
+    for eq_exprs in str_eq_class.values_mut() {
+        let mut ind = 0;
+        while eq_exprs.len() > 1 {
+            let mut length_flag = false;
+            let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
+            let mut i = 0;
+            while i < eq_exprs.len() {
+                let curr_sub_expr = &eq_exprs[i];
+                if ind < curr_sub_expr.head_length() {
+                    let temp = &curr_sub_expr[ind];
+                    union_set.insert(Rc::new(temp.clone()));
+                    i += 1;
+                } else if curr_sub_expr.get_tail() && eq_exprs.len() > 1 {
+                    eq_exprs.remove(i);
+                } else {
+                    for (j, item_j) in eq_exprs.iter().enumerate() {
+                        if i != j {
+                            if ind < item_j.head_length() {
+                                return None;
+                            } else {
+                                continue;
+                            }
+                        }
+                    }
+                    //str_eq_class.insert(var.clone(), vec![curr_sub_expr.clone()]);
+                    let new_vec = vec![curr_sub_expr.clone()];
+
+                    // Move the ownership of `new_vec` to `eq_exprs`
+                    *eq_exprs = new_vec;
+                    //eq_exprs = &mut vec![curr_sub_expr.clone()];
+                    length_flag = true;
+                    break;
+                }
+            }
+            if length_flag {
+                break;
+            }
+            ind += 1;
+            if !union_over_set(
+                &mut union_find,
+                &union_set,
+                &mut expr_to_id,
+                &mut id_to_expr,
+                &mut canonical_map,
+            ) {
+                return None;
+            } //TODO: Union everything together here (add in union_find element)
+        }
+    }
+    let mut combined_expr: SimpleSub = SimpleSub::empty();
+    let mut char_set = HashSet::new();
+    for (var, eq_exprs) in &char_eq_class {
+        let mut temp_set: HashSet<Rc<CharVar>> = eq_exprs
+            .iter()
+            .filter_map(|expr| {
+                if let CharExpression::CharVar(ref var) = *expr {
+                    Some(Rc::new(var.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let mut u_set: HashSet<_> = eq_exprs
+            .iter()
+            .map(|expr| Rc::new((expr).clone())) // Dereference `expr` (&&CharExpression) and clone
+            .collect();
+        u_set.insert(Rc::new(CharExpression::CharVar(var.clone())));
+        temp_set.insert(Rc::new(var.clone()));
+
+        if !union_over_set(
+            &mut union_find,
+            &u_set,
+            &mut expr_to_id,
+            &mut id_to_expr,
+            &mut canonical_map,
+        ) {
+            return None;
+        }
+        char_set = char_set.union(&temp_set).cloned().collect();
+    }
+    for var in char_set {
+        let deref = var.as_ref();
+        let char_expression = Rc::new(CharExpression::CharVar(var.as_ref().clone()));
+        let id_var = expr_to_id[&char_expression];
+        let found_expr = id_to_expr[&union_find.find(id_var)].clone();
+        match canonical_map.get(&char_expression) {
+            Some(value) => combined_expr.set_char_var(var.as_ref().clone(), value.as_ref().clone()),
+            None => {
+                if CharExpression::CharVar(deref.clone()) != *found_expr {
+                    combined_expr.set_char_var(deref.clone(), found_expr.as_ref().clone());
+                }
+            }
+        }
+    }
+
+    //let string_subs = sub_in(string_subs, char_subs); //TODO: implement sub_in
+    //
+    for (var, mut eq_exprs) in str_eq_class {
+        let sub_expr_vector = eq_exprs[0].get_mut_head();
+        for (i, item) in sub_expr_vector.iter_mut().enumerate() {
+            if let CharExpression::CharVar(c_var) = item {
+                let substitution_value = combined_expr.get_char_var(c_var);
+                match substitution_value {
+                    Some(v) => {
+                        // The key was found, and `v` is the value, so update the vector element
+                        *item = v.clone();
+                        //println!("Updated value at index {}: {:?}", i, v);
+                    }
+                    None => {
+                        // The key was not found, so do nothing
+                        //println!("No value found for key at index {}", i);
+                    }
+                }
+            }
+        }
+        combined_expr.set_str_var(var.clone(), eq_exprs[0].clone());
+    }
+
+    // Include range constraints
+    combined_expr.set_ranges(range_constrs);
+
+    Some(combined_expr)
+}
+
+pub fn merge_binary(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
+    let union_lr: AnySub = sub1.clone().union(sub2.clone());
+    merge(union_lr)
+}
+
+pub fn merge_sets(subs1: &HashSet<SimpleSub>, subs2: &HashSet<SimpleSub>) -> HashSet<SimpleSub> {
+    let mut result = HashSet::new();
+    for sub1 in subs1 {
+        for sub2 in subs2 {
+            if let Some(ret) = merge_binary(sub1, sub2) {
+                result.insert(ret);
+            }
+        }
+    }
+    result
+}
+
+pub fn union_sets(subs1: HashSet<SimpleSub>, subs2: HashSet<SimpleSub>) -> HashSet<SimpleSub> {
+    let mut result = subs1;
+    result.extend(subs2);
+    result
+}
+
+pub fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<SimpleSub> {
+    let mut retsub = merged.clone();
+    for char_var in sub.get_char_map().keys() {
+        retsub.remove_char_map(char_var);
+    }
+    for (string_var, sub_expr1) in merged.get_str_map() {
+        if let Some(sub_expr2) = sub.get_str_var(string_var) {
+            retsub.remove_str_map(string_var);
+            if let Some(mut sub) = sub_expr_match(sub_expr1, sub_expr2, string_var) {
+                retsub.get_char_map_mut().append(sub.get_char_map_mut());
+                retsub.get_str_map_mut().append(sub.get_str_map_mut());
+            } else {
+                return None;
+            }
+        }
+    }
+    Some(retsub)
+}
+
+// Note: no longer used atm in favor of sub_difference_from_merge
+// fn sub_difference(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
+//     if let Some(result) = merge_binary(sub1, sub2) {
+//         sub_difference_from_merge(&result, sub2)
+//     } else {
+//         None
+//     }
+// }
+
+fn sub_expr_match(
+    sub_expr1: &SubExpr,
+    sub_expr2: &SubExpr,
+    str_var: &StringVar,
+) -> Option<SimpleSub> {
+    let mut retval = SimpleSub::empty();
+    if sub_expr1.is_empty() && sub_expr2.is_empty() {
+        return Some(retval);
+    } else if sub_expr1.head_length() == 0 && sub_expr1.get_tail() {
+        retval.set_str_var(str_var.clone(), sub_expr2.clone());
+        return Some(retval);
+    } else if sub_expr2.head_length() == 0 && sub_expr2.get_tail() {
+        retval.set_str_var(str_var.clone(), sub_expr1.clone());
+        return Some(retval);
+    } else if sub_expr1.is_empty() || sub_expr2.is_empty() {
+        return None;
+    }
+    let trunc_sub_expr1 = SubExpr::new(sub_expr1.get_head()[1..].to_vec(), sub_expr1.get_tail());
+    let trunc_sub_expr2 = SubExpr::new(sub_expr2.get_head()[1..].to_vec(), sub_expr2.get_tail());
+    match sub_expr_match(&trunc_sub_expr1, &trunc_sub_expr2, str_var) {
+        Some(val) => retval = val,
+        None => return None,
+    }
+    let head1 = &sub_expr1.get_head()[0];
+    let head2 = &sub_expr2.get_head()[0];
+    if let CharExpression::CharVar(key) = head1 {
+        retval.set_char_var(key.clone(), head2.clone());
+    } else if let CharExpression::CharVar(key) = head2 {
+        retval.set_char_var(key.clone(), head1.clone());
+    }
+    Some(retval)
+}
+
+pub fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
+    if substitution.get_str_map().is_empty() && substitution.get_char_map().is_empty() {
+        return expr.clone(); // Returns a clone of expr.
+    }
+    match expr.as_ref() {
+        GenRegex::EmptySet => Rc::clone(expr),
+        GenRegex::Epsilon => Rc::clone(expr),
+        GenRegex::Sigma => Rc::clone(expr),
+        GenRegex::Range(_, _) => Rc::clone(expr),
+        GenRegex::CharExpression(char_expr) => match char_expr {
+            CharExpression::CharVar(char_var) => match substitution.get_char_var(char_var) {
+                Some(value) => Rc::new(GenRegex::CharExpression(value.clone())),
+                None => expr.clone(),
+            },
+            CharExpression::Literal(_) => expr.clone(),
+        },
+        GenRegex::StringVar(string_var) => match substitution.get_str_var(string_var) {
+            Some(value) => value.to_gen_regex(string_var),
+            None => expr.clone(),
+        },
+        GenRegex::StringIndex(string_index) => match substitution.get_str_var(&string_index.var) {
+            Some(value) => {
+                let index = string_index.index as usize;
+                let length = value.get_head().len();
+                if index < length {
+                    Rc::new(GenRegex::CharExpression(value.get_head()[index].clone()))
+                } else if value.get_tail() {
+                    Rc::new(GenRegex::StringIndex(StringIndex {
+                        var: string_index.var.clone(),
+                        index: ((index - length + 1) as i32),
+                    }))
+                } else {
+                    Rc::new(GenRegex::EmptySet)
+                }
+            }
+            None => expr.clone(),
+        },
+        GenRegex::Union(gen_regex1, gen_regex2) => Rc::new(GenRegex::Union(
+            sub_in(gen_regex1, substitution),
+            sub_in(gen_regex2, substitution),
+        )),
+        GenRegex::Intersect(gen_regex1, gen_regex2) => Rc::new(GenRegex::Intersect(
+            sub_in(gen_regex1, substitution),
+            sub_in(gen_regex2, substitution),
+        )),
+        GenRegex::Concatenation(gen_regex1, gen_regex2) => GenRegex::make_concatenation(
+            sub_in(gen_regex1, substitution),
+            sub_in(gen_regex2, substitution),
+        ),
+        GenRegex::Kleene(gen_regex) => Rc::new(GenRegex::Kleene(sub_in(gen_regex, substitution))),
+        GenRegex::Complement(gen_regex) => {
+            Rc::new(GenRegex::Complement(sub_in(gen_regex, substitution)))
+        }
+        GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => {
+            // TODO: Placeholder
+            // Implement this case
+            expr.clone()
+        }
+        GenRegex::StringSlice(string_var, _) => {
+            // TODO: Placeholder
+            // Implement this case
+            expr.clone()
+        }
+    }
+}
+
+fn sub_in_predicate(pred: &Rc<Predicate>, sub: &SimpleSub) -> Rc<Predicate> {
+    match pred.as_ref() {
+        Predicate::True => Rc::clone(pred),
+        Predicate::False => Rc::clone(pred),
+        Predicate::Not(p) => Rc::new(Predicate::Not(sub_in_predicate(p, sub))),
+        Predicate::And(p1, p2) => Rc::new(Predicate::And(
+            sub_in_predicate(p1, sub),
+            sub_in_predicate(p2, sub),
+        )),
+        Predicate::Or(p1, p2) => Rc::new(Predicate::Or(
+            sub_in_predicate(p1, sub),
+            sub_in_predicate(p2, sub),
+        )),
+        Predicate::Equals(expr1, expr2) => {
+            let new_expr1 = sub_in_maybe_char_expr(expr1, sub);
+            let new_expr2 = sub_in_maybe_char_expr(expr2, sub);
+            Rc::new(Predicate::Equals(new_expr1, new_expr2))
+        }
+        Predicate::LessThan(expr, c) => {
+            let new_expr = sub_in_maybe_char_expr(expr, sub);
+            Rc::new(Predicate::LessThan(new_expr, *c))
+        }
+        Predicate::GreaterThan(expr, c) => {
+            let new_expr = sub_in_maybe_char_expr(expr, sub);
+            Rc::new(Predicate::LessThan(new_expr, *c))
+        }
+        Predicate::EqualLength(var, len) => {
+            // TODO
+            unimplemented!()
+            // let new_var = sub_in_string_var(var, sub);
+            // Rc::new(Predicate::EqualLength(new_var, *len))
+        }
+    }
+}
+
+fn sub_in_maybe_char_expr(expr: &MaybeCharExpression, sub: &SimpleSub) -> Rc<MaybeCharExpression> {
+    match expr {
+        MaybeCharExpression::CharExpression(c_expr) => {
+            let new_expr = sub_in_char_expr(c_expr, sub);
+            Rc::new(MaybeCharExpression::CharExpression(new_expr))
+        }
+        MaybeCharExpression::StringIndex(_string_index) => {
+            // TODO
+            unimplemented!()
+            // let new_var = sub_in_string_var(&string_index.var, sub);
+            // Rc::new(MaybeCharExpression::StringIndex(StringIndex {
+            //     var: new_var,
+            //     index: string_index.index,
+            // }))
+        }
+    }
+}
+
+fn sub_in_char_expr(expr: &CharExpression, sub: &SimpleSub) -> CharExpression {
+    match expr {
+        CharExpression::CharVar(var) => sub.get_char_var(var).unwrap_or(expr).clone(),
+        CharExpression::Literal(_) => expr.clone(),
     }
 }

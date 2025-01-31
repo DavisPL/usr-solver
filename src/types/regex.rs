@@ -142,6 +142,22 @@ impl GenRegex {
         }
         retval
     }
+
+    /*
+        Rewriter constructors
+
+        These could be moved to a rewriter module if expanded.
+    */
+
+    pub fn make_concatenation(left: Rc<GenRegex>, right: Rc<GenRegex>) -> Rc<GenRegex> {
+        if let &GenRegex::Epsilon = left.as_ref() {
+            right
+        } else if let &GenRegex::Epsilon = right.as_ref() {
+            left
+        } else {
+            Rc::new(GenRegex::Concatenation(left, right))
+        }
+    }
 }
 
 /*

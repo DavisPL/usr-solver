@@ -2,7 +2,7 @@
 //! Benchmark tests for SMT parsing and satisfiability
 //!
 
-use crate::antimirov::deriv::satisfiable;
+use crate::antimirov::satisfiable;
 // use crate::antimirov_sat::SatChecker;
 use super::parse::{parse_smtlib_file, SmtParser};
 use super::util::hex_to_char;
