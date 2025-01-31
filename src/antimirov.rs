@@ -750,10 +750,12 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             union_sets(result1, result2)
         }
         GenRegex::StringSlice(_, _) => {
+            // TODO
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
-            unimplemented!();
+            // TODO
+            unimplemented!()
         }
     }
 }
@@ -811,24 +813,38 @@ fn sub_from_eq(
     expr1: &Rc<MaybeCharExpression>,
     expr2: &Rc<MaybeCharExpression>,
 ) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
-    match expr1.as_ref() {
-        MaybeCharExpression::CharExpression(CharExpression::CharVar(var)) => {
-            // let mut sub = SimpleSub::empty();
-            // TODO
-            unimplemented!()
-            // sub.set_char_var(var1.clone(), expr2.as_ref().clone());
-            // (sub.into_set(), HashSet::new())
-        }
-        MaybeCharExpression::CharExpression(CharExpression::Literal(_)) => {
-            // TODO
-            unimplemented!()
-            // (SimpleSub::empty().into_set(), HashSet::new())
-        }
-        MaybeCharExpression::StringIndex(_) => {
-            // TODO
-            unimplemented!()
+    let (char_expr1, sub1, fails1) = extract_char_expr(expr1);
+    let (char_expr2, sub2, fails2) = extract_char_expr(expr2);
+
+    let mut true_cases = HashSet::new();
+    let mut false_cases = fails1;
+    false_cases.extend(fails2);
+
+    if let Some(base_sub) = merge_binary(&sub1, &sub2) {
+        match (char_expr1, char_expr2) {
+            (CharExpression::CharVar(var1), exp2) => {
+                let mut sub = SimpleSub::empty();
+                sub.set_char_var(var1, exp2);
+                if let Some(merged) = merge_binary(&sub, &base_sub) {
+                    true_cases.insert(merged);
+                }
+            }
+            (char_expr1, CharExpression::CharVar(var2)) => {
+                let mut sub = SimpleSub::empty();
+                sub.set_char_var(var2, char_expr1);
+                if let Some(merged) = merge_binary(&sub, &base_sub) {
+                    true_cases.insert(merged);
+                }
+            }
+            (CharExpression::Literal(lit1), CharExpression::Literal(lit2)) => {
+                if lit1 == lit2 {
+                    true_cases.insert(base_sub);
+                }
+            }
         }
     }
+
+    (true_cases, false_cases)
 }
 
 pub fn sub_from_eq_len(var: &StringVar, len: &i32) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
