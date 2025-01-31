@@ -377,10 +377,12 @@ fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
             sub_in(gen_regex1, substitution),
             sub_in(gen_regex2, substitution),
         )),
-        GenRegex::Concatenation(gen_regex1, gen_regex2) => Rc::new(GenRegex::Concatenation(
-            sub_in(gen_regex1, substitution),
-            sub_in(gen_regex2, substitution),
-        )),
+        GenRegex::Concatenation(gen_regex1, gen_regex2) => {
+            simplify_concatenation(Rc::new(GenRegex::Concatenation(
+                sub_in(gen_regex1, substitution),
+                sub_in(gen_regex2, substitution),
+            )))
+        }
         GenRegex::Kleene(gen_regex) => Rc::new(GenRegex::Kleene(sub_in(gen_regex, substitution))),
         GenRegex::Complement(gen_regex) => {
             Rc::new(GenRegex::Complement(sub_in(gen_regex, substitution)))
@@ -587,6 +589,18 @@ pub fn derivative(
     }
 }
 
+fn simplify_concatenation(usr: Rc<GenRegex>) -> Rc<GenRegex> {
+    if let GenRegex::Concatenation(left, right) = usr.as_ref() {
+        if let GenRegex::Epsilon = left.as_ref() {
+            return Rc::clone(right);
+        } else if let GenRegex::Epsilon = right.as_ref() {
+            return Rc::clone(left);
+        } else {
+            return Rc::clone(&usr);
+        }
+    }
+    Rc::clone(&usr)
+}
 /*
     Derivative helpers
 */
@@ -632,10 +646,10 @@ fn apply_deriv_concat(
     let l_expr = left_deriv.get_expr();
     let l_sub = left_deriv.get_subs();
     Some(AntimirovElement::new(
-        Rc::new(GenRegex::Concatenation(
+        simplify_concatenation(Rc::new(GenRegex::Concatenation(
             l_expr.clone(),
             sub_in(right, l_sub),
-        )),
+        ))),
         l_sub.clone(),
     ))
 }
@@ -644,10 +658,10 @@ fn apply_deriv_kleene(left_deriv: &AntimirovElement, right: &Rc<GenRegex>) -> An
     let l_expr = left_deriv.get_expr();
     let l_sub = left_deriv.get_subs();
     AntimirovElement::new(
-        Rc::new(GenRegex::Concatenation(
+        simplify_concatenation(Rc::new(GenRegex::Concatenation(
             l_expr.clone(),
             sub_in(right, l_sub),
-        )),
+        ))),
         l_sub.clone(),
     )
 }

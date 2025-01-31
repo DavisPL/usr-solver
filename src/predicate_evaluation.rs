@@ -371,7 +371,7 @@ fn evaluate(
             &mut lit_map,
             &mut canonical_map,
         );
-        if p_eval.len() == 1 {
+        if !p_eval.is_empty() {
             match p_eval[0].as_ref() {
                 Predicate::True => {
                     return vec![vec![Rc::new(Predicate::True)]];
@@ -379,7 +379,9 @@ fn evaluate(
                 Predicate::False => {
                     continue;
                 }
-                _ => {}
+                _ => {
+                    return vec![vec![Rc::new(Predicate::True)]];
+                }
             }
         }
         final_set.push(p_eval);
@@ -513,23 +515,13 @@ pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate> {
 
             Predicate::True => Rc::new(Predicate::False),
             Predicate::False => Rc::new(Predicate::True),
-            Predicate::LessThan(var, val) => Rc::new(Predicate::And(
-                Rc::new(Predicate::GreaterThan(var.clone(), *val)),
-                Rc::new(Predicate::Not(Rc::new(Predicate::Equals(
-                    var.clone(),
-                    Rc::new(MaybeCharExpression::CharExpression(
-                        CharExpression::Literal(*val),
-                    )),
-                )))),
+            Predicate::LessThan(var, val) => Rc::new(Predicate::GreaterThan(
+                var.clone(),
+                char::from_u32(*val as u32 + 1).expect("Invalid char after subtraction"),
             )),
-            Predicate::GreaterThan(var, val) => Rc::new(Predicate::And(
-                Rc::new(Predicate::LessThan(var.clone(), *val)),
-                Rc::new(Predicate::Not(Rc::new(Predicate::Equals(
-                    var.clone(),
-                    Rc::new(MaybeCharExpression::CharExpression(
-                        CharExpression::Literal(*val),
-                    )),
-                )))),
+            Predicate::GreaterThan(var, val) => Rc::new(Predicate::LessThan(
+                var.clone(),
+                char::from_u32(*val as u32 - 1).expect("Invalid char after subtraction"),
             )),
 
             _ => Rc::clone(pred),
