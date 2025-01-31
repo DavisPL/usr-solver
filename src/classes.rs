@@ -6,8 +6,11 @@
 use std::cmp::{max, min};
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Index;
-use std::ops::IndexMut;
 use std::rc::Rc;
+
+/*
+    GenRegex
+*/
 
 // TODO: add a GenRegex::StringLiteral
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -145,35 +148,32 @@ impl GenRegex {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct SubExpr {
-    head: Vec<CharExpression>,
-    tail_is_string_var: bool,
-}
+/*
+    Antimirov derivative terms
+*/
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct AntimirovElement {
     deriv_expression: Rc<GenRegex>,
     subs: SimpleSub,
-    range_constraints: BTreeMap<CharVar, RangeConstr>,
 }
 
 impl AntimirovElement {
-    pub fn new(
-        deriv_expression: Rc<GenRegex>,
-        subs: SimpleSub,
-        range_constraints: BTreeMap<CharVar, RangeConstr>,
-    ) -> Self {
+    pub fn new(deriv_expression: Rc<GenRegex>, subs: SimpleSub) -> Self {
         Self {
             deriv_expression,
             subs,
-            range_constraints,
+        }
+    }
+    pub fn new_epsilon() -> Self {
+        Self {
+            deriv_expression: GenRegex::epsilon(),
+            subs: SimpleSub::empty(),
         }
     }
 
     pub fn add_range(&mut self, key: CharVar, start: char, end: char) {
-        let value = RangeConstr::new(start, end);
-        self.range_constraints.insert(key, value);
+        self.subs.add_range(key, start, end);
     }
     pub fn get_expr(&self) -> &Rc<GenRegex> {
         &self.deriv_expression
@@ -182,13 +182,17 @@ impl AntimirovElement {
         &self.subs
     }
     pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
-        &self.range_constraints
+        self.subs.get_ranges()
     }
 
     pub fn into_set(self) -> HashSet<Self> {
         HashSet::from([self])
     }
 }
+
+/*
+    Range constraints
+*/
 
 /// Optimization to represent ranges as constraints on subs
 // example: d([a-z], x) = {(epsilon, x->a), (epsilon, x->b) ... (epsilon, x->z)}
@@ -219,30 +223,42 @@ impl RangeConstr {
     }
 }
 
+fn merge_range_constraints(
+    constraints1: &BTreeMap<CharVar, RangeConstr>,
+    constraints2: &BTreeMap<CharVar, RangeConstr>,
+) -> Option<BTreeMap<CharVar, RangeConstr>> {
+    let mut constraints = constraints1.clone();
+    for (key, val) in constraints2 {
+        if let Some(other_val) = constraints.get(key) {
+            if let Some(merged_range) = val.intersect(other_val) {
+                constraints.insert(key.clone(), merged_range);
+            } else {
+                return None;
+            }
+        } else {
+            constraints.insert(key.clone(), val.clone());
+        }
+    }
+    Some(constraints)
+}
+
+/*
+    Substitution expressions and substitution classes
+*/
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct SubExpr {
+    head: Vec<CharExpression>,
+    tail_is_string_var: bool,
+}
+
 impl Index<usize> for SubExpr {
     type Output = CharExpression;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.head[index]
-        /*if index < self.head.len() {
-            &Some(self.head[index])
-        } else {
-            // Return a reference to None when the index is out of bounds.
-            &None
-        }*/
     }
 }
-
-impl Index<&StringVar> for SimpleSub {
-    type Output = SubExpr;
-
-    fn index(&self, _index: &StringVar) -> &Self::Output {
-        unimplemented!()
-    }
-}
-// impl Into<GenRegex> for SubExpr2 {
-
-// }
 
 impl SubExpr {
     pub fn to_gen_regex(&self, tail_var: &StringVar) -> Rc<GenRegex> {
@@ -311,13 +327,7 @@ impl SubExpr {
 pub struct AnySub {
     string_to: BTreeMap<StringVar, Vec<SubExpr>>,
     char_to: BTreeMap<CharVar, Vec<CharExpression>>,
-}
-
-/// Represents a simple sub (in a normalized form)
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct SimpleSub {
-    string_to: BTreeMap<StringVar, SubExpr>,
-    char_to: BTreeMap<CharVar, CharExpression>,
+    range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
 }
 
 impl AnySub {
@@ -327,52 +337,54 @@ impl AnySub {
     pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
         &self.char_to
     }
+    pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
+        self.range_constraints.take()
+    }
 }
+
+/// Represents a simple sub (in a normalized form)
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub struct SimpleSub {
+    string_to: BTreeMap<StringVar, SubExpr>,
+    char_to: BTreeMap<CharVar, CharExpression>,
+    range_constraints: BTreeMap<CharVar, RangeConstr>,
+}
+
+impl Index<&StringVar> for SimpleSub {
+    type Output = SubExpr;
+
+    fn index(&self, _index: &StringVar) -> &Self::Output {
+        unimplemented!()
+    }
+}
+
 impl SimpleSub {
+    /*
+        Constructors
+    */
     pub fn new(
         string_to: BTreeMap<StringVar, SubExpr>,
         char_to: BTreeMap<CharVar, CharExpression>,
+        range_constraints: BTreeMap<CharVar, RangeConstr>,
     ) -> Self {
-        SimpleSub { string_to, char_to }
-    }
-    pub fn get_str_map(&self) -> &BTreeMap<StringVar, SubExpr> {
-        &self.string_to
-    }
-    pub fn get_char_map(&self) -> &BTreeMap<CharVar, CharExpression> {
-        &self.char_to
-    }
-    pub fn get_str_map_mut(&mut self) -> &mut BTreeMap<StringVar, SubExpr> {
-        &mut self.string_to
-    }
-    pub fn get_char_map_mut(&mut self) -> &mut BTreeMap<CharVar, CharExpression> {
-        &mut self.char_to
-    }
-    pub fn remove_char_map(&mut self, key: &CharVar) -> Option<CharExpression> {
-        self.char_to.remove(key)
-    }
-    pub fn remove_str_map(&mut self, key: &StringVar) -> Option<SubExpr> {
-        self.string_to.remove(key)
-    }
-    pub fn get_string_var(&self, key: &StringVar) -> Option<&SubExpr> {
-        self.string_to.get(key)
-    }
-
-    pub fn get_char_var(&self, key: &CharVar) -> Option<&CharExpression> {
-        self.char_to.get(key)
-    }
-    pub fn set_string_var(&mut self, key: StringVar, value: SubExpr) {
-        self.string_to.insert(key, value);
-    }
-
-    pub fn set_char_var(&mut self, key: CharVar, value: CharExpression) {
-        self.char_to.insert(key, value);
-    }
-    pub fn empty() -> Self {
         SimpleSub {
-            string_to: BTreeMap::new(), // Empty HashMap
-            char_to: BTreeMap::new(),   // Empty HashMap
+            string_to,
+            char_to,
+            range_constraints,
         }
     }
+    pub fn empty() -> Self {
+        // Sub with empty HashMaps
+        SimpleSub {
+            string_to: BTreeMap::new(),
+            char_to: BTreeMap::new(),
+            range_constraints: BTreeMap::new(),
+        }
+    }
+
+    /*
+        Union operation
+    */
     pub fn union(self, other: SimpleSub) -> AnySub {
         let mut combined_string_to: BTreeMap<StringVar, Vec<SubExpr>> = BTreeMap::new();
         let mut combined_char_to: BTreeMap<CharVar, Vec<CharExpression>> = BTreeMap::new();
@@ -391,48 +403,73 @@ impl SimpleSub {
             combined_char_to.entry(key).or_default().push(value);
         }
 
+        let range_constrs =
+            merge_range_constraints(&self.range_constraints, &other.range_constraints);
+
         AnySub {
             string_to: combined_string_to,
             char_to: combined_char_to,
+            range_constraints: range_constrs,
         }
     }
+
+    /*
+        Getters and Setters
+    */
+    pub fn get_str_map(&self) -> &BTreeMap<StringVar, SubExpr> {
+        &self.string_to
+    }
+    pub fn get_str_map_mut(&mut self) -> &mut BTreeMap<StringVar, SubExpr> {
+        &mut self.string_to
+    }
+    pub fn remove_str_map(&mut self, key: &StringVar) -> Option<SubExpr> {
+        self.string_to.remove(key)
+    }
+    pub fn get_str_var(&self, key: &StringVar) -> Option<&SubExpr> {
+        self.string_to.get(key)
+    }
+    pub fn set_str_var(&mut self, key: StringVar, value: SubExpr) {
+        self.string_to.insert(key, value);
+    }
+
+    pub fn get_char_map(&self) -> &BTreeMap<CharVar, CharExpression> {
+        &self.char_to
+    }
+    pub fn get_char_map_mut(&mut self) -> &mut BTreeMap<CharVar, CharExpression> {
+        &mut self.char_to
+    }
+    pub fn remove_char_map(&mut self, key: &CharVar) -> Option<CharExpression> {
+        self.char_to.remove(key)
+    }
+    pub fn get_char_var(&self, key: &CharVar) -> Option<&CharExpression> {
+        self.char_to.get(key)
+    }
+    pub fn set_char_var(&mut self, key: CharVar, value: CharExpression) {
+        self.char_to.insert(key, value);
+    }
+
+    pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
+        &self.range_constraints
+    }
+    pub fn set_ranges(&mut self, ranges: BTreeMap<CharVar, RangeConstr>) {
+        self.range_constraints = ranges;
+    }
+    pub fn add_range(&mut self, key: CharVar, start: char, end: char) {
+        let value = RangeConstr::new(start, end);
+        self.range_constraints.insert(key, value);
+    }
+
+    /*
+        Consumers
+    */
     pub fn into_set(self) -> HashSet<SimpleSub> {
         HashSet::from([self])
     }
 }
 
-impl SimpleSub {
-    fn substitute_in_regex(&self, _g: GenRegex) -> GenRegex {
-        unimplemented!()
-    }
-}
-
-// l[3] -- 3rd elem of list
-// class MyList
-// m: MyList
-// m[5] -- define what it means to get the 5th element of MyList
-
-// https://doc.rust-lang.org/std/ops/trait.Index.html
-
-impl IndexMut<&StringVar> for SimpleSub {
-    fn index_mut(&mut self, _index: &StringVar) -> &mut Self::Output {
-        unimplemented!()
-    }
-}
-
-// f: SimpleSub
-// w: String var (w1, w2, w3)
-// f[w] <- get the subexpr
-
-// f1 + f2 <- merge two simple subs
-// f1 - f2 <- sub subtractions
-// impl Add<SimpleSub> for SimpleSub {
-//     //
-// }
-
-// merge_subs()
-
-// Option<SimpleSub> - simple sub or \bottom
+/*
+    Predicates and characters
+*/
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum Predicate {
@@ -443,6 +480,7 @@ pub enum Predicate {
     False,
     Equals(Rc<MaybeCharExpression>, Rc<MaybeCharExpression>),
     EqualLength(Rc<StringVar>, i32),
+    // TODO: rename to LessThanEq, GreaterThanEq
     LessThan(Rc<MaybeCharExpression>, char), //Includes Equal to
     GreaterThan(Rc<MaybeCharExpression>, char), //Includes Equal to
 }

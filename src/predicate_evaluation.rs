@@ -381,7 +381,6 @@ fn evaluate(
                 }
                 _ => {
                     return vec![vec![Rc::new(Predicate::True)]];
-
                 }
             }
         }
@@ -516,9 +515,14 @@ pub fn internalize_all_nots(pred: &Rc<Predicate>) -> Rc<Predicate> {
 
             Predicate::True => Rc::new(Predicate::False),
             Predicate::False => Rc::new(Predicate::True),
-            Predicate::LessThan(var, val) => Rc::new(Predicate::GreaterThan(var.clone(), char::from_u32(*val as u32 + 1).expect("Invalid char after subtraction"))),
-            Predicate::GreaterThan(var, val) => Rc::new(Predicate::LessThan(var.clone(), char::from_u32(*val as u32 - 1).expect("Invalid char after subtraction"))),
-            
+            Predicate::LessThan(var, val) => Rc::new(Predicate::GreaterThan(
+                var.clone(),
+                char::from_u32(*val as u32 + 1).expect("Invalid char after subtraction"),
+            )),
+            Predicate::GreaterThan(var, val) => Rc::new(Predicate::LessThan(
+                var.clone(),
+                char::from_u32(*val as u32 - 1).expect("Invalid char after subtraction"),
+            )),
 
             _ => Rc::clone(pred),
         },

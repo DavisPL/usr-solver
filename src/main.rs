@@ -40,7 +40,6 @@ fn main() {
     } else {
         println!("Using Antimirov");
         //antimirov::satisfiable(&Rc::new(re))
-        // TBD
         let mut sat_check = SatChecker::new();
         sat_check.satisfiable(&Rc::new(re))
     };
