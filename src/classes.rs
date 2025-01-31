@@ -6,8 +6,11 @@
 use std::cmp::{max, min};
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Index;
-use std::ops::IndexMut;
 use std::rc::Rc;
+
+/*
+    GenRegex
+*/
 
 // TODO: add a GenRegex::StringLiteral
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -143,11 +146,9 @@ impl GenRegex {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct SubExpr {
-    head: Vec<CharExpression>,
-    tail_is_string_var: bool,
-}
+/*
+    Antimirov derivative terms
+*/
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct AntimirovElement {
@@ -187,6 +188,10 @@ impl AntimirovElement {
     }
 }
 
+/*
+    Range constraints
+*/
+
 /// Optimization to represent ranges as constraints on subs
 // example: d([a-z], x) = {(epsilon, x->a), (epsilon, x->b) ... (epsilon, x->z)}
 // Store only: x, [a, z], {(epsilon, {})}.
@@ -216,6 +221,35 @@ impl RangeConstr {
     }
 }
 
+fn merge_range_constraints(
+    constraints1: &BTreeMap<CharVar, RangeConstr>,
+    constraints2: &BTreeMap<CharVar, RangeConstr>,
+) -> Option<BTreeMap<CharVar, RangeConstr>> {
+    let mut constraints = constraints1.clone();
+    for (key, val) in constraints2 {
+        if let Some(other_val) = constraints.get(key) {
+            if let Some(merged_range) = val.intersect(other_val) {
+                constraints.insert(key.clone(), merged_range);
+            } else {
+                return None;
+            }
+        } else {
+            constraints.insert(key.clone(), val.clone());
+        }
+    }
+    Some(constraints)
+}
+
+/*
+    Substitution expressions and substitution classes
+*/
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct SubExpr {
+    head: Vec<CharExpression>,
+    tail_is_string_var: bool,
+}
+
 impl Index<usize> for SubExpr {
     type Output = CharExpression;
 
@@ -230,6 +264,34 @@ impl Index<usize> for SubExpr {
     }
 }
 
+/// Represents any sub, not necessarily simple (e.g. x -> y, y -> x)
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub struct AnySub {
+    string_to: BTreeMap<StringVar, Vec<SubExpr>>,
+    char_to: BTreeMap<CharVar, Vec<CharExpression>>,
+    range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
+}
+
+impl AnySub {
+    pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {
+        &self.string_to
+    }
+    pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
+        &self.char_to
+    }
+    pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
+        self.range_constraints.take()
+    }
+}
+
+/// Represents a simple sub (in a normalized form)
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub struct SimpleSub {
+    string_to: BTreeMap<StringVar, SubExpr>,
+    char_to: BTreeMap<CharVar, CharExpression>,
+    range_constraints: BTreeMap<CharVar, RangeConstr>,
+}
+
 impl Index<&StringVar> for SimpleSub {
     type Output = SubExpr;
 
@@ -237,9 +299,6 @@ impl Index<&StringVar> for SimpleSub {
         unimplemented!()
     }
 }
-// impl Into<GenRegex> for SubExpr2 {
-
-// }
 
 impl SubExpr {
     pub fn to_gen_regex(&self, tail_var: &StringVar) -> Rc<GenRegex> {
@@ -301,53 +360,6 @@ impl SubExpr {
             tail_is_string_var,
         }
     }
-}
-
-/// Represents any sub, not necessarily simple (e.g. x -> y, y -> x)
-#[derive(Debug, Eq, PartialEq, Hash)]
-pub struct AnySub {
-    string_to: BTreeMap<StringVar, Vec<SubExpr>>,
-    char_to: BTreeMap<CharVar, Vec<CharExpression>>,
-    range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
-}
-
-/// Represents a simple sub (in a normalized form)
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct SimpleSub {
-    string_to: BTreeMap<StringVar, SubExpr>,
-    char_to: BTreeMap<CharVar, CharExpression>,
-    range_constraints: BTreeMap<CharVar, RangeConstr>,
-}
-
-impl AnySub {
-    pub fn get_str_map(&self) -> &BTreeMap<StringVar, Vec<SubExpr>> {
-        &self.string_to
-    }
-    pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
-        &self.char_to
-    }
-    pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
-        self.range_constraints.take()
-    }
-}
-
-fn merge_range_constraints(
-    constraints1: &BTreeMap<CharVar, RangeConstr>,
-    constraints2: &BTreeMap<CharVar, RangeConstr>,
-) -> Option<BTreeMap<CharVar, RangeConstr>> {
-    let mut constraints = constraints1.clone();
-    for (key, val) in constraints2 {
-        if let Some(other_val) = constraints.get(key) {
-            if let Some(merged_range) = val.intersect(other_val) {
-                constraints.insert(key.clone(), merged_range);
-            } else {
-                return None;
-            }
-        } else {
-            constraints.insert(key.clone(), val.clone());
-        }
-    }
-    Some(constraints)
 }
 
 impl SimpleSub {
@@ -459,38 +471,9 @@ impl SimpleSub {
     }
 }
 
-impl SimpleSub {
-    fn substitute_in_regex(&self, _g: GenRegex) -> GenRegex {
-        unimplemented!()
-    }
-}
-
-// l[3] -- 3rd elem of list
-// class MyList
-// m: MyList
-// m[5] -- define what it means to get the 5th element of MyList
-
-// https://doc.rust-lang.org/std/ops/trait.Index.html
-
-impl IndexMut<&StringVar> for SimpleSub {
-    fn index_mut(&mut self, _index: &StringVar) -> &mut Self::Output {
-        unimplemented!()
-    }
-}
-
-// f: SimpleSub
-// w: String var (w1, w2, w3)
-// f[w] <- get the subexpr
-
-// f1 + f2 <- merge two simple subs
-// f1 - f2 <- sub subtractions
-// impl Add<SimpleSub> for SimpleSub {
-//     //
-// }
-
-// merge_subs()
-
-// Option<SimpleSub> - simple sub or \bottom
+/*
+    Predicates and characters
+*/
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum Predicate {
