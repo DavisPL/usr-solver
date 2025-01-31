@@ -3,8 +3,9 @@
 //!
 
 // TODO: fix and remove
-#![allow(non_snake_case)]
 #![allow(clippy::single_match)]
+#![allow(dead_code)]
+#![allow(non_snake_case)]
 
 use crate::types::expr::{CharExpression, MaybeCharExpression, StringIndex, StringVar};
 use crate::types::predicate::Predicate;

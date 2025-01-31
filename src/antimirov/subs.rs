@@ -2,6 +2,9 @@
 //! Substitution terms, used for Antimirov derivatives
 //!
 
+// TODO: Fix and remove
+#![allow(dead_code)]
+
 use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex, StringVar};
 use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;

@@ -83,24 +83,10 @@ impl fmt::Display for SmtParseError {
 impl Error for SmtParseError {}
 
 /*
-    S-expression parsing functions
-
-    These are private so that the implementation can be changed later
+    Top-level S-expression parsing functions
 */
 
-fn expect_pair(v: &Value) -> Result<(&Value, &Value), SmtParseError> {
-    v.as_pair().ok_or(SmtParseError::unexpected(v, "pair"))
-}
-
-fn expect_null(v: &Value) -> Result<(), SmtParseError> {
-    v.as_null().ok_or(SmtParseError::unexpected(v, "null"))
-}
-
-fn expect_symbol(v: &Value) -> Result<&str, SmtParseError> {
-    v.as_symbol().ok_or(SmtParseError::unexpected(v, "symbol"))
-}
-
-fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
+pub fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
     let v = lexpr::from_str(smt_string)?;
     Ok(v)
 }
@@ -118,6 +104,22 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
 
     // Return
     Ok(v)
+}
+
+/*
+    Helper functions
+*/
+
+fn expect_pair(v: &Value) -> Result<(&Value, &Value), SmtParseError> {
+    v.as_pair().ok_or(SmtParseError::unexpected(v, "pair"))
+}
+
+fn expect_null(v: &Value) -> Result<(), SmtParseError> {
+    v.as_null().ok_or(SmtParseError::unexpected(v, "null"))
+}
+
+fn expect_symbol(v: &Value) -> Result<&str, SmtParseError> {
+    v.as_symbol().ok_or(SmtParseError::unexpected(v, "symbol"))
 }
 
 /*

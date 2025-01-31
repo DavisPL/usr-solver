@@ -1,5 +1,5 @@
 //!
-//! Main entrypoint
+//! Binary entrypoint
 //!
 
 use gen_regex_impl::antimirov::sat_checker::SatChecker;

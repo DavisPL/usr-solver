@@ -20,7 +20,7 @@ pub struct CharVar {
 /*
     Character expressions
 
-    TODO: probably merge MaybeCharExpression and CharExpression,
+    TODO: possibly merge MaybeCharExpression and CharExpression,
     or make MaybeCharExpression a String expression.
 */
 
