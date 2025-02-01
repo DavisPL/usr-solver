@@ -669,6 +669,20 @@ fn test_passw_complement_3() {
     assert_satisfiable("benchmarks/passw_sat_4.smt2");
 }
 
+// Diverging for Brz, returning wrong answer for Ant
+#[ignore]
+#[test]
+fn test_passw_complement_simpler() {
+    assert_satisfiable("benchmarks/passw_simpler_sat_1.smt2");
+}
+
+// Diverging for Brz, slow but converging for Ant
+#[ignore]
+#[test]
+fn test_passw_complement_simplest() {
+    assert_satisfiable("benchmarks/passw_simplest_sat_1.smt2");
+}
+
 // Diverging
 #[ignore]
 #[test]
