@@ -3,7 +3,7 @@
 //!
 
 use gen_regex_impl::smt::parse::{parse_smtlib_file, SmtParser};
-use gen_regex_impl::solver::{ABSolver, Solver};
+use gen_regex_impl::solver::{self, Solver};
 
 use clap::Parser;
 use std::rc::Rc;
@@ -13,6 +13,10 @@ use std::rc::Rc;
 struct Args {
     /// SMT input file to run on
     filename: String,
+
+    /// Solver to use: options are "ab", "a", or "b"
+    #[clap(long, short, default_value = "ab")]
+    solver_name: String,
 }
 
 fn main() {
@@ -24,7 +28,11 @@ fn main() {
     let mut parser = SmtParser::new();
     let re = Rc::new(parser.parse_s_expr(&v).expect("Invalid S-expr"));
 
-    let result = ABSolver::new().satisfiable(&re);
+    let solver_name = solver::lookup_solver_name(&args.solver_name);
+    println!("Using solver: {}", solver_name);
+    let mut solver: Box<dyn Solver> = solver::solver_by_name(solver_name);
+
+    let result = solver.satisfiable(&re);
     if result {
         println!("sat");
     } else {

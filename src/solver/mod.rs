@@ -26,11 +26,20 @@ pub use ab_solver::ABSolver;
 pub use antimirov::AntimirovSolver;
 pub use brzozowski::BrzozowskiSolver;
 
+pub fn lookup_solver_name(name: &str) -> &str {
+    match name {
+        "a" | "antimirov" => "Antimirov",
+        "b" | "brzozowski" => "Brzozowski",
+        "ab" => "AB Solver",
+        _ => panic!("Unknown solver: {}", name),
+    }
+}
+
 pub fn solver_by_name(name: &str) -> Box<dyn Solver> {
     match name {
-        "antimirov" => Box::new(AntimirovSolver::new()),
-        "brzozowski" => Box::new(BrzozowskiSolver::new()),
-        "ab" => Box::new(ABSolver::new()),
+        "Antimirov" => Box::new(AntimirovSolver::new()),
+        "Brzozowski" => Box::new(BrzozowskiSolver::new()),
+        "AB Solver" => Box::new(ABSolver::new()),
         _ => panic!("Unknown solver: {}", name),
     }
 }
