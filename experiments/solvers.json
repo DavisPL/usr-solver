@@ -8,19 +8,19 @@
 	},
 	"usr_a": {
 		"path": "../target/release/gen-regex-impl",
-		"opts": ["-s a"],
+		"opts": ["-s", "a"],
 		"rseed_opt": null,
 		"detect_crash_patterns": []
 	},
 	"usr_b": {
 		"path": "../target/release/gen-regex-impl",
-		"opts": ["-s b"],
+		"opts": ["-s", "b"],
 		"rseed_opt": null,
 		"detect_crash_patterns": []
 	},
 	"usr_ab": {
 		"path": "../target/release/gen-regex-impl",
-		"opts": ["-s ab"],
+		"opts": ["-s", "ab"],
 		"rseed_opt": null,
 		"detect_crash_patterns": []
 	},
