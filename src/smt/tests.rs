@@ -2,11 +2,9 @@
 //! Benchmark tests for SMT parsing and satisfiability
 //!
 
-use crate::antimirov::satisfiable;
-// use crate::antimirov_sat::SatChecker;
 use super::parse::{parse_smtlib_file, SmtParser};
 use super::util::hex_to_char;
-use crate::brzozowski::deriv;
+use crate::solver::satisfiable;
 use crate::types::expr::{CharExpression, StringVar};
 use crate::types::regex::GenRegex;
 
@@ -30,14 +28,7 @@ fn assert_smt2_file_helper(filepath: &str, expected: bool) {
     let gen_regex_unwrapped = gen_regex.unwrap();
 
     // Get result
-    let result: bool = if parser.use_brzozowski() {
-        deriv::satisfiable(&Rc::new(gen_regex_unwrapped))
-    } else {
-        satisfiable(&Rc::new(gen_regex_unwrapped))
-        // TBD
-        // let mut sat_check = SatChecker::new();
-        // sat_check.satisfiable(&Rc::new(gen_regex_unwrapped))
-    };
+    let result = satisfiable(&Rc::new(gen_regex_unwrapped));
     assert_eq!(result, expected);
 }
 
@@ -519,7 +510,7 @@ fn test_equality() {
     let eq2 = GenRegex::intersect(&GenRegex::complement(&GenRegex::empty_set()), &together);
     let expected = GenRegex::Union(eq1, eq2);
     assert_eq!(gen_regex_unwrapped, expected);
-    assert_eq!(deriv::satisfiable(&Rc::new(gen_regex_unwrapped)), true);
+    assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped)), true);
 }
 
 // TODO: Equality not supported for now
@@ -546,10 +537,7 @@ fn test_hex_code() {
 
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
-    assert_eq!(
-        deriv::satisfiable(&Rc::new(gen_regex_unwrapped.clone())),
-        true
-    );
+    assert_eq!(satisfiable(&Rc::new(gen_regex_unwrapped.clone())), true);
 }
 
 #[test]

@@ -445,7 +445,6 @@ pub struct SmtParser {
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
     let_vars: HashMap<String, Value>,
     regex_result: Option<Rc<GenRegex>>,
-    brzozowski_flag: bool,
     not_flag: bool,
 }
 
@@ -459,7 +458,6 @@ impl SmtParser {
             re_var_names: HashMap::new(),
             let_vars: HashMap::new(),
             regex_result: None,
-            brzozowski_flag: false,
             not_flag: false,
         }
     }
@@ -494,10 +492,6 @@ impl SmtParser {
         } else {
             Err(SmtParseError::unrecog(v))
         }
-    }
-
-    pub fn use_brzozowski(&self) -> bool {
-        self.brzozowski_flag
     }
 
     /*
@@ -777,7 +771,7 @@ impl SmtParser {
                 Err(SmtParseError::Unimplemented(format!(
                     "Equals had not been fixed"
                 )))
-                /*self.brzozowski_flag = true;
+                /*
                 Ok(GenRegex::union(
                     &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
                     &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
@@ -837,7 +831,6 @@ impl SmtParser {
             ))),
             RegexToken::Val(gen_regex) => {
                 let gen_regex = if self.not_flag {
-                    self.brzozowski_flag = true;
                     GenRegex::complement(gen_regex)
                 } else {
                     gen_regex.clone()
@@ -1068,7 +1061,6 @@ impl SmtParser {
 
     fn parse_re_diff(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         // Syntax: (re.diff R R)
-        self.brzozowski_flag = true;
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
@@ -1245,7 +1237,6 @@ impl SmtParser {
     }
 
     fn parse_re_comp(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
-        self.brzozowski_flag = true;
         let (regex, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
         RegexToken::comp(&self.parse_regex(regex)?)

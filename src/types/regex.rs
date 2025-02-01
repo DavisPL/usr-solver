@@ -158,6 +158,38 @@ impl GenRegex {
             Rc::new(GenRegex::Concatenation(left, right))
         }
     }
+
+    /*
+        Helper for what the regex contains as a subexpression
+    */
+
+    pub fn contains_ite_complement_or_str_index(&self) -> bool {
+        match self {
+            GenRegex::IfThenElse(_, _, _) => true,
+            GenRegex::Complement(_) => true,
+            GenRegex::StringIndex(_) => true,
+            GenRegex::StringSlice(_, _) => true,
+            GenRegex::Union(gre1, gre2) => {
+                gre1.contains_ite_complement_or_str_index()
+                    || gre2.contains_ite_complement_or_str_index()
+            }
+            GenRegex::Intersect(gre1, gre2) => {
+                gre1.contains_ite_complement_or_str_index()
+                    || gre2.contains_ite_complement_or_str_index()
+            }
+            GenRegex::Concatenation(gre1, gre2) => {
+                gre1.contains_ite_complement_or_str_index()
+                    || gre2.contains_ite_complement_or_str_index()
+            }
+            GenRegex::Kleene(gre1) => gre1.contains_ite_complement_or_str_index(),
+            GenRegex::EmptySet
+            | GenRegex::Epsilon
+            | GenRegex::Sigma
+            | GenRegex::Range(_, _)
+            | GenRegex::CharExpression(_)
+            | GenRegex::StringVar(_) => false,
+        }
+    }
 }
 
 /*
