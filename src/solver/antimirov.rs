@@ -1,16 +1,21 @@
 /*
     Satisfiability checker using Antimirov derivatives
+
+    This solver internally uses Brzozowski in the complement case,
+    so it is a hybrid approach.
 */
 
-use super::deriv::{derivative, nullable};
+use super::Solver;
+
+use crate::antimirov::deriv::{derivative, nullable};
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
 use std::collections::{HashSet, VecDeque};
 use std::rc::Rc;
 
-#[derive(Debug)]
-pub struct SatChecker {}
+#[derive(Debug, Default)]
+pub struct AntimirovSolver {}
 
 // Stores a regex and at what depth of derivative it was found.
 struct DerivativeDepth {
@@ -18,11 +23,14 @@ struct DerivativeDepth {
     depth: i32,
 }
 
-impl SatChecker {
+impl AntimirovSolver {
     pub fn new() -> Self {
-        SatChecker {}
+        Self {}
     }
-    pub fn satisfiable(&mut self, expr: &Rc<GenRegex>) -> bool {
+}
+
+impl Solver for AntimirovSolver {
+    fn satisfiable(&mut self, expr: &Rc<GenRegex>) -> bool {
         let mut sat_stack = VecDeque::new();
         sat_stack.push_back(DerivativeDepth {
             gre: expr.clone(),
@@ -55,18 +63,11 @@ impl SatChecker {
         }
         false
     }
+}
+
+impl AntimirovSolver {
     fn get_fresh_var(&mut self, id: i32) -> Rc<CharExpression> {
         let var_name = format!("f.{}", id);
         Rc::new(CharExpression::CharVar(CharVar { name: var_name }))
-    }
-}
-
-/*
-    Trait implementations
-*/
-
-impl Default for SatChecker {
-    fn default() -> Self {
-        Self::new()
     }
 }
