@@ -56,7 +56,7 @@ use std::fmt::{self, Display};
 
 impl Display for CharVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CHAR({})", self.name)
+        write!(f, "{}", self.name)
     }
 }
 
@@ -67,7 +67,7 @@ impl Display for CharExpression {
                 write!(f, "{}", name)
             }
             CharExpression::Literal(name) => {
-                write!(f, "{}", name)
+                write!(f, "'{}'", name)
             }
         }
     }
@@ -88,7 +88,7 @@ impl Display for MaybeCharExpression {
 
 impl Display for StringVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "STR({})", self.name)
+        write!(f, "{}", self.name)
     }
 }
 
