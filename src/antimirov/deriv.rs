@@ -10,7 +10,8 @@ use super::subs::{
     merge_binary, merge_sets, sub_difference_from_merge, sub_in, union_sets, AntimirovElement,
     SimpleSub, SubExpr,
 };
-use crate::brzozowski::deriv;
+
+use crate::brzozowski;
 use crate::types::expr::CharExpression;
 use crate::types::regex::GenRegex;
 
@@ -31,21 +32,18 @@ pub fn derivative(
         GenRegex::EmptySet => HashSet::new(),
         GenRegex::Epsilon => HashSet::new(),
         GenRegex::Sigma => AntimirovElement::new_epsilon().into_set(),
-        GenRegex::Range(char1, char2) => {
-            let mut result = AntimirovElement::new_epsilon();
-            match deriv_char.as_ref() {
-                CharExpression::Literal(literal) => {
-                    if literal < char1 || literal > char2 {
-                        return HashSet::new();
-                    }
-                }
-                CharExpression::CharVar(deriv_var) => {
-                    result.add_range(deriv_var.clone(), *char1, *char2);
+        GenRegex::Range(char1, char2) => match deriv_char.as_ref() {
+            CharExpression::Literal(literal) => {
+                if literal < char1 || literal > char2 {
+                    HashSet::new()
+                } else {
+                    AntimirovElement::new_epsilon().into_set()
                 }
             }
-
-            result.into_set()
-        }
+            CharExpression::CharVar(deriv_var) => {
+                AntimirovElement::new_epsilon_range(deriv_var.clone(), *char1, *char2).into_set()
+            }
+        },
         GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
             (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
                 if deriv_lit == literal_value {
@@ -130,11 +128,11 @@ pub fn derivative(
             ret_set
         }
         GenRegex::Complement(_) => {
-            let deriv = deriv::derivative(gre, deriv_char);
+            let deriv = brzozowski::deriv::derivative(gre, deriv_char);
             AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
         }
         GenRegex::IfThenElse(_, _, _) => {
-            let deriv = deriv::derivative(gre, deriv_char);
+            let deriv = brzozowski::deriv::derivative(gre, deriv_char);
             AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
         }
         GenRegex::StringSlice(_, _) => {

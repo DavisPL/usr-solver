@@ -38,9 +38,37 @@ impl AntimirovElement {
         }
     }
 
+    pub fn new_empty() -> Self {
+        Self {
+            deriv_expression: GenRegex::empty_set(),
+            subs: SimpleSub::empty(),
+        }
+    }
+
+    /*
+        Range expressions
+    */
+
     pub fn add_range(&mut self, key: CharVar, start: char, end: char) {
         self.subs.add_range(key, start, end);
     }
+
+    pub fn new_epsilon_range(key: CharVar, start: char, end: char) -> Self {
+        let mut result = Self::new_epsilon();
+        result.add_range(key, start, end);
+        result
+    }
+
+    pub fn new_empty_range(key: CharVar, start: char, end: char) -> Self {
+        let mut result = Self::new_empty();
+        result.add_range(key, start, end);
+        result
+    }
+
+    /*
+        Getters and setters
+    */
+
     pub fn get_expr(&self) -> &Rc<GenRegex> {
         &self.deriv_expression
     }

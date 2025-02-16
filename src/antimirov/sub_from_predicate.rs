@@ -4,6 +4,8 @@
 //!
 
 use super::subs::{merge_binary, merge_sets, union_sets, SimpleSub};
+use super::util::{char_minus_one, char_plus_one, CHAR_MAX, CHAR_MIN};
+
 use crate::types::expr::{CharExpression, MaybeCharExpression, StringIndex, StringVar};
 use crate::types::predicate::Predicate;
 
@@ -158,14 +160,14 @@ fn sub_from_char_compare(
         CharExpression::CharVar(var) => {
             let below = char_minus_one(pivot).map(|c| {
                 let mut below = SimpleSub::empty();
-                below.add_range(var.clone(), char::MIN, c);
+                below.add_range(var.clone(), CHAR_MIN, c);
                 below
             });
             let mut equal = SimpleSub::empty();
             equal.add_range(var.clone(), pivot, pivot);
             let above = char_plus_one(pivot).map(|c| {
                 let mut above = SimpleSub::empty();
-                above.add_range(var.clone(), c, char::MAX);
+                above.add_range(var.clone(), c, CHAR_MAX);
                 above
             });
             (below, Some(equal), above)
@@ -179,22 +181,6 @@ fn sub_from_char_compare(
             }
         }
     }
-}
-
-// PRECONDITION: assumes c+1 is a valid Unicode scalar value, if it exists
-// We don't currently handle the general case soundly.
-// Returns None if arithmetic is out of bounds or u32-to-char conversion fails.
-fn char_plus_one(c: char) -> Option<char> {
-    let c_val = c as u32;
-    c_val.checked_add(1)?.try_into().ok()
-}
-
-// PRECONDITION: assumes c-1 is a valid Unicode scalar value, if it exists
-// We don't currently handle the unicode case soundly.
-// Returns None if arithmetic is out of bounds.
-fn char_minus_one(c: char) -> Option<char> {
-    let c_val: u32 = c as u32;
-    c_val.checked_sub(1)?.try_into().ok()
 }
 
 // The following function turns out to be key: it allows us to convert a string
