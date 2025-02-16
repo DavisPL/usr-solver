@@ -12,7 +12,7 @@ use super::deriv;
 use super::subs::{AntimirovElement, SimpleSub, SubExpr};
 use super::util::{char_minus_one, char_plus_one, CHAR_MAX, CHAR_MIN};
 
-use crate::types::expr::CharExpression;
+use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
 use std::collections::{BTreeMap, HashSet};
@@ -45,80 +45,44 @@ pub fn derivative_determinized(
                     AntimirovElement::new_epsilon().into_set()
                 }
             }
-            CharExpression::CharVar(deriv_var) => {
-                let mut result = HashSet::new();
-                if let Some(char0) = char_minus_one(*char1) {
-                    let mut result_low = AntimirovElement::new_empty();
-                    result_low.add_range(deriv_var.clone(), CHAR_MIN, char0);
-                    result.insert(result_low);
-                }
-                let mut result_mid = AntimirovElement::new_epsilon();
-                result_mid.add_range(deriv_var.clone(), *char1, *char2);
-                result.insert(result_mid);
-                if let Some(char2) = char_plus_one(*char1) {
-                    let mut result_high = AntimirovElement::new_empty();
-                    result_high.add_range(deriv_var.clone(), char2, CHAR_MAX);
-                    result.insert(result_high);
-                }
-                result
-            }
+            CharExpression::CharVar(deriv_var) => determinize_range(deriv_var, *char1, *char2),
         },
         GenRegex::CharExpression(c_expr) => match (deriv_char.as_ref(), c_expr) {
             (CharExpression::Literal(deriv_lit), CharExpression::Literal(literal_value)) => {
-                unimplemented!();
-                // if deriv_lit == literal_value {
-                //     AntimirovElement::new_epsilon().into_set()
-                // } else {
-                //     HashSet::new()
-                // }
+                if deriv_lit == literal_value {
+                    AntimirovElement::new_epsilon().into_set()
+                } else {
+                    AntimirovElement::new_empty().into_set()
+                }
             }
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
-                unimplemented!();
-                // let mut char_to = BTreeMap::new();
-                // char_to.insert(d_var.clone(), c_expr.clone());
-                // let subs = SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new());
-                // AntimirovElement::new(GenRegex::epsilon(), subs).into_set()
+                determinize_range(d_var, *lit_val, *lit_val)
             }
-            (_, CharExpression::CharVar(c_var)) => {
+            (CharExpression::Literal(lit_val), CharExpression::CharVar(c_var)) => {
+                determinize_range(c_var, *lit_val, *lit_val)
+            }
+            (CharExpression::CharVar(d_var), CharExpression::CharVar(c_var)) => {
+                // TODO: Hard case, requires encoding x != y
                 unimplemented!();
-                // let mut char_to = BTreeMap::new();
-                // char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
-                // let subs = SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new());
-                // AntimirovElement::new(GenRegex::epsilon(), subs).into_set()
             }
         },
         GenRegex::StringVar(string_var) => {
+            // TODO: Hard case, requires handling w |-> xw and negation of this
             unimplemented!();
-            // let head = vec![deriv_char.as_ref().clone()];
-
-            // let subexpr = SubExpr::new(head, true);
-
-            // let mut string_to = BTreeMap::new();
-            // string_to.insert(string_var.clone(), subexpr);
-
-            // let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
-
-            // AntimirovElement::new(gre.clone(), substitution).into_set()
         }
         GenRegex::Union(side1, side2) => {
-            unimplemented!();
-            // let side1_deriv = derivative(side1, deriv_char);
-            // let side2_deriv = derivative(side2, deriv_char);
-            // side1_deriv.union(&side2_deriv).cloned().collect()
+            let side1_deriv = derivative_determinized(side1, deriv_char);
+            let side2_deriv = derivative_determinized(side2, deriv_char);
+            merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
+                Some(GenRegex::union(left, right))
+            })
         }
-        GenRegex::Intersect(left, right) => {
-            unimplemented!();
-            // let p_deriv = derivative(left, deriv_char);
-            // let q_deriv = derivative(right, deriv_char);
-            // let mut ret_set = HashSet::new();
-            // for p_sub in &p_deriv {
-            //     for q_sub in &q_deriv {
-            //         if let Some(ret) = merge_derivs_intersect(p_sub, q_sub) {
-            //             ret_set.insert(ret);
-            //         }
-            //     }
-            // }
-            // ret_set
+        GenRegex::Intersect(side1, side2) => {
+            let side1_deriv = derivative_determinized(side1, deriv_char);
+            let side2_deriv = derivative_determinized(side2, deriv_char);
+            merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
+                Some(GenRegex::intersect(left, right))
+            })
         }
         GenRegex::Concatenation(left, right) => {
             unimplemented!();
@@ -145,33 +109,78 @@ pub fn derivative_determinized(
             // ret_set
         }
         GenRegex::Kleene(expr) => {
-            unimplemented!();
-
-            // let p_derivs = derivative(expr, deriv_char);
-            // let mut ret_set = HashSet::new();
-            // for p_deriv in &p_derivs {
-            //     let ret = apply_deriv_kleene(p_deriv, gre);
-            //     ret_set.insert(ret);
-            // }
-            // ret_set
+            let p_derivs = derivative_determinized(expr, deriv_char);
+            let right_copy = AntimirovElement::new_emptysub(gre.clone()).into_set();
+            merge_helper(&right_copy, &p_derivs, &|left, right| {
+                Some(GenRegex::concat(left, right))
+            })
         }
-        GenRegex::Complement(_) => {
-            unimplemented!();
-
-            // let deriv = brzozowski::deriv::derivative(gre, deriv_char);
-            // AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
+        GenRegex::Complement(expr) => {
+            // This is where we get the benefit of determinization!
+            let p_derivs = derivative_determinized(expr, deriv_char);
+            p_derivs
+                .into_iter()
+                .map(|elem| elem.map_expr(|gre| GenRegex::complement(&gre)))
+                .collect()
         }
         GenRegex::IfThenElse(_, _, _) => {
+            // Unimplemented for now
             unimplemented!();
-
-            // let deriv = brzozowski::deriv::derivative(gre, deriv_char);
-            // AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
         }
         GenRegex::StringSlice(_, _) => {
+            // Unimplemented for now
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
+            // Unimplemented for now
             unimplemented!();
         }
     }
+}
+
+// Return a determinized set of derivatives for a range
+// TODO: handle the case char1 = char2 by creating a substitution instead of a range
+fn determinize_range(deriv_var: &CharVar, char1: char, char2: char) -> HashSet<AntimirovElement> {
+    let mut result = HashSet::new();
+    if let Some(char0) = char_minus_one(char1) {
+        result.insert(AntimirovElement::new_empty_range(
+            deriv_var.clone(),
+            CHAR_MIN,
+            char0,
+        ));
+    }
+    result.insert(AntimirovElement::new_epsilon_range(
+        deriv_var.clone(),
+        char1,
+        char2,
+    ));
+    if let Some(char2) = char_plus_one(char1) {
+        result.insert(AntimirovElement::new_empty_range(
+            deriv_var.clone(),
+            char2,
+            CHAR_MAX,
+        ));
+    }
+    result
+}
+
+// Merge two determinized derivatives using a custom GenRegex combination operation
+// This is done exhaustively (effectively a product construction)
+fn merge_helper<F>(
+    left_set: &HashSet<AntimirovElement>,
+    right_set: &HashSet<AntimirovElement>,
+    merge_op: &F,
+) -> HashSet<AntimirovElement>
+where
+    F: Fn(&Rc<GenRegex>, &Rc<GenRegex>) -> Option<Rc<GenRegex>>,
+{
+    let mut result = HashSet::new();
+    for left in left_set {
+        for right in right_set {
+            if let Some(merged) = AntimirovElement::merge_using(left, right, merge_op) {
+                result.insert(merged);
+            }
+        }
+    }
+    result
 }

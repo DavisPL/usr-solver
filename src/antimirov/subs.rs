@@ -25,24 +25,30 @@ pub struct AntimirovElement {
 }
 
 impl AntimirovElement {
+    /*
+        Main constructors
+    */
+
     pub fn new(deriv_expression: Rc<GenRegex>, subs: SimpleSub) -> Self {
         Self {
             deriv_expression,
             subs,
         }
     }
-    pub fn new_epsilon() -> Self {
+
+    pub fn new_emptysub(deriv_expression: Rc<GenRegex>) -> Self {
         Self {
-            deriv_expression: GenRegex::epsilon(),
+            deriv_expression,
             subs: SimpleSub::empty(),
         }
     }
 
+    pub fn new_epsilon() -> Self {
+        Self::new_emptysub(GenRegex::epsilon())
+    }
+
     pub fn new_empty() -> Self {
-        Self {
-            deriv_expression: GenRegex::empty_set(),
-            subs: SimpleSub::empty(),
-        }
+        Self::new_emptysub(GenRegex::empty_set())
     }
 
     /*
@@ -66,7 +72,39 @@ impl AntimirovElement {
     }
 
     /*
-        Getters and setters
+        Merge
+
+        This operation comes up repeatedly (using merge on substitutions),
+        so should be useful to have a generic wrapper for it.
+    */
+
+    pub fn merge_using<F>(
+        left: &AntimirovElement,
+        right: &AntimirovElement,
+        merge_fun: F,
+    ) -> Option<AntimirovElement>
+    where
+        F: Fn(&Rc<GenRegex>, &Rc<GenRegex>) -> Option<Rc<GenRegex>>,
+    {
+        // Calculate subs
+        let l_subs = left.get_subs();
+        let r_subs = right.get_subs();
+        let subs = merge_binary(l_subs, r_subs)?;
+        let l_sub_diff = sub_difference_from_merge(&subs, l_subs)?;
+        let r_sub_diff = sub_difference_from_merge(&subs, r_subs)?;
+
+        // Calculate left and right expressions
+        let l_expr = sub_in(left.get_expr(), &l_sub_diff);
+        let r_expr = sub_in(right.get_expr(), &r_sub_diff);
+
+        // Apply merge function
+        let merged = merge_fun(&l_expr, &r_expr)?;
+        let result = AntimirovElement::new(merged, subs);
+        Some(result)
+    }
+
+    /*
+        Getters
     */
 
     pub fn get_expr(&self) -> &Rc<GenRegex> {
@@ -78,6 +116,29 @@ impl AntimirovElement {
     pub fn get_ranges(&self) -> &BTreeMap<CharVar, RangeConstr> {
         self.subs.get_ranges()
     }
+
+    /*
+        Setters
+    */
+
+    pub fn map_expr<F>(self, map_fun: F) -> Self
+    where
+        F: Fn(Rc<GenRegex>) -> Rc<GenRegex>,
+    {
+        let Self {
+            deriv_expression,
+            subs,
+        } = self;
+        let deriv_expression = map_fun(deriv_expression);
+        Self {
+            deriv_expression,
+            subs,
+        }
+    }
+
+    /*
+        Consumers
+    */
 
     pub fn into_set(self) -> HashSet<Self> {
         HashSet::from([self])
