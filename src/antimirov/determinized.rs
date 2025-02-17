@@ -250,16 +250,10 @@ pub fn nullable_determinized(
     gre: &Rc<GenRegex>,
 ) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
     fn true_helper() -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
-        (
-            AntimirovElement::new_epsilon().into_set(),
-            HashSet::new(),
-        )
+        (AntimirovElement::new_epsilon().into_set(), HashSet::new())
     }
     fn false_helper() -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
-        (
-            HashSet::new(),
-            AntimirovElement::new_epsilon().into_set(),
-        )
+        (HashSet::new(), AntimirovElement::new_epsilon().into_set())
     }
     match gre.as_ref() {
         GenRegex::EmptySet => false_helper(),
