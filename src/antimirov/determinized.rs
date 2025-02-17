@@ -100,7 +100,7 @@ pub fn derivative_determinized(
 
                 // Refine non-nullable case
                 let left_only =
-                    merge_helper(&left_result, &left_nullable_no, &|l, _null| l.clone());
+                    merge_helper(&left_nullable_no, &left_result, &|_null, l| l.clone());
 
                 // Refine nullable case
                 let right_only =

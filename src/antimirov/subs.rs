@@ -90,8 +90,8 @@ impl AntimirovElement {
         let l_subs = left.get_subs();
         let r_subs = right.get_subs();
         let subs = merge_binary(l_subs, r_subs)?;
-        let l_sub_diff = sub_difference_from_merge(&subs, l_subs)?;
-        let r_sub_diff = sub_difference_from_merge(&subs, r_subs)?;
+        let l_sub_diff = sub_difference_from_merge(&subs, l_subs);
+        let r_sub_diff = sub_difference_from_merge(&subs, r_subs);
 
         // Calculate left and right expressions
         let l_expr = sub_in(left.get_expr(), &l_sub_diff);
@@ -118,10 +118,8 @@ impl AntimirovElement {
         let l_subs = left.get_subs();
         let r_subs = right.get_subs();
         let subs = merge_binary(l_subs, r_subs)?;
-        let l_sub_diff = sub_difference_from_merge(&subs, l_subs)
-            .expect("Failed to calculate left sub difference");
-        let r_sub_diff = sub_difference_from_merge(&subs, r_subs)
-            .expect("Failed to calculate right sub difference");
+        let l_sub_diff = sub_difference_from_merge(&subs, l_subs);
+        let r_sub_diff = sub_difference_from_merge(&subs, r_subs);
 
         // Calculate left and right expressions
         let l_expr = sub_in(left.get_expr(), &l_sub_diff);
@@ -692,7 +690,9 @@ pub fn union_sets(subs1: HashSet<SimpleSub>, subs2: HashSet<SimpleSub>) -> HashS
     result
 }
 
-pub fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<SimpleSub> {
+/// PRECONDITION: merged is the merge of sub and sub2
+/// If the precondition holds, this should never panic
+pub fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> SimpleSub {
     let mut retsub = merged.clone();
     for char_var in sub.get_char_map().keys() {
         retsub.remove_char_map(char_var);
@@ -704,11 +704,13 @@ pub fn sub_difference_from_merge(merged: &SimpleSub, sub: &SimpleSub) -> Option<
                 retsub.get_char_map_mut().append(sub.get_char_map_mut());
                 retsub.get_str_map_mut().append(sub.get_str_map_mut());
             } else {
-                return None;
+                panic!(
+                    "sub_difference_from_merge failed: was it called with the right precondition?"
+                );
             }
         }
     }
-    Some(retsub)
+    retsub
 }
 
 // Note: no longer used atm in favor of sub_difference_from_merge

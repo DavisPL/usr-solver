@@ -165,8 +165,8 @@ fn merge_derivs_intersect(
     let merged_sub = merge_binary(l_sub, r_sub)?;
 
     // Compute the difference and apply needed remaining subs in left and right
-    let l_minus_r = sub_difference_from_merge(&merged_sub, r_sub)?;
-    let r_minus_l = sub_difference_from_merge(&merged_sub, l_sub)?;
+    let l_minus_r = sub_difference_from_merge(&merged_sub, r_sub);
+    let r_minus_l = sub_difference_from_merge(&merged_sub, l_sub);
     // let l_minus_r = sub_difference(Rc::new(l_sub.clone()), Rc::new(r_sub.clone()))?;
     // let r_minus_l = sub_difference(Rc::new(r_sub.clone()), Rc::new(l_sub.clone()))?;
     let l_expr = left.get_expr();
@@ -182,7 +182,7 @@ fn merge_derivs_concat(n_sub: &SimpleSub, right: &AntimirovElement) -> Option<An
     let r_sub = right.get_subs();
     let merged_sub = merge_binary(n_sub, r_sub)?;
 
-    let r_minus_l = sub_difference_from_merge(&merged_sub, r_sub)?;
+    let r_minus_l = sub_difference_from_merge(&merged_sub, r_sub);
     // let r_r_minus_l = sub_difference(Rc::new(n_sub.clone()), Rc::new(right_elem.clone()))?;
     let result = sub_in(right.get_expr(), &r_minus_l);
     Some(AntimirovElement::new(result, merged_sub))
