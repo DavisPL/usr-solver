@@ -5,7 +5,7 @@
 use super::parse::{parse_smtlib_file, SmtParser};
 use super::util::hex_to_char;
 
-use crate::solver::{satisfiable_all, NUM_SOLVERS};
+use crate::solver::{satisfiable_all, satisfiable_default, NUM_SOLVERS};
 use crate::types::expr::{CharExpression, StringVar};
 use crate::types::regex::GenRegex;
 
@@ -17,14 +17,19 @@ use std::rc::Rc;
 
 // Assert that satisfiable() on the GenRegex returns as expected
 
-fn assert_regex_helper(gre: &Rc<GenRegex>, expected: bool) {
-    let results = satisfiable_all(gre);
-    assert!(results.len() == NUM_SOLVERS);
-    assert!(results.iter().all(|&result| result == expected));
+fn assert_regex_helper(gre: &Rc<GenRegex>, expected: bool, default_only: bool) {
+    if default_only {
+        let result = satisfiable_default(gre);
+        assert_eq!(result, expected);
+    } else {
+        let results = satisfiable_all(gre);
+        assert!(results.len() == NUM_SOLVERS);
+        assert!(results.iter().all(|&result| result == expected));
+    }
 }
 
 // Run the SMT2 file and assert that satisfiable() returns as expected
-fn assert_smt2_file_helper(filepath: &str, expected: bool) {
+fn assert_smt2_file_helper(filepath: &str, expected: bool, default_only: bool) {
     // Read the file and parse as s-expression
     let smt_result = parse_smtlib_file(filepath);
     println!("Parsed s-expression: {:?}", smt_result);
@@ -39,27 +44,37 @@ fn assert_smt2_file_helper(filepath: &str, expected: bool) {
     let gen_regex_unwrapped = Rc::new(gen_regex.unwrap());
 
     // Check result
-    assert_regex_helper(&gen_regex_unwrapped, expected);
+    assert_regex_helper(&gen_regex_unwrapped, expected, default_only);
 }
 
 fn assert_satisfiable(filepath: &str) {
-    assert_smt2_file_helper(filepath, true);
+    assert_smt2_file_helper(filepath, true, false);
 }
-
 fn assert_unsatisfiable(filepath: &str) {
-    assert_smt2_file_helper(filepath, false);
+    assert_smt2_file_helper(filepath, false, false);
 }
-
 fn assert_satisfiable_regex(gre: &Rc<GenRegex>) {
-    assert_regex_helper(gre, true);
+    assert_regex_helper(gre, true, false);
+}
+fn assert_unsatisfiable_regex(gre: &Rc<GenRegex>) {
+    assert_regex_helper(gre, false, false);
 }
 
-fn assert_unsatisfiable_regex(gre: &Rc<GenRegex>) {
-    assert_regex_helper(gre, false);
+fn assert_satisfiable_default_only(filepath: &str) {
+    assert_smt2_file_helper(filepath, true, true);
+}
+fn assert_unsatisfiable_default_only(filepath: &str) {
+    assert_smt2_file_helper(filepath, false, true);
+}
+fn assert_satisfiable_regex_default_only(gre: &Rc<GenRegex>) {
+    assert_regex_helper(gre, true, true);
+}
+fn assert_unsatisfiable_regex_default_only(gre: &Rc<GenRegex>) {
+    assert_regex_helper(gre, false, true);
 }
 
 /*
-    Tests
+    Tests - easiest cases
 */
 
 #[test]
@@ -324,8 +339,139 @@ fn test_date() {
     assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
 }
 
-// TODO: overflowing stack for Brz, works for Ant
-#[ignore]
+#[test]
+fn test_passw_sat1() {
+    let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
+    println!("Parsed s-expression: {:?}", smt_result);
+
+    assert!(smt_result.is_ok());
+    let s_expr = smt_result.unwrap();
+
+    // Parse the s-expression as a GenRegex
+    let mut parser = SmtParser::new();
+    let gen_regex = parser.parse_s_expr(&s_expr);
+    println!("Parsed GenRegex: {:?}", gen_regex);
+
+    assert!(gen_regex.is_ok());
+    let gen_regex_unwrapped = gen_regex.unwrap();
+
+    let dot_star = GenRegex::star(&GenRegex::create_sigma());
+    let first = GenRegex::concat(
+        &GenRegex::concat(&dot_star, &GenRegex::re_range('a', 'z')),
+        &dot_star,
+    );
+    let second = GenRegex::concat(
+        &GenRegex::concat(&dot_star, &GenRegex::re_range('A', 'Z')),
+        &dot_star,
+    );
+    let third = GenRegex::concat(
+        &GenRegex::concat(&dot_star, &GenRegex::re_range('0', '9')),
+        &dot_star,
+    );
+    let fourth = GenRegex::re_loop(0, 3, &GenRegex::re_range('!', '~'));
+    let regex = GenRegex::intersect(
+        &GenRegex::intersect(&GenRegex::intersect(&first, &second), &third),
+        &fourth,
+    );
+    let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
+
+    assert_eq!(gen_regex_unwrapped, expected);
+    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped));
+}
+
+#[test]
+fn test_simple_hex() {
+    println!("A number{:?}", hex_to_char(0));
+    let smt_result = parse_smtlib_file("benchmarks/simplehex_sat.smt2");
+    println!("Parsed s-expression: {:?}", smt_result);
+
+    assert!(smt_result.is_ok());
+    let s_expr = smt_result.unwrap();
+
+    // Parse the s-expression as a GenRegex
+    let mut parser = SmtParser::new();
+    let gen_regex = parser.parse_s_expr(&s_expr);
+    println!("Parsed GenRegex: {:?}", gen_regex);
+
+    assert!(gen_regex.is_ok());
+    let gen_regex_unwrapped = gen_regex.unwrap();
+    let hex = hex_to_char(0x0).unwrap();
+    let expected = GenRegex::Intersect(
+        GenRegex::create_gre_str_var("x"),
+        GenRegex::re_range(hex, '/'),
+    );
+
+    assert_eq!(gen_regex_unwrapped, expected);
+    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+}
+
+#[test]
+fn test_passw_complement_3() {
+    assert_satisfiable("benchmarks/passw_sat_4.smt2");
+}
+
+#[test]
+fn unicode_hex_test() {
+    assert_satisfiable("benchmarks/hex_syntax_test_sat.smt2");
+}
+
+#[test]
+fn test_reglan_var() {
+    assert_satisfiable("benchmarks/reglan_var_test_sat.smt2");
+}
+
+#[test]
+fn test_let_1() {
+    assert_satisfiable("benchmarks/simple_let_sat_1.smt2");
+}
+
+#[test]
+fn test_let_2() {
+    assert_satisfiable("benchmarks/simple_let_sat_2.smt2");
+}
+
+#[test]
+fn test_let_3() {
+    assert_satisfiable("benchmarks/simple_let_sat_3.smt2");
+}
+
+#[test]
+fn test_let_4() {
+    assert_satisfiable("benchmarks/simple_let_sat_4.smt2");
+}
+
+#[test]
+fn test_define_fun1() {
+    assert_satisfiable("benchmarks/simple_definefun_sat_1.smt2");
+}
+
+#[test]
+fn test_define_fun2() {
+    assert_satisfiable("benchmarks/simple_definefun_sat_2.smt2");
+}
+
+#[test]
+fn test_loops_1() {
+    assert_satisfiable("benchmarks/deadloop1_sat.smt2");
+}
+
+#[test]
+fn test_not1() {
+    assert_satisfiable("benchmarks/simple_not_sat_1.smt2");
+}
+
+#[test]
+fn test_not2() {
+    assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
+}
+
+/*
+    Tests - medium cases
+
+    Only Antimirov can currently handle these
+    (testing default solver only)
+*/
+
 #[test]
 fn test_date_2() {
     fn create_case_insensitive(word: &str) -> Rc<GenRegex> {
@@ -404,51 +550,9 @@ fn test_date_2() {
 
     assert_eq!(gen_regex_unwrapped, expected);
 
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_satisfiable_regex_default_only(&Rc::new(gen_regex_unwrapped.clone()));
 }
 
-#[test]
-fn test_passw_sat1() {
-    let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
-    assert!(gen_regex.is_ok());
-    let gen_regex_unwrapped = gen_regex.unwrap();
-
-    let dot_star = GenRegex::star(&GenRegex::create_sigma());
-    let first = GenRegex::concat(
-        &GenRegex::concat(&dot_star, &GenRegex::re_range('a', 'z')),
-        &dot_star,
-    );
-    let second = GenRegex::concat(
-        &GenRegex::concat(&dot_star, &GenRegex::re_range('A', 'Z')),
-        &dot_star,
-    );
-    let third = GenRegex::concat(
-        &GenRegex::concat(&dot_star, &GenRegex::re_range('0', '9')),
-        &dot_star,
-    );
-    let fourth = GenRegex::re_loop(0, 3, &GenRegex::re_range('!', '~'));
-    let regex = GenRegex::intersect(
-        &GenRegex::intersect(&GenRegex::intersect(&first, &second), &third),
-        &fourth,
-    );
-    let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
-
-    assert_eq!(gen_regex_unwrapped, expected);
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped));
-}
-
-// TODO: overflowing stack for Brz, works for Ant
-#[ignore]
 #[test]
 fn test_passw_unsat1() {
     let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
@@ -487,8 +591,29 @@ fn test_passw_unsat1() {
 
     assert_eq!(gen_regex_unwrapped, expected);
 
-    assert_unsatisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_unsatisfiable_regex_default_only(&Rc::new(gen_regex_unwrapped.clone()));
 }
+
+#[test]
+fn test_let_5() {
+    assert_satisfiable_default_only("benchmarks/date_format_days_sat.smt2");
+}
+
+#[test]
+fn test_loops_2() {
+    assert_unsatisfiable_default_only("benchmarks/det_blowup_unsat_3.smt2");
+}
+
+#[test]
+fn test_loops_3() {
+    assert_unsatisfiable_default_only("benchmarks/inter_mod2_unsat.smt2");
+}
+
+/*
+    Tests - hardest cases, currently ignored
+
+    No solvers can currently handle these
+*/
 
 // TODO: Equality not supported for now
 #[ignore]
@@ -567,37 +692,6 @@ fn test_hex_code() {
     assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
 }
 
-#[test]
-fn test_simple_hex() {
-    println!("A number{:?}", hex_to_char(0));
-    let smt_result = parse_smtlib_file("benchmarks/simplehex_sat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
-    assert!(gen_regex.is_ok());
-    let gen_regex_unwrapped = gen_regex.unwrap();
-    let hex = hex_to_char(0x0).unwrap();
-    let expected = GenRegex::Intersect(
-        GenRegex::create_gre_str_var("x"),
-        GenRegex::re_range(hex, '/'),
-    );
-
-    assert_eq!(gen_regex_unwrapped, expected);
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
-}
-
-#[test]
-fn unicode_hex_test() {
-    assert_satisfiable("benchmarks/hex_syntax_test_sat.smt2");
-}
-
 // Quite slow
 #[ignore]
 #[test]
@@ -605,82 +699,11 @@ fn intersect_test1() {
     assert_satisfiable("benchmarks/intersect_0_0_sat.smt2");
 }
 
-#[test]
-fn test_reglan_var() {
-    assert_satisfiable("benchmarks/reglan_var_test_sat.smt2");
-}
-
-#[test]
-fn test_let_1() {
-    assert_satisfiable("benchmarks/simple_let_sat_1.smt2");
-}
-
-#[test]
-fn test_let_2() {
-    assert_satisfiable("benchmarks/simple_let_sat_2.smt2");
-}
-
-#[test]
-fn test_let_3() {
-    assert_satisfiable("benchmarks/simple_let_sat_3.smt2");
-}
-
-#[test]
-fn test_let_4() {
-    assert_satisfiable("benchmarks/simple_let_sat_4.smt2");
-}
-
-// TODO: overflowing stack for Brz, works for Ant
-#[ignore]
-#[test]
-fn test_let_5() {
-    assert_satisfiable("benchmarks/date_format_days_sat.smt2");
-}
-
-#[test]
-fn test_define_fun1() {
-    assert_satisfiable("benchmarks/simple_definefun_sat_1.smt2");
-}
-
-#[test]
-fn test_define_fun2() {
-    assert_satisfiable("benchmarks/simple_definefun_sat_2.smt2");
-}
-
-#[test]
-fn test_loops_1() {
-    assert_satisfiable("benchmarks/deadloop1_sat.smt2");
-}
-
-// TODO: overflowing stack for Brz, works for Ant
-#[ignore]
-#[test]
-fn test_loops_2() {
-    assert_unsatisfiable("benchmarks/det_blowup_unsat_3.smt2");
-}
-
-// TODO: overflowing stack for Brz, works for Ant
-#[ignore]
-#[test]
-fn test_loops_3() {
-    assert_unsatisfiable("benchmarks/inter_mod2_unsat.smt2");
-}
-
 // TODO
 #[ignore]
 #[test]
 fn test_usr_2() {
     assert_satisfiable("benchmarks/usr_2_sat.smt2");
-}
-
-#[test]
-fn test_not1() {
-    assert_satisfiable("benchmarks/simple_not_sat_1.smt2");
-}
-
-#[test]
-fn test_not2() {
-    assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
 }
 
 // Diverging
@@ -695,11 +718,6 @@ fn test_passw_complement_1() {
 #[test]
 fn test_passw_complement_2() {
     assert_satisfiable("benchmarks/passw_complex_sat_2.smt2");
-}
-
-#[test]
-fn test_passw_complement_3() {
-    assert_satisfiable("benchmarks/passw_sat_4.smt2");
 }
 
 // Diverging for Brz, returning wrong answer for Ant
