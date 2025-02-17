@@ -87,4 +87,5 @@ pub fn satisfiable_all(gre: &Rc<GenRegex>) -> Vec<bool> {
 /// Run only default solver, for test purposes
 pub fn satisfiable_default(gre: &Rc<GenRegex>) -> bool {
     ab_satisfiable(gre)
+    // antimirov_satisfiable(gre)
 }
