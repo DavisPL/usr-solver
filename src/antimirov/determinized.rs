@@ -73,7 +73,7 @@ pub fn derivative_determinized(
             let side1_deriv = derivative_determinized(side1, deriv_char);
             let side2_deriv = derivative_determinized(side2, deriv_char);
             merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
-                GenRegex::union(left, right)
+                GenRegex::make_union(left.clone(), right.clone())
             })
         }
         GenRegex::Intersect(side1, side2) => {
@@ -110,7 +110,7 @@ pub fn derivative_determinized(
 
                 // Merge both cases
                 merge_helper(&left_only, &right_only, &|left, right| {
-                    GenRegex::union(left, right)
+                    GenRegex::make_union(left.clone(), right.clone())
                 })
             }
         }

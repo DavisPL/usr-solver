@@ -181,6 +181,7 @@ fn test_simple_2() {
 
     assert_eq!(gen_regex_unwrapped, expected);
 
+    // assert_unsatisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
     assert_unsatisfiable_regex_default_only(&Rc::new(gen_regex_unwrapped.clone()));
 }
 

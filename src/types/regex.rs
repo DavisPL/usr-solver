@@ -163,6 +163,18 @@ impl GenRegex {
         }
     }
 
+    pub fn make_union(left: Rc<GenRegex>, right: Rc<GenRegex>) -> Rc<GenRegex> {
+        if let &GenRegex::EmptySet = left.as_ref() {
+            right
+        } else if let &GenRegex::EmptySet = right.as_ref() {
+            left
+        } else if left == right {
+            left
+        } else {
+            Rc::new(GenRegex::Union(left, right))
+        }
+    }
+
     /*
         Helper for what the regex contains as a subexpression
     */
