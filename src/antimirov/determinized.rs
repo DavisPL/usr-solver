@@ -6,7 +6,6 @@
 
 // TODO: fix and remove
 #![allow(unused_variables)]
-#![allow(unused_imports)]
 
 use super::subs::{AntimirovElement, SimpleSub, SubExpr};
 use super::util::{char_minus_one, char_plus_one, CHAR_MAX, CHAR_MIN};
@@ -192,58 +191,111 @@ where
 /*
     Determinized nullable
 
-    Returns a set of AntimirovElements (epsilon, f, pi)
+    Returns a set of AntimirovElements (varnothing, f, pi)
     and a set of AntimirovElements (varnothing, f, pi)
     where f is a substitution and pi is a range constraint
     such that all (f, pi) pairs form a partition of the entire space of valuations.
 
+    The regex coordinate `varnothing` is just a placeholder. It isn't used by
+    the functions in this file - technically, it would be more correct to return epsilon
+    for the true case and empty for the false case.
+
     This is required to be a partition for the Concat case to work correctly in the main derivative.
 */
+
+pub fn nullable_negation_helper(
+    (true_case, false_case): (HashSet<AntimirovElement>, HashSet<AntimirovElement>),
+) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
+    (false_case, true_case)
+}
+
+pub fn nullable_and_helper(
+    (left_true, left_false): (HashSet<AntimirovElement>, HashSet<AntimirovElement>),
+    (right_true, right_false): (HashSet<AntimirovElement>, HashSet<AntimirovElement>),
+) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
+    let true_case = merge_helper(&left_true, &right_true, &|_left, _right| {
+        GenRegex::empty_set()
+    });
+    let left_only = merge_helper(&left_true, &left_false, &|_left, _right| {
+        GenRegex::empty_set()
+    });
+    let false_case = left_false.into_iter().chain(left_only).collect();
+    (true_case, false_case)
+}
+
+pub fn nullable_or_helper(
+    left: (HashSet<AntimirovElement>, HashSet<AntimirovElement>),
+    right: (HashSet<AntimirovElement>, HashSet<AntimirovElement>),
+) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
+    nullable_negation_helper(nullable_and_helper(
+        nullable_negation_helper(left),
+        nullable_negation_helper(right),
+    ))
+}
 
 pub fn nullable_determinized(
     gre: &Rc<GenRegex>,
 ) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
-    unimplemented!();
-    // match gre.as_ref() {
-    //     GenRegex::EmptySet => HashSet::new(),
-    //     GenRegex::Epsilon => SimpleSub::empty().into_set(),
-    //     GenRegex::Sigma => HashSet::new(),
-    //     GenRegex::Range(_, _) => HashSet::new(),
-    //     GenRegex::CharExpression(c_expr) => HashSet::new(),
-    //     GenRegex::StringVar(s_var) => {
-    //         let mut string_to = BTreeMap::new();
-    //         string_to.insert(s_var.clone(), SubExpr::empty());
-    //         let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
-    //         string_sub.into_set()
-    //     }
-    //     GenRegex::Union(side1, side2) => {
-    //         let left_null = nullable(side1);
-    //         let right_null = nullable(side2);
-    //         union_sets(left_null, right_null)
-    //     }
-    //     GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
-    //         let left_null = nullable(side1);
-    //         let right_null = nullable(side2);
-    //         merge_sets(&left_null, &right_null)
-    //     }
-    //     GenRegex::Kleene(_) => SimpleSub::empty().into_set(),
-    //     GenRegex::Complement(gre1) => {
-    //         // Use complement of the nullable function
-    //         nullable_complement(gre1)
-    //     }
-    //     GenRegex::IfThenElse(p, g1, g2) => {
-    //         let (left, right) = sub_from_predicate(p);
-    //         let left_nullable = nullable(g1);
-    //         let right_nullable = nullable(g2);
-    //         let result1 = merge_sets(&left, &left_nullable);
-    //         let result2 = merge_sets(&right, &right_nullable);
-    //         union_sets(result1, result2)
-    //     }
-    //     GenRegex::StringSlice(_, _) => {
-    //         unimplemented!();
-    //     }
-    //     GenRegex::StringIndex(_) => {
-    //         unimplemented!();
-    //     }
-    // }
+    fn true_helper() -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
+        (
+            AntimirovElement::new_epsilon().into_set(),
+            AntimirovElement::new_empty().into_set(),
+        )
+    }
+    fn false_helper() -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
+        (
+            AntimirovElement::new_empty().into_set(),
+            AntimirovElement::new_epsilon().into_set(),
+        )
+    }
+    match gre.as_ref() {
+        GenRegex::EmptySet => false_helper(),
+        GenRegex::Epsilon => true_helper(),
+        GenRegex::Sigma => false_helper(),
+        GenRegex::Range(char1, char2) => false_helper(),
+        GenRegex::CharExpression(c_expr) => false_helper(),
+        GenRegex::StringVar(s_var) => {
+            let mut string_to = BTreeMap::new();
+            string_to.insert(s_var.clone(), SubExpr::empty());
+            let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+            let true_case = AntimirovElement::new(GenRegex::empty_set(), string_sub).into_set();
+
+            // TODO: Ensure var is fresh
+            let fresh = CharVar {
+                name: "fresh".to_string(),
+            };
+            let fresh_expr = CharExpression::CharVar(fresh.clone());
+            let subexpr = SubExpr::new(vec![fresh_expr], true);
+
+            let mut string_to = BTreeMap::new();
+            string_to.insert(s_var.clone(), subexpr);
+
+            let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+
+            let false_case = AntimirovElement::new(GenRegex::empty_set(), substitution).into_set();
+
+            (true_case, false_case)
+        }
+        GenRegex::Union(side1, side2) => {
+            let left = nullable_determinized(side1);
+            let right = nullable_determinized(side2);
+            nullable_or_helper(left, right)
+        }
+        GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
+            let left = nullable_determinized(side1);
+            let right = nullable_determinized(side2);
+            nullable_and_helper(left, right)
+        }
+        GenRegex::Kleene(_) => true_helper(),
+        GenRegex::Complement(gre1) => nullable_negation_helper(nullable_determinized(gre1)),
+        GenRegex::IfThenElse(p, g1, g2) => {
+            unimplemented!();
+        }
+        GenRegex::StringSlice(_, _) => {
+            unimplemented!();
+        }
+        GenRegex::StringIndex(_) => {
+            unimplemented!();
+        }
+    }
 }
