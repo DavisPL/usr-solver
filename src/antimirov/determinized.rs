@@ -36,6 +36,7 @@ pub fn derivative_determinized(
         GenRegex::EmptySet => AntimirovElement::new_empty().into_set(),
         GenRegex::Epsilon => AntimirovElement::new_empty().into_set(),
         GenRegex::Sigma => AntimirovElement::new_epsilon().into_set(),
+        GenRegex::SigmaStar => AntimirovElement::new_emptysub(gre.clone()).into_set(),
         GenRegex::Range(char1, char2) => match deriv_char.as_ref() {
             CharExpression::Literal(literal) => {
                 if literal < char1 || literal > char2 {
@@ -255,6 +256,7 @@ pub fn nullable_determinized(
         GenRegex::EmptySet => false_helper(),
         GenRegex::Epsilon => true_helper(),
         GenRegex::Sigma => false_helper(),
+        GenRegex::SigmaStar => true_helper(),
         GenRegex::Range(char1, char2) => false_helper(),
         GenRegex::CharExpression(c_expr) => false_helper(),
         GenRegex::StringVar(s_var) => {

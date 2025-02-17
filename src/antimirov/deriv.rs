@@ -33,6 +33,7 @@ pub fn derivative(
         GenRegex::EmptySet => HashSet::new(),
         GenRegex::Epsilon => HashSet::new(),
         GenRegex::Sigma => AntimirovElement::new_epsilon().into_set(),
+        GenRegex::SigmaStar => AntimirovElement::new_emptysub(gre.clone()).into_set(),
         GenRegex::Range(char1, char2) => match deriv_char.as_ref() {
             CharExpression::Literal(literal) => {
                 if literal < char1 || literal > char2 {
@@ -218,6 +219,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::EmptySet => HashSet::new(),
         GenRegex::Epsilon => SimpleSub::empty().into_set(),
         GenRegex::Sigma => HashSet::new(),
+        GenRegex::SigmaStar => SimpleSub::empty().into_set(),
         GenRegex::Range(_, _) => HashSet::new(),
         GenRegex::CharExpression(c_expr) => HashSet::new(),
         GenRegex::StringVar(s_var) => {
@@ -265,6 +267,7 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::EmptySet => SimpleSub::empty().into_set(),
         GenRegex::Epsilon => HashSet::new(),
         GenRegex::Sigma => SimpleSub::empty().into_set(),
+        GenRegex::SigmaStar => HashSet::new(),
         GenRegex::Range(_, _) => SimpleSub::empty().into_set(),
         GenRegex::CharExpression(c_expr) => SimpleSub::empty().into_set(),
         GenRegex::StringVar(s_var) => {

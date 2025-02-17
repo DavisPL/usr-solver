@@ -14,6 +14,7 @@ pub enum GenRegex {
     EmptySet,
     Epsilon,
     Sigma,
+    SigmaStar,
     Range(char, char),
     CharExpression(CharExpression),
     StringVar(StringVar),
@@ -30,6 +31,9 @@ pub enum GenRegex {
 impl GenRegex {
     pub fn create_sigma() -> Rc<GenRegex> {
         Rc::new(GenRegex::Sigma)
+    }
+    pub fn sigma_star() -> Rc<GenRegex> {
+        Rc::new(GenRegex::SigmaStar)
     }
     pub fn epsilon() -> Rc<GenRegex> {
         Rc::new(GenRegex::Epsilon)
@@ -175,6 +179,28 @@ impl GenRegex {
         }
     }
 
+    pub fn make_intersection(left: Rc<GenRegex>, right: Rc<GenRegex>) -> Rc<GenRegex> {
+        if let &GenRegex::EmptySet = left.as_ref() {
+            left
+        } else if let &GenRegex::EmptySet = right.as_ref() {
+            right
+        } else if left == right {
+            left
+        } else {
+            Rc::new(GenRegex::Intersect(left, right))
+        }
+    }
+
+    pub fn make_star(gre: Rc<GenRegex>) -> Rc<GenRegex> {
+        if let &GenRegex::EmptySet = gre.as_ref() {
+            GenRegex::epsilon()
+        } else if let &GenRegex::Epsilon = gre.as_ref() {
+            GenRegex::epsilon()
+        } else {
+            Rc::new(GenRegex::Kleene(gre))
+        }
+    }
+
     /*
         Helper for what the regex contains as a subexpression
     */
@@ -201,6 +227,7 @@ impl GenRegex {
             GenRegex::EmptySet
             | GenRegex::Epsilon
             | GenRegex::Sigma
+            | GenRegex::SigmaStar
             | GenRegex::Range(_, _)
             | GenRegex::CharExpression(_)
             | GenRegex::StringVar(_) => false,
@@ -290,6 +317,9 @@ impl Display for GenRegexPrintHelper<'_> {
             }
             GenRegex::Sigma => {
                 write!(f, ".")
+            }
+            GenRegex::SigmaStar => {
+                write!(f, "(.*)")
             }
             GenRegex::Range(char1, char2) => {
                 write!(f, "[{}-{}]", char1, char2)

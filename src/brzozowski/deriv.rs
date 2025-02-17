@@ -150,6 +150,7 @@ pub fn derivative(gre: &Rc<GenRegex>, deriv_char: &Rc<CharExpression>) -> Rc<Gen
         GenRegex::EmptySet => GenRegex::empty_set(),
         GenRegex::Epsilon => GenRegex::empty_set(),
         GenRegex::Sigma => GenRegex::epsilon(),
+        GenRegex::SigmaStar => GenRegex::sigma_star(),
         GenRegex::Range(start, end) => simplifies(&Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::And(
                 Rc::new(Predicate::GreaterThan(
@@ -257,6 +258,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         GenRegex::EmptySet => GenRegex::empty_set(),
         GenRegex::Epsilon => GenRegex::epsilon(),
         GenRegex::Sigma => GenRegex::empty_set(),
+        GenRegex::SigmaStar => GenRegex::epsilon(),
         GenRegex::Range(_start, _end) => GenRegex::empty_set(),
         GenRegex::CharExpression(c_expr) => match c_expr {
             CharExpression::CharVar(_name) => GenRegex::empty_set(),
@@ -304,6 +306,7 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
     match expr.as_ref() {
         GenRegex::EmptySet => Rc::new(Predicate::False),
         GenRegex::Epsilon => Rc::new(Predicate::True),
+        GenRegex::SigmaStar => Rc::new(Predicate::True),
         GenRegex::CharExpression(c_expr) => Rc::new(Predicate::False),
         GenRegex::IfThenElse(pred, true_expr, false_expr) => {
             let true_proj = nullable_projection_helper(true_expr);

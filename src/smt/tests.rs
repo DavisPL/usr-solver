@@ -272,7 +272,7 @@ fn test_re_all() {
         &GenRegex::create_gre_char_lit('a'),
         &GenRegex::create_gre_char_lit('b'),
     );
-    let regex = GenRegex::concat(&GenRegex::star(&GenRegex::create_sigma()), &union);
+    let regex = GenRegex::concat(&GenRegex::sigma_star(), &union);
     let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
     assert_eq!(gen_regex_unwrapped, expected);
@@ -296,7 +296,7 @@ fn test_date() {
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
-    let dot_star = GenRegex::star(&GenRegex::create_sigma());
+    let dot_star = GenRegex::sigma_star();
     let mut days_of_the_week: Vec<Rc<GenRegex>> = Vec::new();
     days_of_the_week.push(GenRegex::str_to_re("monday"));
     days_of_the_week.push(GenRegex::str_to_re("tuesday"));
@@ -359,7 +359,7 @@ fn test_passw_sat1() {
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
-    let dot_star = GenRegex::star(&GenRegex::create_sigma());
+    let dot_star = GenRegex::sigma_star();
     let first = GenRegex::concat(
         &GenRegex::concat(&dot_star, &GenRegex::re_range('a', 'z')),
         &dot_star,
@@ -513,7 +513,7 @@ fn test_date_2() {
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
-    let dot_star = GenRegex::star(&GenRegex::create_sigma());
+    let dot_star = GenRegex::sigma_star();
     let mut days_of_the_week: Vec<Rc<GenRegex>> = Vec::new();
     days_of_the_week.push(create_case_insensitive("monday"));
     days_of_the_week.push(create_case_insensitive("tuesday"));
@@ -576,7 +576,7 @@ fn test_passw_unsat1() {
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
-    let dot_star = GenRegex::star(&GenRegex::create_sigma());
+    let dot_star = GenRegex::sigma_star();
     let first = GenRegex::concat(
         &GenRegex::concat(&dot_star, &GenRegex::re_range('a', 'z')),
         &dot_star,
@@ -640,7 +640,7 @@ fn test_equality() {
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
-    let dot_star = GenRegex::star(&GenRegex::create_sigma());
+    let dot_star = GenRegex::sigma_star();
     let one = GenRegex::concat_many(&vec![
         dot_star.clone(),
         GenRegex::re_range('a', 'z'),

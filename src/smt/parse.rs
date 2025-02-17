@@ -1093,7 +1093,7 @@ impl SmtParser {
     }
 
     fn parse_re_all(&self) -> Result<RegexToken, SmtParseError> {
-        Ok(RegexToken::Val(GenRegex::star(&GenRegex::create_sigma())))
+        Ok(RegexToken::Val(GenRegex::sigma_star()))
     }
 
     fn parse_re_none(&self) -> Result<RegexToken, SmtParseError> {

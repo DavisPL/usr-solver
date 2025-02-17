@@ -763,6 +763,7 @@ pub fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
         GenRegex::EmptySet => Rc::clone(expr),
         GenRegex::Epsilon => Rc::clone(expr),
         GenRegex::Sigma => Rc::clone(expr),
+        GenRegex::SigmaStar => Rc::clone(expr),
         GenRegex::Range(_, _) => Rc::clone(expr),
         GenRegex::CharExpression(char_expr) => match char_expr {
             CharExpression::CharVar(char_var) => match substitution.get_char_var(char_var) {
