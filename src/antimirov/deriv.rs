@@ -133,7 +133,7 @@ pub fn derivative(
             // Filter out empty sets
             derivative_determinized(gre, deriv_char)
                 .into_iter()
-                .filter(|x| matches!(x.get_expr().as_ref(), GenRegex::EmptySet))
+                .filter(|x| !matches!(x.get_expr().as_ref(), GenRegex::EmptySet))
                 .collect()
         }
         GenRegex::IfThenElse(_, _, _) => {

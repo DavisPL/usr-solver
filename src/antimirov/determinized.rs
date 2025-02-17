@@ -95,6 +95,8 @@ pub fn derivative_determinized(
             let (left_nullable_yes, left_nullable_no) = nullable_determinized(left);
             if left_nullable_yes.is_empty() {
                 left_result
+            } else if left_nullable_no.is_empty() {
+                derivative_determinized(right, deriv_char)
             } else {
                 let right_deriv = derivative_determinized(right, deriv_char);
 
