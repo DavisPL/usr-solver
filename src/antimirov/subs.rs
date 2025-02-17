@@ -103,6 +103,36 @@ impl AntimirovElement {
         Some(result)
     }
 
+    // Safe version which enforces that the merge should return Some(..) iff left.subs and right.subs
+    // are consistent (have nonempty overlap)
+    // This version errors on on failure to calculate sub difference
+    pub fn merge_using_safe<F>(
+        left: &AntimirovElement,
+        right: &AntimirovElement,
+        merge_fun: F,
+    ) -> Option<AntimirovElement>
+    where
+        F: Fn(&Rc<GenRegex>, &Rc<GenRegex>) -> Rc<GenRegex>,
+    {
+        // Calculate subs
+        let l_subs = left.get_subs();
+        let r_subs = right.get_subs();
+        let subs = merge_binary(l_subs, r_subs)?;
+        let l_sub_diff = sub_difference_from_merge(&subs, l_subs)
+            .expect("Failed to calculate left sub difference");
+        let r_sub_diff = sub_difference_from_merge(&subs, r_subs)
+            .expect("Failed to calculate right sub difference");
+
+        // Calculate left and right expressions
+        let l_expr = sub_in(left.get_expr(), &l_sub_diff);
+        let r_expr = sub_in(right.get_expr(), &r_sub_diff);
+
+        // Apply merge function
+        let merged = merge_fun(&l_expr, &r_expr);
+        let result = AntimirovElement::new(merged, subs);
+        Some(result)
+    }
+
     /*
         Getters
     */

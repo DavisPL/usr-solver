@@ -8,7 +8,6 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 
-use super::deriv;
 use super::subs::{AntimirovElement, SimpleSub, SubExpr};
 use super::util::{char_minus_one, char_plus_one, CHAR_MAX, CHAR_MIN};
 
@@ -27,6 +26,7 @@ use std::rc::Rc;
 
     The idea is that we can then complement these easily by just negating each individual R.
 */
+
 pub fn derivative_determinized(
     gre: &Rc<GenRegex>,
     deriv_char: &Rc<CharExpression>,
@@ -74,45 +74,49 @@ pub fn derivative_determinized(
             let side1_deriv = derivative_determinized(side1, deriv_char);
             let side2_deriv = derivative_determinized(side2, deriv_char);
             merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
-                Some(GenRegex::union(left, right))
+                GenRegex::union(left, right)
             })
         }
         GenRegex::Intersect(side1, side2) => {
             let side1_deriv = derivative_determinized(side1, deriv_char);
             let side2_deriv = derivative_determinized(side2, deriv_char);
             merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
-                Some(GenRegex::intersect(left, right))
+                GenRegex::intersect(left, right)
             })
         }
         GenRegex::Concatenation(left, right) => {
-            unimplemented!();
-            // let left_deriv = derivative(left, deriv_char);
-            // let mut ret_set = HashSet::new();
-            // for sub in &left_deriv {
-            //     if let Some(ret) = apply_deriv_concat(sub, right) {
-            //         ret_set.insert(ret);
-            //     }
-            // }
+            // Derivative-of-left case
+            let left_deriv = derivative_determinized(left, deriv_char);
+            let right_copy = AntimirovElement::new_emptysub(right.clone()).into_set();
+            let left_result =
+                merge_helper(&left_deriv, &right_copy, &|l, r| GenRegex::concat(l, r));
 
-            // let p_nullable = nullable(left);
-            // if !p_nullable.is_empty() {
-            //     let right_deriv = derivative(right, deriv_char);
-            //     for n_sub in &p_nullable {
-            //         for q_sub in &right_deriv {
-            //             if let Some(ret) = merge_derivs_concat(n_sub, q_sub) {
-            //                 ret_set.insert(ret);
-            //             }
-            //         }
-            //     }
-            // }
+            // Derivative-of-right case
+            let (left_nullable_yes, left_nullable_no) = nullable_determinized(left);
+            if left_nullable_yes.is_empty() {
+                left_result
+            } else {
+                let right_deriv = derivative_determinized(right, deriv_char);
 
-            // ret_set
+                // Refine non-nullable case
+                let left_only =
+                    merge_helper(&left_result, &left_nullable_no, &|l, _null| l.clone());
+
+                // Refine nullable case
+                let right_only =
+                    merge_helper(&left_nullable_yes, &right_deriv, &|_null, r| r.clone());
+
+                // Merge both cases
+                merge_helper(&left_only, &right_only, &|left, right| {
+                    GenRegex::union(left, right)
+                })
+            }
         }
         GenRegex::Kleene(expr) => {
             let p_derivs = derivative_determinized(expr, deriv_char);
             let right_copy = AntimirovElement::new_emptysub(gre.clone()).into_set();
             merge_helper(&right_copy, &p_derivs, &|left, right| {
-                Some(GenRegex::concat(left, right))
+                GenRegex::concat(left, right)
             })
         }
         GenRegex::Complement(expr) => {
@@ -172,15 +176,74 @@ fn merge_helper<F>(
     merge_op: &F,
 ) -> HashSet<AntimirovElement>
 where
-    F: Fn(&Rc<GenRegex>, &Rc<GenRegex>) -> Option<Rc<GenRegex>>,
+    F: Fn(&Rc<GenRegex>, &Rc<GenRegex>) -> Rc<GenRegex>,
 {
     let mut result = HashSet::new();
     for left in left_set {
         for right in right_set {
-            if let Some(merged) = AntimirovElement::merge_using(left, right, merge_op) {
+            if let Some(merged) = AntimirovElement::merge_using_safe(left, right, merge_op) {
                 result.insert(merged);
             }
         }
     }
     result
+}
+
+/*
+    Determinized nullable
+
+    Returns a set of AntimirovElements (epsilon, f, pi)
+    and a set of AntimirovElements (varnothing, f, pi)
+    where f is a substitution and pi is a range constraint
+    such that all (f, pi) pairs form a partition of the entire space of valuations.
+
+    This is required to be a partition for the Concat case to work correctly in the main derivative.
+*/
+
+pub fn nullable_determinized(
+    gre: &Rc<GenRegex>,
+) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
+    unimplemented!();
+    // match gre.as_ref() {
+    //     GenRegex::EmptySet => HashSet::new(),
+    //     GenRegex::Epsilon => SimpleSub::empty().into_set(),
+    //     GenRegex::Sigma => HashSet::new(),
+    //     GenRegex::Range(_, _) => HashSet::new(),
+    //     GenRegex::CharExpression(c_expr) => HashSet::new(),
+    //     GenRegex::StringVar(s_var) => {
+    //         let mut string_to = BTreeMap::new();
+    //         string_to.insert(s_var.clone(), SubExpr::empty());
+    //         let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+    //         string_sub.into_set()
+    //     }
+    //     GenRegex::Union(side1, side2) => {
+    //         let left_null = nullable(side1);
+    //         let right_null = nullable(side2);
+    //         union_sets(left_null, right_null)
+    //     }
+    //     GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
+    //         let left_null = nullable(side1);
+    //         let right_null = nullable(side2);
+    //         merge_sets(&left_null, &right_null)
+    //     }
+    //     GenRegex::Kleene(_) => SimpleSub::empty().into_set(),
+    //     GenRegex::Complement(gre1) => {
+    //         // Use complement of the nullable function
+    //         nullable_complement(gre1)
+    //     }
+    //     GenRegex::IfThenElse(p, g1, g2) => {
+    //         let (left, right) = sub_from_predicate(p);
+    //         let left_nullable = nullable(g1);
+    //         let right_nullable = nullable(g2);
+    //         let result1 = merge_sets(&left, &left_nullable);
+    //         let result2 = merge_sets(&right, &right_nullable);
+    //         union_sets(result1, result2)
+    //     }
+    //     GenRegex::StringSlice(_, _) => {
+    //         unimplemented!();
+    //     }
+    //     GenRegex::StringIndex(_) => {
+    //         unimplemented!();
+    //     }
+    // }
 }
