@@ -64,3 +64,13 @@ pub fn ab_satisfiable(gre: &Rc<GenRegex>) -> bool {
 pub fn satisfiable(gre: &Rc<GenRegex>) -> bool {
     ab_satisfiable(gre)
 }
+
+/// Run ALL solvers, for test purposes
+pub const NUM_SOLVERS: usize = 3;
+pub fn satisfiable_all(gre: &Rc<GenRegex>) -> Vec<bool> {
+    let mut results = Vec::new();
+    results.push(antimirov_satisfiable(gre));
+    results.push(brzozowski_satisfiable(gre));
+    results.push(ab_satisfiable(gre));
+    results
+}
