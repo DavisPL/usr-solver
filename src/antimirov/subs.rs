@@ -196,11 +196,14 @@ impl RangeConstr {
         &self.end
     }
     pub fn intersect(&self, other: &Self) -> Option<Self> {
+        // println!("INTERSECT: {} and {}", self, other);
         let start = max(self.start, other.start);
         let end = min(self.end, other.end);
-        if start < end {
+        if start <= end {
+            // println!("INTERSECTED RESULT: [{}, {}]", start, end);
             Some(Self { start, end })
         } else {
+            // println!("INTERSECTED RESULT: None");
             None
         }
     }
