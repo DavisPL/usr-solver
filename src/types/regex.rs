@@ -72,7 +72,7 @@ impl GenRegex {
         } else if args.len() == 1 {
             args[0].clone()
         } else {
-            GenRegex::union(&args[0].clone(), &GenRegex::union_many(&args[1..]))
+            GenRegex::union(&args[0], &GenRegex::union_many(&args[1..]))
         }
     }
 
@@ -82,7 +82,7 @@ impl GenRegex {
         } else if args.len() == 1 {
             args[0].clone()
         } else {
-            GenRegex::intersect(&args[0].clone(), &GenRegex::intersect_many(&args[1..]))
+            GenRegex::intersect(&args[0], &GenRegex::intersect_many(&args[1..]))
         }
     }
 
@@ -92,7 +92,7 @@ impl GenRegex {
         } else if args.len() == 1 {
             args[0].clone()
         } else {
-            GenRegex::concat(&args[0].clone(), &GenRegex::concat_many(&args[1..]))
+            GenRegex::concat(&args[0], &GenRegex::concat_many(&args[1..]))
         }
     }
     pub fn diff(gre1: &Rc<GenRegex>, gre2: &Rc<GenRegex>) -> Rc<GenRegex> {
@@ -154,13 +154,13 @@ impl GenRegex {
     */
 
     pub fn make_concatenation(left: Rc<GenRegex>, right: Rc<GenRegex>) -> Rc<GenRegex> {
-        if let &GenRegex::Epsilon = left.as_ref() {
+        if let GenRegex::Epsilon = left.as_ref() {
             right
-        } else if let &GenRegex::Epsilon = right.as_ref() {
+        } else if let GenRegex::Epsilon = right.as_ref() {
             left
-        } else if let &GenRegex::EmptySet = left.as_ref() {
+        } else if let GenRegex::EmptySet = left.as_ref() {
             left
-        } else if let &GenRegex::EmptySet = right.as_ref() {
+        } else if let GenRegex::EmptySet = right.as_ref() {
             right
         } else {
             Rc::new(GenRegex::Concatenation(left, right))
@@ -168,10 +168,14 @@ impl GenRegex {
     }
 
     pub fn make_union(left: Rc<GenRegex>, right: Rc<GenRegex>) -> Rc<GenRegex> {
-        if let &GenRegex::EmptySet = left.as_ref() {
+        if let GenRegex::EmptySet = left.as_ref() {
             right
-        } else if let &GenRegex::EmptySet = right.as_ref() {
+        } else if let GenRegex::EmptySet = right.as_ref() {
             left
+        } else if let GenRegex::SigmaStar = left.as_ref() {
+            left
+        } else if let GenRegex::SigmaStar = right.as_ref() {
+            right
         } else if left == right {
             left
         } else {
@@ -180,10 +184,14 @@ impl GenRegex {
     }
 
     pub fn make_intersection(left: Rc<GenRegex>, right: Rc<GenRegex>) -> Rc<GenRegex> {
-        if let &GenRegex::EmptySet = left.as_ref() {
+        if let GenRegex::EmptySet = left.as_ref() {
             left
-        } else if let &GenRegex::EmptySet = right.as_ref() {
+        } else if let GenRegex::EmptySet = right.as_ref() {
             right
+        } else if let GenRegex::SigmaStar = left.as_ref() {
+            right
+        } else if let GenRegex::SigmaStar = right.as_ref() {
+            left
         } else if left == right {
             left
         } else {
@@ -192,10 +200,16 @@ impl GenRegex {
     }
 
     pub fn make_star(gre: Rc<GenRegex>) -> Rc<GenRegex> {
-        if let &GenRegex::EmptySet = gre.as_ref() {
+        if let GenRegex::EmptySet = gre.as_ref() {
             GenRegex::epsilon()
-        } else if let &GenRegex::Epsilon = gre.as_ref() {
+        } else if let GenRegex::Epsilon = gre.as_ref() {
             GenRegex::epsilon()
+        } else if let GenRegex::Sigma = gre.as_ref() {
+            GenRegex::sigma_star()
+        } else if let GenRegex::SigmaStar = gre.as_ref() {
+            GenRegex::sigma_star()
+        } else if let GenRegex::Kleene(gre) = gre.as_ref() {
+            gre.clone()
         } else {
             Rc::new(GenRegex::Kleene(gre))
         }

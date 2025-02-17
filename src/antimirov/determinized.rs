@@ -81,7 +81,7 @@ pub fn derivative_determinized(
             let side1_deriv = derivative_determinized(side1, deriv_char);
             let side2_deriv = derivative_determinized(side2, deriv_char);
             merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
-                GenRegex::intersect(left, right)
+                GenRegex::make_intersection(left.clone(), right.clone())
             })
         }
         GenRegex::Concatenation(left, right) => {

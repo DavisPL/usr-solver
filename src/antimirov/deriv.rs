@@ -174,7 +174,7 @@ fn merge_derivs_intersect(
     let r_expr = right.get_expr();
     let p_prime_sub = sub_in(l_expr, &r_minus_l);
     let q_prime_sub = sub_in(r_expr, &l_minus_r);
-    let final_expr = Rc::new(GenRegex::Intersect(p_prime_sub, q_prime_sub));
+    let final_expr = GenRegex::make_intersection(p_prime_sub, q_prime_sub);
     Some(AntimirovElement::new(final_expr, merged_sub))
 }
 
