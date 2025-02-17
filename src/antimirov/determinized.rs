@@ -30,7 +30,7 @@ pub fn derivative_determinized(
     gre: &Rc<GenRegex>,
     deriv_char: &Rc<CharExpression>,
 ) -> HashSet<AntimirovElement> {
-    // print!("d({}, {})", gre, deriv_char);
+    // println!("d({}, {})", gre, deriv_char);
 
     // let result =
     match gre.as_ref() {
@@ -70,6 +70,8 @@ pub fn derivative_determinized(
         GenRegex::StringVar(string_var) => {
             // TODO: Hard case, requires handling w |-> xw and negation of this
             unimplemented!();
+            // TEMP - uncomment to run determinizing solver on examples
+            // AntimirovElement::new_emptysub(gre.clone()).into_set()
         }
         GenRegex::Union(side1, side2) => {
             let side1_deriv = derivative_determinized(side1, deriv_char);
@@ -97,21 +99,23 @@ pub fn derivative_determinized(
             let (left_nullable_yes, left_nullable_no) = nullable_determinized(left);
             if left_nullable_yes.is_empty() {
                 left_result
-            } else if left_nullable_no.is_empty() {
-                derivative_determinized(right, deriv_char)
             } else {
                 let right_deriv = derivative_determinized(right, deriv_char);
 
-                // Refine non-nullable case
-                let left_only =
-                    merge_helper(&left_nullable_no, &left_result, &|_null, l| l.clone());
-
                 // Refine nullable case
-                let right_only =
+                let not_nullable_right =
+                    merge_helper(&left_nullable_no, &right_deriv, &|_null, _r| {
+                        GenRegex::empty_set()
+                    });
+                let nullable_right =
                     merge_helper(&left_nullable_yes, &right_deriv, &|_null, r| r.clone());
+                let right_result = not_nullable_right
+                    .into_iter()
+                    .chain(nullable_right)
+                    .collect();
 
                 // Merge both cases
-                merge_helper(&left_only, &right_only, &|left, right| {
+                merge_helper(&left_result, &right_result, &|left, right| {
                     GenRegex::make_union(left.clone(), right.clone())
                 })
             }
@@ -144,10 +148,11 @@ pub fn derivative_determinized(
             unimplemented!();
         }
     }
+    // ;
 
-    // print!(" = {{ ");
+    // print!("    d({}, {}) = {{ ", gre, deriv_char);
     // for ele in &result {
-    //     print!("{}, ", ele);
+    //     print!("{}, ", ele.get_expr());
     // }
     // println!("}}");
 
@@ -190,6 +195,8 @@ fn merge_helper<F>(
 where
     F: Fn(&Rc<GenRegex>, &Rc<GenRegex>) -> Rc<GenRegex>,
 {
+    // println!("    merge_helper left: {:?}", left_set);
+    // println!("    merge_helper right: {:?}", right_set);
     let mut result = HashSet::new();
     for left in left_set {
         for right in right_set {
@@ -198,6 +205,7 @@ where
             }
         }
     }
+    // println!("    merge_helper result: {:?}", result);
     result
 }
 
