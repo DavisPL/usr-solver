@@ -154,6 +154,10 @@ impl GenRegex {
             right
         } else if let &GenRegex::Epsilon = right.as_ref() {
             left
+        } else if let &GenRegex::EmptySet = left.as_ref() {
+            left
+        } else if let &GenRegex::EmptySet = right.as_ref() {
+            right
         } else {
             Rc::new(GenRegex::Concatenation(left, right))
         }

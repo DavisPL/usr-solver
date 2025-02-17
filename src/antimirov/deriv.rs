@@ -5,6 +5,7 @@
 // TODO: fix and remove
 #![allow(unused_variables)]
 
+use super::determinized::derivative_determinized;
 use super::sub_from_predicate::sub_from_predicate;
 use super::subs::{
     merge_binary, merge_sets, sub_difference_from_merge, sub_in, union_sets, AntimirovElement,
@@ -128,10 +129,15 @@ pub fn derivative(
             ret_set
         }
         GenRegex::Complement(_) => {
-            let deriv = brzozowski::deriv::derivative(gre, deriv_char);
-            AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
+            // Use Determinized derivative
+            // Filter out empty sets
+            derivative_determinized(gre, deriv_char)
+                .into_iter()
+                .filter(|x| matches!(x.get_expr().as_ref(), GenRegex::EmptySet))
+                .collect()
         }
         GenRegex::IfThenElse(_, _, _) => {
+            // Use Brzozowski derivative
             let deriv = brzozowski::deriv::derivative(gre, deriv_char);
             AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
         }

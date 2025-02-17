@@ -87,8 +87,9 @@ pub fn derivative_determinized(
             // Derivative-of-left case
             let left_deriv = derivative_determinized(left, deriv_char);
             let right_copy = AntimirovElement::new_emptysub(right.clone()).into_set();
-            let left_result =
-                merge_helper(&left_deriv, &right_copy, &|l, r| GenRegex::concat(l, r));
+            let left_result = merge_helper(&left_deriv, &right_copy, &|l, r| {
+                GenRegex::make_concatenation(l.clone(), r.clone())
+            });
 
             // Derivative-of-right case
             let (left_nullable_yes, left_nullable_no) = nullable_determinized(left);
@@ -115,7 +116,7 @@ pub fn derivative_determinized(
             let p_derivs = derivative_determinized(expr, deriv_char);
             let right_copy = AntimirovElement::new_emptysub(gre.clone()).into_set();
             merge_helper(&right_copy, &p_derivs, &|left, right| {
-                GenRegex::concat(left, right)
+                GenRegex::make_concatenation(left.clone(), right.clone())
             })
         }
         GenRegex::Complement(expr) => {
