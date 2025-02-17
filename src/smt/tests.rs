@@ -56,7 +56,6 @@ fn assert_unsatisfiable(filepath: &str) {
 fn assert_satisfiable_regex(gre: &Rc<GenRegex>) {
     assert_regex_helper(gre, true, false);
 }
-#[allow(dead_code)]
 fn assert_unsatisfiable_regex(gre: &Rc<GenRegex>) {
     assert_regex_helper(gre, false, false);
 }
@@ -143,8 +142,6 @@ fn test_simple_1() {
     assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
 }
 
-// TODO: failing for Determinization experiment
-// Using default (Antimirov) only for now
 #[test]
 fn test_simple_2() {
     let smt_result = parse_smtlib_file("benchmarks/simple2_unsat.smt2");
@@ -181,8 +178,7 @@ fn test_simple_2() {
 
     assert_eq!(gen_regex_unwrapped, expected);
 
-    // assert_unsatisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
-    assert_unsatisfiable_regex_default_only(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_unsatisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
 }
 
 #[test]
@@ -616,6 +612,37 @@ fn test_loops_3() {
     assert_unsatisfiable_default_only("benchmarks/inter_mod2_unsat.smt2");
 }
 
+#[test]
+fn test_passw_complement_1() {
+    assert_satisfiable_default_only("benchmarks/passw_complex_sat_1.smt2");
+}
+
+#[test]
+fn test_passw_complement_2() {
+    assert_satisfiable_default_only("benchmarks/passw_complex_sat_2.smt2");
+}
+
+#[test]
+fn test_passw_complement_simpler() {
+    assert_satisfiable_default_only("benchmarks/passw_simpler_sat_1.smt2");
+}
+
+#[test]
+fn test_passw_complement_simplest() {
+    assert_satisfiable_default_only("benchmarks/passw_simplest_sat_1.smt2");
+}
+
+#[test]
+fn test_passw_complement_4() {
+    assert_unsatisfiable_default_only("benchmarks/passw_very_complex_unsat.smt2");
+}
+
+// Returning wrong answer for Antimirov
+#[test]
+fn test_zelkova_ex() {
+    assert_unsatisfiable_default_only("benchmarks/zelkova_unsat.smt2")
+}
+
 /*
     Tests - hardest cases, currently ignored
 
@@ -711,46 +738,4 @@ fn intersect_test1() {
 #[test]
 fn test_usr_2() {
     assert_satisfiable("benchmarks/usr_2_sat.smt2");
-}
-
-// Diverging
-#[ignore]
-#[test]
-fn test_passw_complement_1() {
-    assert_satisfiable("benchmarks/passw_complex_sat_1.smt2");
-}
-
-// Diverging
-#[ignore]
-#[test]
-fn test_passw_complement_2() {
-    assert_satisfiable("benchmarks/passw_complex_sat_2.smt2");
-}
-
-// Diverging for Brz, returning wrong answer for Ant
-#[ignore]
-#[test]
-fn test_passw_complement_simpler() {
-    assert_satisfiable("benchmarks/passw_simpler_sat_1.smt2");
-}
-
-// Diverging for Brz, slow but converging for Ant
-#[ignore]
-#[test]
-fn test_passw_complement_simplest() {
-    assert_satisfiable("benchmarks/passw_simplest_sat_1.smt2");
-}
-
-// Diverging
-#[ignore]
-#[test]
-fn test_passw_complement_4() {
-    assert_unsatisfiable("benchmarks/passw_very_complex_unsat.smt2");
-}
-
-// Diverging
-#[ignore]
-#[test]
-fn test_zelkova_ex() {
-    assert_unsatisfiable("benchmarks/zelkova_unsat.smt2")
 }
