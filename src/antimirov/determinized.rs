@@ -30,8 +30,9 @@ pub fn derivative_determinized(
     gre: &Rc<GenRegex>,
     deriv_char: &Rc<CharExpression>,
 ) -> HashSet<AntimirovElement> {
-    // println!("taking d({}, {})", gre, deriv_char);
+    // print!("d({}, {})", gre, deriv_char);
 
+    // let result =
     match gre.as_ref() {
         GenRegex::EmptySet => AntimirovElement::new_empty().into_set(),
         GenRegex::Epsilon => AntimirovElement::new_empty().into_set(),
@@ -143,6 +144,14 @@ pub fn derivative_determinized(
             unimplemented!();
         }
     }
+
+    // print!(" = {{ ");
+    // for ele in &result {
+    //     print!("{}, ", ele);
+    // }
+    // println!("}}");
+
+    // result
 }
 
 // Return a determinized set of derivatives for a range
@@ -243,12 +252,12 @@ pub fn nullable_determinized(
     fn true_helper() -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
         (
             AntimirovElement::new_epsilon().into_set(),
-            AntimirovElement::new_empty().into_set(),
+            HashSet::new(),
         )
     }
     fn false_helper() -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
         (
-            AntimirovElement::new_empty().into_set(),
+            HashSet::new(),
             AntimirovElement::new_epsilon().into_set(),
         )
     }
