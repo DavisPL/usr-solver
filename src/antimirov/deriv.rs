@@ -130,6 +130,9 @@ pub fn derivative(
             ret_set
         }
         GenRegex::Complement(_) => {
+            // Uncomment to use Brzozowski derivative
+            // let deriv = brzozowski::deriv::derivative(gre, deriv_char);
+            // AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
             // Use Determinized derivative
             // Filter out empty sets
             derivative_determinized(gre, deriv_char)

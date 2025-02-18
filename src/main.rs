@@ -14,8 +14,8 @@ struct Args {
     /// SMT input file to run on
     filename: String,
 
-    /// Solver to use: options are "ab", "a", or "b"
-    #[clap(long, short, default_value = "ab")]
+    /// Solver to use: options are "ab", "a", "b", or "d"
+    #[clap(long, short, default_value = "a")]
     solver_name: String,
 }
 
