@@ -39,7 +39,13 @@ impl Solver for DeterminizingSolver {
             println!("{}", layer.gre);
             if !nullable_determinized(&layer.gre).0.is_empty() {
                 return true;
+            } else if visited.contains(&layer.gre) {
+                continue;
             } else {
+                visited.insert(layer.gre.clone());
+                println!("Visited count: {}", visited.len());
+                println!("Stack size: {}", sat_stack.len());
+
                 let deriv = derivative_determinized(&layer.gre, &self.get_fresh_var(layer.depth));
                 for ele in deriv {
                     // Check range
@@ -49,14 +55,11 @@ impl Solver for DeterminizingSolver {
                         eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
                     }
-                    if !visited.contains(ele.get_expr()) {
-                        sat_stack.push_back(DerivativeDepth {
-                            gre: ele.get_expr().clone(),
-                            depth: layer.depth + 1,
-                        });
-                    }
+                    sat_stack.push_back(DerivativeDepth {
+                        gre: ele.get_expr().clone(),
+                        depth: layer.depth + 1,
+                    });
                 }
-                visited.insert(layer.gre);
             }
         }
         false
