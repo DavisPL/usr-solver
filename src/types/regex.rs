@@ -7,6 +7,8 @@ use super::expr::{CharExpression, CharVar, StringIndex, StringVar};
 use super::predicate::Predicate;
 
 use std::rc::Rc;
+use std::cmp::max;
+use std::cmp::Ordering;
 
 // TODO: add a GenRegex::StringLiteral
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -216,6 +218,33 @@ impl GenRegex {
     }
 
     /*
+        Helper for regex length
+    */
+    pub fn length(&self) -> usize {
+        match self {
+            GenRegex::IfThenElse(_, a, b) => max(a.length(), b.length()),
+            GenRegex::Complement(inner) => inner.length(),
+            GenRegex::StringIndex(_) => 1,
+            GenRegex::StringSlice(_, _) => 1,
+            GenRegex::Union(gre1, gre2) => {
+                max(gre1.length(), gre2.length())
+            },
+            GenRegex::Intersect(gre1, gre2) => {
+                max(gre1.length(), gre2.length())
+            },
+            GenRegex::Concatenation(gre1, gre2) => gre1.length() + gre2.length(),
+            GenRegex::Kleene(gre1) => gre1.length(),
+            GenRegex::EmptySet
+            | GenRegex::Epsilon
+            | GenRegex::Sigma
+            | GenRegex::SigmaStar
+            | GenRegex::Range(_, _)
+            | GenRegex::CharExpression(_)
+            | GenRegex::StringVar(_) => 1,
+        }
+    }
+
+    /*
         Helper for what the regex contains as a subexpression
     */
 
@@ -248,6 +277,23 @@ impl GenRegex {
         }
     }
 }
+
+/*
+    Ordering logic
+*/
+impl PartialOrd for GenRegex {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.length().cmp(&other.length()))
+    }
+}
+
+impl Ord for GenRegex {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.length().cmp(&other.length())
+    }
+}
+
+
 
 /*
     Pretty printing

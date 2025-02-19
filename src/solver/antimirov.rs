@@ -11,8 +11,11 @@ use crate::antimirov::deriv::{derivative, nullable};
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashSet, BinaryHeap};
+use std::cmp::{Ord, Ordering, PartialOrd};
 use std::rc::Rc;
+use std::cmp::Reverse;
+
 
 #[derive(Debug, Default)]
 pub struct AntimirovSolver {}
@@ -22,6 +25,24 @@ struct DerivativeDepth {
     gre: Rc<GenRegex>,
     depth: i32,
 }
+impl Ord for DerivativeDepth {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.gre.cmp(&other.gre)
+    }
+}
+
+impl PartialOrd for DerivativeDepth {
+
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+}
+
+impl PartialEq for DerivativeDepth {
+    fn eq(&self, other: &Self) -> bool {
+        self.gre == other.gre
+    }
+}
+
+impl Eq for DerivativeDepth {}
 
 impl AntimirovSolver {
     pub fn new() -> Self {
@@ -31,13 +52,13 @@ impl AntimirovSolver {
 
 impl Solver for AntimirovSolver {
     fn satisfiable(&mut self, expr: &Rc<GenRegex>) -> bool {
-        let mut sat_stack = VecDeque::new();
-        sat_stack.push_back(DerivativeDepth {
+        let mut sat_stack = BinaryHeap::new();
+        sat_stack.push(Reverse(DerivativeDepth {
             gre: expr.clone(),
             depth: 0,
-        });
+        }));
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
-        while let Some(layer) = sat_stack.pop_front() {
+        while let Some(Reverse(layer)) = sat_stack.pop() {
             if !nullable(&layer.gre).is_empty() {
                 return true;
             } else if visited.contains(&layer.gre) {
@@ -57,10 +78,10 @@ impl Solver for AntimirovSolver {
                         eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
                     }
-                    sat_stack.push_back(DerivativeDepth {
+                    sat_stack.push(Reverse(DerivativeDepth {
                         gre: ele.get_expr().clone(),
                         depth: layer.depth + 1,
-                    });
+                    }));
                 }
             }
         }
