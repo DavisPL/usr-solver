@@ -11,11 +11,10 @@ use crate::antimirov::deriv::{derivative, nullable};
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
-use std::collections::{HashSet, BinaryHeap};
-use std::cmp::{Ord, Ordering, PartialOrd};
-use std::rc::Rc;
 use std::cmp::Reverse;
-
+use std::cmp::{Ord, Ordering, PartialOrd};
+use std::collections::{BinaryHeap, HashSet};
+use std::rc::Rc;
 
 #[derive(Debug, Default)]
 pub struct AntimirovSolver {}
@@ -32,8 +31,9 @@ impl Ord for DerivativeDepth {
 }
 
 impl PartialOrd for DerivativeDepth {
-
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl PartialEq for DerivativeDepth {
