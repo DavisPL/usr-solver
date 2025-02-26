@@ -11,7 +11,6 @@ use crate::antimirov::deriv::{derivative, nullable};
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
-use std::cmp::Reverse;
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::{BinaryHeap, HashSet};
 use std::rc::Rc;
@@ -26,7 +25,7 @@ struct DerivativeDepth {
 }
 impl Ord for DerivativeDepth {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.gre.cmp(&other.gre)
+        other.gre.cmp(&self.gre)
     }
 }
 
@@ -53,12 +52,12 @@ impl AntimirovSolver {
 impl Solver for AntimirovSolver {
     fn satisfiable(&mut self, expr: &Rc<GenRegex>) -> bool {
         let mut sat_stack = BinaryHeap::new();
-        sat_stack.push(Reverse(DerivativeDepth {
+        sat_stack.push(DerivativeDepth {
             gre: expr.clone(),
             depth: 0,
-        }));
+        });
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
-        while let Some(Reverse(layer)) = sat_stack.pop() {
+        while let Some(layer) = sat_stack.pop() {
             if !nullable(&layer.gre).is_empty() {
                 return true;
             } else if visited.contains(&layer.gre) {
@@ -78,10 +77,10 @@ impl Solver for AntimirovSolver {
                         eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
                     }
-                    sat_stack.push(Reverse(DerivativeDepth {
+                    sat_stack.push(DerivativeDepth {
                         gre: ele.get_expr().clone(),
                         depth: layer.depth + 1,
-                    }));
+                    });
                 }
             }
         }

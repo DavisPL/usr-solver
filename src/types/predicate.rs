@@ -26,6 +26,15 @@ pub enum Predicate {
 
 use std::fmt::{self, Display};
 
+impl Predicate {
+    pub fn length(&self) -> usize {
+        match self {
+            Predicate::And(a, b) | Predicate::Or(a, b) => 1 + a.length() + b.length(),
+            Predicate::Not(a) => 1 + a.length(),
+            _ => 1,
+        }
+    }
+}
 impl Display for Predicate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

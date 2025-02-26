@@ -6,7 +6,6 @@
 use super::expr::{CharExpression, CharVar, StringIndex, StringVar};
 use super::predicate::Predicate;
 
-use std::cmp::max;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
@@ -222,21 +221,20 @@ impl GenRegex {
     */
     pub fn length(&self) -> usize {
         match self {
-            GenRegex::IfThenElse(_, a, b) => max(a.length(), b.length()),
-            GenRegex::Complement(inner) => inner.length(),
-            GenRegex::StringIndex(_) => 1,
-            GenRegex::StringSlice(_, _) => 1,
-            GenRegex::Union(gre1, gre2) => max(gre1.length(), gre2.length()),
-            GenRegex::Intersect(gre1, gre2) => max(gre1.length(), gre2.length()),
-            GenRegex::Concatenation(gre1, gre2) => gre1.length() + gre2.length(),
-            GenRegex::Kleene(gre1) => gre1.length(),
+            GenRegex::IfThenElse(p, a, b) => p.length() + a.length() + b.length(),
+            GenRegex::Complement(inner) | GenRegex::Kleene(inner) => 1 + inner.length(),
+            GenRegex::Union(gre1, gre2)
+            | GenRegex::Intersect(gre1, gre2)
+            | GenRegex::Concatenation(gre1, gre2) => 1 + gre1.length() + gre2.length(),
             GenRegex::EmptySet
             | GenRegex::Epsilon
             | GenRegex::Sigma
             | GenRegex::SigmaStar
             | GenRegex::Range(_, _)
             | GenRegex::CharExpression(_)
-            | GenRegex::StringVar(_) => 1,
+            | GenRegex::StringVar(_)
+            | GenRegex::StringIndex(_)
+            | GenRegex::StringSlice(_, _) => 1,
         }
     }
 
