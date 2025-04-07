@@ -9,6 +9,9 @@ disjoint-sets = "0.4.2"
 lexpr = "0.2.7"
 regex = "1.11.1"
 clap = { version = "4.5.27", features = ["derive"] }
+z3-sys = {version = "0.8.1", features = ["static-link-z3"] }
+z3 = "0.12.1"
+
 
 [lib]
 doctest = false
