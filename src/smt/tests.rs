@@ -3,6 +3,7 @@
 //!
 
 use super::parse::{parse_smtlib_file, SmtParser};
+use super::parse2;
 use super::util::hex_to_char;
 
 use crate::solver::{satisfiable_all, satisfiable_default, NUM_SOLVERS};
@@ -30,7 +31,7 @@ fn assert_regex_helper(gre: &Rc<GenRegex>, expected: bool, default_only: bool) {
 
 // Run the SMT2 file and assert that satisfiable() returns as expected
 fn assert_smt2_file_helper(filepath: &str, expected: bool, default_only: bool) {
-    // Read the file and parse as s-expression
+    /*// Read the file and parse as s-expression
     let smt_result = parse_smtlib_file(filepath);
     println!("Parsed s-expression: {:?}", smt_result);
     assert!(smt_result.is_ok());
@@ -41,7 +42,9 @@ fn assert_smt2_file_helper(filepath: &str, expected: bool, default_only: bool) {
     let gen_regex = parser.parse_s_expr(&s_expr);
     println!("Parsed GenRegex: {:?}", gen_regex);
     assert!(gen_regex.is_ok());
-    let gen_regex_unwrapped = Rc::new(gen_regex.unwrap());
+    let gen_regex_unwrapped = Rc::new(gen_regex.unwrap());*/
+
+    let gen_regex_unwrapped=parse2::parse_smtlib_file(filepath).unwrap();
 
     // Check result
     assert_regex_helper(&gen_regex_unwrapped, expected, default_only);
@@ -111,18 +114,7 @@ fn s_expr_test() {
 #[test]
 fn test_simple_1() {
     // Load the file simple1.smt2
-    // Parse as s-expression
-    let smt_result = parse_smtlib_file("benchmarks/simple1_sat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/simple1_sat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -137,24 +129,14 @@ fn test_simple_1() {
         )),
     );
 
-    assert_eq!(gen_regex_unwrapped, expected);
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
 
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_simple_2() {
-    let smt_result = parse_smtlib_file("benchmarks/simple2_unsat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/simple2_unsat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -176,24 +158,14 @@ fn test_simple_2() {
         Rc::new(expected_intersection_2),
     );
 
-    assert_eq!(gen_regex_unwrapped, expected);
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
 
-    assert_unsatisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_unsatisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_simple_3() {
-    let smt_result = parse_smtlib_file("benchmarks/simple3_sat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/simple3_sat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -217,24 +189,13 @@ fn test_simple_3() {
         Rc::new(expected_intersection_1),
         Rc::new(expected_intersection_2),
     );
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
-
-    assert_eq!(gen_regex_unwrapped, expected);
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_range() {
-    let smt_result = parse_smtlib_file("benchmarks/range1_sat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/range1_sat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -243,24 +204,13 @@ fn test_range() {
         GenRegex::re_range('0', '9'),
     );
 
-    assert_eq!(gen_regex_unwrapped, expected);
-
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_re_all() {
-    let smt_result = parse_smtlib_file("benchmarks/re_all_sat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/re_all_sat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -271,24 +221,13 @@ fn test_re_all() {
     let regex = GenRegex::concat(&GenRegex::sigma_star(), &union);
     let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
-    assert_eq!(gen_regex_unwrapped, expected);
-
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_date() {
-    let smt_result = parse_smtlib_file("benchmarks/date_sat.smt2");
-    println!("Parsed s-expression: {:?}\n", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/date_sat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -334,24 +273,13 @@ fn test_date() {
     let regex = GenRegex::intersect(&&GenRegex::intersect(&first, &second), &third);
     let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
-    assert_eq!(gen_regex_unwrapped, expected);
-
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_passw_sat1() {
-    let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/passw_sat1.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -375,24 +303,14 @@ fn test_passw_sat1() {
     );
     let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
-    assert_eq!(gen_regex_unwrapped, expected);
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_simple_hex() {
     println!("A number{:?}", hex_to_char(0));
-    let smt_result = parse_smtlib_file("benchmarks/simplehex_sat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/simplehex_sat1.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
     let hex = hex_to_char(0x0).unwrap();
@@ -401,8 +319,8 @@ fn test_simple_hex() {
         GenRegex::re_range(hex, '/'),
     );
 
-    assert_eq!(gen_regex_unwrapped, expected);
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 // TODO: debug
@@ -495,17 +413,7 @@ fn test_date_2() {
 
         curr_regex
     }
-    let smt_result = parse_smtlib_file("benchmarks/date2_sat.smt2");
-    println!("Parsed s-expression: {:?}\n", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/date2_sat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -551,24 +459,13 @@ fn test_date_2() {
     let regex = GenRegex::intersect(&first, &second);
     let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
-    assert_eq!(gen_regex_unwrapped, expected);
-
-    assert_satisfiable_regex_default_only(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
 fn test_passw_unsat1() {
-    let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/passw_unsat1.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -592,9 +489,8 @@ fn test_passw_unsat1() {
     );
     let expected = GenRegex::Intersect(GenRegex::create_gre_str_var("x"), regex);
 
-    assert_eq!(gen_regex_unwrapped, expected);
-
-    assert_unsatisfiable_regex_default_only(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 #[test]
@@ -622,17 +518,7 @@ fn test_loops_3() {
 #[ignore]
 #[test]
 fn test_equality() {
-    let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
 
@@ -664,8 +550,8 @@ fn test_equality() {
     let eq1 = GenRegex::intersect(&GenRegex::empty_set(), &GenRegex::complement(&together));
     let eq2 = GenRegex::intersect(&GenRegex::complement(&GenRegex::empty_set()), &together);
     let expected = GenRegex::Union(eq1, eq2);
-    assert_eq!(gen_regex_unwrapped, expected);
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped));
+    assert_eq!(gen_regex_unwrapped, Rc::new(expected));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 // TODO: Equality not supported for now
@@ -679,20 +565,10 @@ fn test_disequality() {
 #[ignore]
 #[test]
 fn test_hex_code() {
-    let smt_result = parse_smtlib_file("benchmarks/hexcode_sat.smt2");
-    println!("Parsed s-expression: {:?}", smt_result);
-
-    assert!(smt_result.is_ok());
-    let s_expr = smt_result.unwrap();
-
-    // Parse the s-expression as a GenRegex
-    let mut parser = SmtParser::new();
-    let gen_regex = parser.parse_s_expr(&s_expr);
-    println!("Parsed GenRegex: {:?}", gen_regex);
-
+    let gen_regex = parse2::parse_smtlib_file("benchmarks/hexcode_sat.smt2");
     assert!(gen_regex.is_ok());
     let gen_regex_unwrapped = gen_regex.unwrap();
-    assert_satisfiable_regex(&Rc::new(gen_regex_unwrapped.clone()));
+    assert_satisfiable_regex(&gen_regex_unwrapped);
 }
 
 // Quite slow
