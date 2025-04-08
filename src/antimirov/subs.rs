@@ -334,7 +334,6 @@ pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
-
     // TODO: add not constraints here:
     // not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
 }
@@ -534,7 +533,6 @@ use super::union_find::{count_union_elems, union_over_set, UnionFind};
 use std::collections::HashMap;
 
 fn merge(substitutions: AnySub) -> Option<SimpleSub> {
-
     // TODO: Add how to handle not constraints
 
     // Take range constraints
