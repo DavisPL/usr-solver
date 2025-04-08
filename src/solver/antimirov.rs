@@ -51,6 +51,8 @@ impl AntimirovSolver {
 
 impl Solver for AntimirovSolver {
     fn satisfiable(&mut self, expr: &Rc<GenRegex>) -> bool {
+        // TODO: track not constraints along with the derivative regexes
+
         let mut sat_stack = BinaryHeap::new();
         sat_stack.push(DerivativeDepth {
             gre: expr.clone(),

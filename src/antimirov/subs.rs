@@ -10,7 +10,7 @@ use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;
 
 use std::cmp::{max, min};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ops::Index;
 use std::rc::Rc;
 
@@ -334,6 +334,9 @@ pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
+
+    // TODO: add not constraints here:
+    // not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
 }
 
 impl Index<&StringVar> for SimpleSub {
@@ -531,6 +534,9 @@ use super::union_find::{count_union_elems, union_over_set, UnionFind};
 use std::collections::HashMap;
 
 fn merge(substitutions: AnySub) -> Option<SimpleSub> {
+
+    // TODO: Add how to handle not constraints
+
     // Take range constraints
     // If merge was unsuccessful, return None
     let mut substitutions = substitutions;
