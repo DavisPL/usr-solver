@@ -254,6 +254,7 @@ pub fn nullable_or_helper(
     ))
 }
 
+//TODO: Add not constraint tracking
 pub fn nullable_determinized(
     gre: &Rc<GenRegex>,
 ) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
@@ -273,7 +274,8 @@ pub fn nullable_determinized(
         GenRegex::StringVar(s_var) => {
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), SubExpr::empty());
-            let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+            //TODO: set correct not constraints for string_sub
+            let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(),BTreeMap::new());
             let true_case = AntimirovElement::new(GenRegex::empty_set(), string_sub).into_set();
 
             // TODO: Ensure var is fresh
@@ -286,7 +288,8 @@ pub fn nullable_determinized(
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), subexpr);
 
-            let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+            //TODO: set correct not constraints for substitutions
+            let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(),BTreeMap::new());
 
             let false_case = AntimirovElement::new(GenRegex::empty_set(), substitution).into_set();
 

@@ -314,6 +314,7 @@ pub struct AnySub {
     string_to: BTreeMap<StringVar, Vec<SubExpr>>,
     char_to: BTreeMap<CharVar, Vec<CharExpression>>,
     range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
+    not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
 }
 
 impl AnySub {
@@ -335,7 +336,7 @@ pub struct SimpleSub {
     char_to: BTreeMap<CharVar, CharExpression>,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
     // TODO: add not constraints here:
-    // not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
+    not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
 }
 
 impl Index<&StringVar> for SimpleSub {
@@ -354,11 +355,13 @@ impl SimpleSub {
         string_to: BTreeMap<StringVar, SubExpr>,
         char_to: BTreeMap<CharVar, CharExpression>,
         range_constraints: BTreeMap<CharVar, RangeConstr>,
+        not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
     ) -> Self {
         SimpleSub {
             string_to,
             char_to,
             range_constraints,
+            not_constraints,
         }
     }
     pub fn empty() -> Self {
@@ -367,6 +370,7 @@ impl SimpleSub {
             string_to: BTreeMap::new(),
             char_to: BTreeMap::new(),
             range_constraints: BTreeMap::new(),
+            not_constraints:BTreeMap::new()
         }
     }
 
@@ -376,6 +380,7 @@ impl SimpleSub {
     pub fn union(self, other: SimpleSub) -> AnySub {
         let mut combined_string_to: BTreeMap<StringVar, Vec<SubExpr>> = BTreeMap::new();
         let mut combined_char_to: BTreeMap<CharVar, Vec<CharExpression>> = BTreeMap::new();
+        let mut combined_not_constraints: BTreeMap<CharVar,BTreeSet<CharExpression>>=BTreeMap::new();
 
         for (key, value) in self.string_to {
             combined_string_to.entry(key).or_default().push(value);
@@ -391,6 +396,13 @@ impl SimpleSub {
             combined_char_to.entry(key).or_default().push(value);
         }
 
+        for (key, value) in self.not_constraints {
+            combined_not_constraints.entry(key).or_default().extend(value);
+        }
+        for (key, value) in other.not_constraints {
+            combined_not_constraints.entry(key).or_default().extend(value);
+        }
+
         let range_constrs =
             merge_range_constraints(&self.range_constraints, &other.range_constraints);
 
@@ -398,6 +410,7 @@ impl SimpleSub {
             string_to: combined_string_to,
             char_to: combined_char_to,
             range_constraints: range_constrs,
+            not_constraints: combined_not_constraints
         }
     }
 
@@ -446,6 +459,14 @@ impl SimpleSub {
         let value = RangeConstr::new(start, end);
         self.range_constraints.insert(key, value);
     }
+
+    pub fn get_not_constraints(&self)-> &BTreeMap<CharVar,BTreeSet<CharExpression>> {
+        &self.not_constraints
+    }
+
+    pub fn set_not_constraints(&mut self, not_constr:BTreeMap<CharVar,BTreeSet<CharExpression>>) {
+        self.not_constraints=not_constr;
+    } 
 
     /*
         Consumers
@@ -533,7 +554,6 @@ use super::union_find::{count_union_elems, union_over_set, UnionFind};
 use std::collections::HashMap;
 
 fn merge(substitutions: AnySub) -> Option<SimpleSub> {
-    // TODO: Add how to handle not constraints
 
     // Take range constraints
     // If merge was unsuccessful, return None
@@ -667,6 +687,18 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
         }
         combined_expr.set_str_var(var.clone(), eq_exprs[0].clone());
     }
+
+    // TODO: Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
+    // let combined_not = BTreeMap<...>::new();
+    // for (c: CharVar,not_constraint_set: BTreeSet) in substituions.not_constraints{
+    //     let modified_not = Find(not_constraint_set);
+    //     if Find(c) in modified_not:
+    //         return /bot;
+    //     combined_not.insert(c, modified_not);
+    // }
+
+    // Include not constraints
+    // combined_expr.set_not_constraints(combined_not);
 
     // Include range constraints
     combined_expr.set_ranges(range_constrs);
