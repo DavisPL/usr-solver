@@ -370,7 +370,7 @@ impl SimpleSub {
             string_to: BTreeMap::new(),
             char_to: BTreeMap::new(),
             range_constraints: BTreeMap::new(),
-            not_constraints:BTreeMap::new()
+            not_constraints: BTreeMap::new(),
         }
     }
 
@@ -380,7 +380,8 @@ impl SimpleSub {
     pub fn union(self, other: SimpleSub) -> AnySub {
         let mut combined_string_to: BTreeMap<StringVar, Vec<SubExpr>> = BTreeMap::new();
         let mut combined_char_to: BTreeMap<CharVar, Vec<CharExpression>> = BTreeMap::new();
-        let mut combined_not_constraints: BTreeMap<CharVar,BTreeSet<CharExpression>>=BTreeMap::new();
+        let mut combined_not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>> =
+            BTreeMap::new();
 
         for (key, value) in self.string_to {
             combined_string_to.entry(key).or_default().push(value);
@@ -397,10 +398,16 @@ impl SimpleSub {
         }
 
         for (key, value) in self.not_constraints {
-            combined_not_constraints.entry(key).or_default().extend(value);
+            combined_not_constraints
+                .entry(key)
+                .or_default()
+                .extend(value);
         }
         for (key, value) in other.not_constraints {
-            combined_not_constraints.entry(key).or_default().extend(value);
+            combined_not_constraints
+                .entry(key)
+                .or_default()
+                .extend(value);
         }
 
         let range_constrs =
@@ -410,7 +417,7 @@ impl SimpleSub {
             string_to: combined_string_to,
             char_to: combined_char_to,
             range_constraints: range_constrs,
-            not_constraints: combined_not_constraints
+            not_constraints: combined_not_constraints,
         }
     }
 
@@ -460,13 +467,13 @@ impl SimpleSub {
         self.range_constraints.insert(key, value);
     }
 
-    pub fn get_not_constraints(&self)-> &BTreeMap<CharVar,BTreeSet<CharExpression>> {
+    pub fn get_not_constraints(&self) -> &BTreeMap<CharVar, BTreeSet<CharExpression>> {
         &self.not_constraints
     }
 
-    pub fn set_not_constraints(&mut self, not_constr:BTreeMap<CharVar,BTreeSet<CharExpression>>) {
-        self.not_constraints=not_constr;
-    } 
+    pub fn set_not_constraints(&mut self, not_constr: BTreeMap<CharVar, BTreeSet<CharExpression>>) {
+        self.not_constraints = not_constr;
+    }
 
     /*
         Consumers
@@ -554,7 +561,6 @@ use super::union_find::{count_union_elems, union_over_set, UnionFind};
 use std::collections::HashMap;
 
 fn merge(substitutions: AnySub) -> Option<SimpleSub> {
-
     // Take range constraints
     // If merge was unsuccessful, return None
     let mut substitutions = substitutions;

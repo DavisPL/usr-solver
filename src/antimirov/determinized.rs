@@ -275,7 +275,8 @@ pub fn nullable_determinized(
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), SubExpr::empty());
             //TODO: set correct not constraints for string_sub
-            let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(),BTreeMap::new());
+            let string_sub =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
             let true_case = AntimirovElement::new(GenRegex::empty_set(), string_sub).into_set();
 
             // TODO: Ensure var is fresh
@@ -289,7 +290,8 @@ pub fn nullable_determinized(
             string_to.insert(s_var.clone(), subexpr);
 
             //TODO: set correct not constraints for substitutions
-            let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(),BTreeMap::new());
+            let substitution =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
 
             let false_case = AntimirovElement::new(GenRegex::empty_set(), substitution).into_set();
 

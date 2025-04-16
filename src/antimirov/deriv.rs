@@ -58,13 +58,15 @@ pub fn derivative(
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(d_var.clone(), c_expr.clone());
-                let subs = SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(),BTreeMap::new());
+                let subs =
+                    SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(), BTreeMap::new());
                 AntimirovElement::new(GenRegex::epsilon(), subs).into_set()
             }
             (_, CharExpression::CharVar(c_var)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
-                let subs = SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(),BTreeMap::new());
+                let subs =
+                    SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(), BTreeMap::new());
                 AntimirovElement::new(GenRegex::epsilon(), subs).into_set()
             }
         },
@@ -76,7 +78,8 @@ pub fn derivative(
             let mut string_to = BTreeMap::new();
             string_to.insert(string_var.clone(), subexpr);
 
-            let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(),BTreeMap::new());
+            let substitution =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
 
             AntimirovElement::new(gre.clone(), substitution).into_set()
         }
@@ -230,7 +233,8 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::StringVar(s_var) => {
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), SubExpr::empty());
-            let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(),BTreeMap::new());
+            let string_sub =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
             string_sub.into_set()
         }
         GenRegex::Union(side1, side2) => {
