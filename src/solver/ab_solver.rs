@@ -30,7 +30,6 @@ impl ABSolver {
 
 impl Solver for ABSolver {
     fn satisfiable(&mut self, gre: &Rc<crate::types::regex::GenRegex>) -> bool {
-
         panic!("AB solver is deprecated.");
 
         if gre.contains_ite_complement_or_str_index() {
