@@ -695,13 +695,15 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     }
 
     // TODO: Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
-    // let combined_not = BTreeMap<...>::new();
-    // for (c: CharVar,not_constraint_set: BTreeSet) in substituions.not_constraints{
-    //     let modified_not = Find(not_constraint_set);
-    //     if Find(c) in modified_not:
-    //         return /bot;
-    //     combined_not.insert(c, modified_not);
-    // }
+     let mut combined_not = BTreeMap::new();
+     for (c,not_constraint_set) in substitutions.not_constraints{
+         let modified_not = find_set(not_constraint_set, &union_find, &expr_to_id);
+         let id_var = expr_to_id[&CharExpression::CharVar(c.clone())];
+         if modified_not.contains(&union_find.find(id_var).clone()){
+             return None;
+        }
+         combined_not.insert(c.clone(), modified_not);
+     }
 
     // Include not constraints
     // combined_expr.set_not_constraints(combined_not);
@@ -710,6 +712,16 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     combined_expr.set_ranges(range_constrs);
 
     Some(combined_expr)
+}
+
+pub fn find_set(queries: BTreeSet<CharExpression>, union_find: &UnionFind, expr_to_id: &HashMap<Rc<CharExpression>, usize>) -> BTreeSet<usize> {
+
+    let mut ret_set = BTreeSet::new();
+    for query in queries{
+         let id_var = expr_to_id[&query];
+         ret_set.insert(union_find.find(id_var));
+    }
+    ret_set
 }
 
 pub fn merge_binary(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
