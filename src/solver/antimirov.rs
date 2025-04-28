@@ -8,11 +8,12 @@
 use super::Solver;
 
 use crate::antimirov::deriv::{derivative, nullable};
+use crate::antimirov::subs::{merge_binary, merge_sets, SimpleSub};
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
 use std::cmp::{Ord, Ordering, PartialOrd};
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashSet};
 use std::rc::Rc;
 
 #[derive(Debug, Default)]
@@ -21,6 +22,7 @@ pub struct AntimirovSolver {}
 // Stores a regex and at what depth of derivative it was found.
 struct DerivativeDepth {
     gre: Rc<GenRegex>,
+    not_sub: SimpleSub,
     depth: i32,
 }
 impl Ord for DerivativeDepth {
@@ -56,11 +58,18 @@ impl Solver for AntimirovSolver {
         let mut sat_stack = BinaryHeap::new();
         sat_stack.push(DerivativeDepth {
             gre: expr.clone(),
+            not_sub: SimpleSub::empty(),
             depth: 0,
         });
+        //Modify visited to compare not substitutions
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
         while let Some(layer) = sat_stack.pop() {
-            if !nullable(&layer.gre).is_empty() {
+            if !merge_sets(
+                &HashSet::from([layer.not_sub.clone()]),
+                &nullable(&layer.gre),
+            )
+            .is_empty()
+            {
                 return true;
             } else if visited.contains(&layer.gre) {
                 continue;
@@ -79,8 +88,17 @@ impl Solver for AntimirovSolver {
                         eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
                     }
+                    let Some(f) = merge_binary(ele.get_subs(), &layer.not_sub) else {
+                        continue;
+                    };
                     sat_stack.push(DerivativeDepth {
                         gre: ele.get_expr().clone(),
+                        not_sub: SimpleSub::new(
+                            BTreeMap::new(),
+                            BTreeMap::new(),
+                            BTreeMap::new(),
+                            f.get_not_constraints().clone(),
+                        ),
                         depth: layer.depth + 1,
                     });
                 }

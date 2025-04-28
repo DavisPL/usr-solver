@@ -694,16 +694,16 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
         combined_expr.set_str_var(var.clone(), eq_exprs[0].clone());
     }
 
-    // TODO: Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
-     let mut combined_not = BTreeMap::new();
-     for (c,not_constraint_set) in substitutions.not_constraints{
-         let modified_not = find_set(not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
-         let id_var = expr_to_id[&CharExpression::CharVar(c.clone())];
-         if modified_not.contains(&id_to_expr[&union_find.find(id_var).clone()]){
-             return None;
+    // Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
+    let mut combined_not = BTreeMap::new();
+    for (c, not_constraint_set) in substitutions.not_constraints {
+        let modified_not = find_set(not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
+        let id_var = expr_to_id[&CharExpression::CharVar(c.clone())];
+        if modified_not.contains(&id_to_expr[&union_find.find(id_var).clone()]) {
+            return None;
         }
-         combined_not.insert(c.clone(), modified_not);
-     }
+        combined_not.insert(c.clone(), modified_not);
+    }
 
     // Include not constraints
     combined_expr.set_not_constraints(combined_not);
@@ -714,11 +714,16 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     Some(combined_expr)
 }
 
-pub fn find_set(queries: BTreeSet<CharExpression>, union_find: &UnionFind, expr_to_id: &HashMap<Rc<CharExpression>, usize>, id_to_expr: &HashMap<usize, Rc<CharExpression>>) -> BTreeSet<CharExpression> {
+pub fn find_set(
+    queries: BTreeSet<CharExpression>,
+    union_find: &UnionFind,
+    expr_to_id: &HashMap<Rc<CharExpression>, usize>,
+    id_to_expr: &HashMap<usize, Rc<CharExpression>>,
+) -> BTreeSet<CharExpression> {
     let mut ret_set = BTreeSet::new();
-    for query in queries{
-         let id_var = expr_to_id[&query];
-         ret_set.insert((*id_to_expr[&union_find.find(id_var)]).clone());
+    for query in queries {
+        let id_var = expr_to_id[&query];
+        ret_set.insert((*id_to_expr[&union_find.find(id_var)]).clone());
     }
     ret_set
 }
