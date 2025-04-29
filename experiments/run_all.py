@@ -435,7 +435,7 @@ def time_cl_call(cl_call, timeout):
         if not output:
             output = ""
         if type(output) is not str:
-            # Note: the following may no longer needed.
+            # Note: the following may no longer be needed.
             # It used to be always enabled (as result.stdout returned a bytes object)
             # but this seems to be no longer true as of Python 3.12.2.
             # With the above guard output may be str or bytes.
