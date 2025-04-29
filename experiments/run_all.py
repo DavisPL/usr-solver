@@ -431,10 +431,15 @@ def time_cl_call(cl_call, timeout):
         end_time = time.time()
         return TestResult(end_time - start_time, timeout, result.stdout)
     except subprocess.TimeoutExpired as result:
-        # for some reason in this case result.stdout is not properly
-        # converted to string instead of bytes, so we have to decode it
-        output = (result.stdout.decode(sys.stdout.encoding)
-                  if result.stdout else "")
+        output = result.stdout
+        if not output:
+            output = ""
+        if type(output) is not str:
+            # Note: the following may no longer needed.
+            # It used to be always enabled (as result.stdout returned a bytes object)
+            # but this seems to be no longer true as of Python 3.12.2.
+            # With the above guard output may be str or bytes.
+            output = output.decode(sys.stdout.encoding)
         return make_timeout_result(timeout, output)
     except subprocess.CalledProcessError as result:
         output = result.stdout if result.stdout else ""
