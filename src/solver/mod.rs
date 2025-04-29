@@ -73,15 +73,18 @@ pub fn determinized_satisfiable(gre: &Rc<GenRegex>) -> bool {
 */
 
 /// Run ALL solvers, for test purposes
-pub const NUM_SOLVERS: usize = 3;
+pub const NUM_SOLVERS: usize = 2;
 pub fn satisfiable_all(gre: &Rc<GenRegex>) -> Vec<bool> {
-    vec![
+    let result = vec![
         antimirov_satisfiable(gre),
         brzozowski_satisfiable(gre),
-        ab_satisfiable(gre),
+        // Disabled - deprecated
+        // ab_satisfiable(gre),
         // Disabled as cannot handle string variables on its own
         // determinized_satisfiable(gre),
-    ]
+    ];
+    debug_assert_eq!(result.len(), NUM_SOLVERS);
+    result
 }
 
 /// Run only default solver, for test purposes
