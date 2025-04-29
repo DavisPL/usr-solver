@@ -880,7 +880,7 @@ pub fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
     }
 }
 
-fn sub_in_predicate(pred: &Rc<Predicate>, sub: &SimpleSub) -> Rc<Predicate> {
+pub fn sub_in_predicate(pred: &Rc<Predicate>, sub: &SimpleSub) -> Rc<Predicate> {
     match pred.as_ref() {
         Predicate::True => Rc::clone(pred),
         Predicate::False => Rc::clone(pred),

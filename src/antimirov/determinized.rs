@@ -141,15 +141,13 @@ pub fn derivative_determinized(
                 .collect()
         }
         GenRegex::IfThenElse(_, _, _) => {
-            // Unimplemented for now
+            // TODO Caleb
             unimplemented!();
         }
         GenRegex::StringSlice(_, _) => {
-            // Unimplemented for now
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
-            // Unimplemented for now
             unimplemented!();
         }
     }
@@ -306,6 +304,7 @@ pub fn nullable_determinized(
         GenRegex::Kleene(_) => true_helper(),
         GenRegex::Complement(gre1) => nullable_negation_helper(nullable_determinized(gre1)),
         GenRegex::IfThenElse(p, g1, g2) => {
+            // TODO Caleb
             unimplemented!();
         }
         GenRegex::StringSlice(_, _) => {

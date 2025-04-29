@@ -8,11 +8,10 @@
 use super::determinized::derivative_determinized;
 use super::sub_from_predicate::sub_from_predicate;
 use super::subs::{
-    merge_binary, merge_sets, sub_difference_from_merge, sub_in, union_sets, AntimirovElement,
-    SimpleSub, SubExpr,
+    merge_binary, merge_sets, sub_difference_from_merge, sub_in, sub_in_predicate, union_sets,
+    AntimirovElement, SimpleSub, SubExpr,
 };
 
-use crate::brzozowski;
 use crate::types::expr::CharExpression;
 use crate::types::regex::GenRegex;
 
@@ -144,11 +143,29 @@ pub fn derivative(
                 .filter(|x| !matches!(x.get_expr().as_ref(), GenRegex::EmptySet))
                 .collect()
         }
-        GenRegex::IfThenElse(_, _, _) => {
-            // Use Brzozowski derivative
-            eprintln!("Warning: IfThenElse encountered in Antimirov; falling back to Brzozowski");
-            let deriv = brzozowski::deriv::derivative(gre, deriv_char);
-            AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
+        GenRegex::IfThenElse(pred, expr1, expr2) => {
+            let derivs1 = derivative(expr1, deriv_char);
+            let derivs2 = derivative(expr2, deriv_char);
+
+            let mut ret_set = HashSet::new();
+            for d1 in &derivs1 {
+                let e1 = d1.get_expr();
+                let subs1 = d1.get_subs();
+                let pred1 = sub_in_predicate(pred, subs1);
+                let re1 = GenRegex::if_then_else(&pred1, e1, &GenRegex::empty_set());
+                let ret1 = AntimirovElement::new(re1, subs1.clone());
+                ret_set.insert(ret1);
+            }
+            for d2 in &derivs2 {
+                let e2 = d2.get_expr();
+                let subs2 = d2.get_subs();
+                let pred2 = sub_in_predicate(pred, subs2);
+                let re2 = GenRegex::if_then_else(&pred2, &GenRegex::empty_set(), e2);
+                let ret2 = AntimirovElement::new(re2, subs2.clone());
+                ret_set.insert(ret2);
+            }
+
+            ret_set
         }
         GenRegex::StringSlice(_, _) => {
             eprintln!("TODO: Antimirov derivative does not currently support string slicing");
