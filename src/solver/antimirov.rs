@@ -85,6 +85,7 @@ impl Solver for AntimirovSolver {
                     let range = ele.get_ranges();
                     for (var, range) in range {
                         // TODO: Placeholder
+                        // TODO Caleb
                         eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
                     }

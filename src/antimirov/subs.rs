@@ -335,7 +335,6 @@ pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
-    // TODO: add not constraints here:
     not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
 }
 
@@ -622,7 +621,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
                 &mut canonical_map,
             ) {
                 return None;
-            } //TODO: Union everything together here (add in union_find element)
+            }
         }
     }
     let mut combined_expr: SimpleSub = SimpleSub::empty();
@@ -671,8 +670,6 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
         }
     }
 
-    //let string_subs = sub_in(string_subs, char_subs); //TODO: implement sub_in
-    //
     for (var, mut eq_exprs) in str_eq_class {
         let sub_expr_vector = eq_exprs[0].get_mut_head();
         for (i, item) in sub_expr_vector.iter_mut().enumerate() {
@@ -871,14 +868,14 @@ pub fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
             Rc::new(GenRegex::Complement(sub_in(gen_regex, substitution)))
         }
         GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => {
-            // TODO: Placeholder
-            // Implement this case
-            expr.clone()
+            // TODO 6: Optional
+            eprintln!("TODO: Antimirov derivative does not currently fully support IfThenElse for substitutions");
+            unimplemented!()
         }
         GenRegex::StringSlice(string_var, _) => {
-            // TODO: Placeholder
-            // Implement this case
-            expr.clone()
+            // TODO 7: Optional
+            eprintln!("TODO: Antimirov derivative does not currently fully support StringSlice for substitutions");
+            unimplemented!()
         }
     }
 }
@@ -925,13 +922,9 @@ fn sub_in_maybe_char_expr(expr: &MaybeCharExpression, sub: &SimpleSub) -> Rc<May
             Rc::new(MaybeCharExpression::CharExpression(new_expr))
         }
         MaybeCharExpression::StringIndex(_string_index) => {
-            // TODO
+            // TODO 8: Optional
+            eprintln!("TODO: Antimirov derivative does not currently fully support String Index for substitutions");
             unimplemented!()
-            // let new_var = sub_in_string_var(&string_index.var, sub);
-            // Rc::new(MaybeCharExpression::StringIndex(StringIndex {
-            //     var: new_var,
-            //     index: string_index.index,
-            // }))
         }
     }
 }

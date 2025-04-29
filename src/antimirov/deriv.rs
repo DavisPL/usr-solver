@@ -146,13 +146,16 @@ pub fn derivative(
         }
         GenRegex::IfThenElse(_, _, _) => {
             // Use Brzozowski derivative
+            eprintln!("Warning: IfThenElse encountered in Antimirov; falling back to Brzozowski");
             let deriv = brzozowski::deriv::derivative(gre, deriv_char);
             AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
         }
         GenRegex::StringSlice(_, _) => {
+            eprintln!("TODO: Antimirov derivative does not currently support string slicing");
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
+            eprintln!("TODO: Antimirov derivative does not currently support string indexing");
             unimplemented!();
         }
     }
