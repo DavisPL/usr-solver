@@ -61,7 +61,7 @@ impl Solver for AntimirovSolver {
             not_sub: SimpleSub::empty(),
             depth: 0,
         });
-        //Modify visited to compare not substitutions
+        //TODO: Modify visited to compare not substitutions, not just the USR
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
         while let Some(layer) = sat_stack.pop() {
             if !merge_sets(
