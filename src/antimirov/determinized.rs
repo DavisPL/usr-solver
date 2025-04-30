@@ -7,10 +7,8 @@
 // TODO: fix and remove
 #![allow(unused_variables)]
 
-//use clap::builder::Str;
-
 use super::subs::{AntimirovElement, SimpleSub, SubExpr};
-use super::util::{char_minus_one, char_plus_one, CHAR_MAX, CHAR_MIN};
+use super::util::{char_minus_one, char_plus_one, get_fresh_var, CHAR_MAX, CHAR_MIN};
 
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
@@ -27,14 +25,6 @@ use std::rc::Rc;
 
     The idea is that we can then complement these easily by just negating each individual R.
 */
-
-// TODO: Create a global fresh var generator
-fn get_fresh_var(name: String) -> CharVar {
-    let var_name = format!("{}'", name);
-    CharVar {
-        name: format!("{}'", var_name),
-    }
-}
 
 pub fn derivative_determinized(
     gre: &Rc<GenRegex>,
@@ -108,7 +98,7 @@ pub fn derivative_determinized(
                 CharExpression::CharVar(char_var) => char_var.name.clone(),
                 CharExpression::Literal(c) => c.to_string(),
             };
-            let mid_char = get_fresh_var(name);
+            let mid_char = get_fresh_var();
             let d_char = CharExpression::CharVar(mid_char.clone());
             let head = vec![d_char.clone()];
 

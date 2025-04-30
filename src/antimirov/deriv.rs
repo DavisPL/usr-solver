@@ -11,8 +11,9 @@ use super::subs::{
     merge_binary, merge_sets, sub_difference_from_merge, sub_in, sub_in_predicate, union_sets,
     AntimirovElement, SimpleSub, SubExpr,
 };
+use super::util::get_fresh_var;
 
-use crate::types::expr::{CharExpression, CharVar};
+use crate::types::expr::CharExpression;
 use crate::types::regex::GenRegex;
 
 use std::collections::{BTreeMap, HashSet};
@@ -21,14 +22,6 @@ use std::rc::Rc;
 /*
     The main derivative operation
 */
-
-// TODO: Create a global fresh var generator
-fn get_fresh_var(name: String) -> CharVar {
-    let var_name = format!("{}'", name);
-    CharVar {
-        name: format!("{}'", var_name),
-    }
-}
 
 pub fn derivative(
     gre: &Rc<GenRegex>,
@@ -316,10 +309,7 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             let mut string_to = BTreeMap::new();
             string_to.insert(
                 s_var.clone(),
-                SubExpr::new(
-                    vec![CharExpression::CharVar(get_fresh_var(s_var.name.clone()))],
-                    true,
-                ),
+                SubExpr::new(vec![CharExpression::CharVar(get_fresh_var())], true),
             );
             let string_sub =
                 SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
