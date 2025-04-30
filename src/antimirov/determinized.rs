@@ -57,18 +57,23 @@ pub fn derivative_determinized(
                 }
             }
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
+                // TODO 1: Tiching
                 determinize_range(d_var, *lit_val, *lit_val)
             }
             (CharExpression::Literal(lit_val), CharExpression::CharVar(c_var)) => {
+                // TODO 2: Tiching
                 determinize_range(c_var, *lit_val, *lit_val)
             }
             (CharExpression::CharVar(d_var), CharExpression::CharVar(c_var)) => {
+                // TODO 3: Tiching
                 // TODO: Hard case, requires encoding x != y
                 unimplemented!();
             }
         },
         GenRegex::StringVar(string_var) => {
-            // TODO: Hard case, requires handling w |-> xw and negation of this
+            // TODO 4: Tiching
+            // Hard case, requires handling w |-> xw and negation of this
+            eprintln!("Warning: determinized derivative case for StringVar may be unsound");
             unimplemented!();
             // TEMP - uncomment to run determinizing solver on examples
             // AntimirovElement::new_emptysub(gre.clone()).into_set()
@@ -136,27 +141,16 @@ pub fn derivative_determinized(
                 .collect()
         }
         GenRegex::IfThenElse(_, _, _) => {
-            // Unimplemented for now
+            // TODO Caleb
             unimplemented!();
         }
         GenRegex::StringSlice(_, _) => {
-            // Unimplemented for now
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
-            // Unimplemented for now
             unimplemented!();
         }
     }
-    // ;
-
-    // print!("    d({}, {}) = {{ ", gre, deriv_char);
-    // for ele in &result {
-    //     print!("{}, ", ele.get_expr());
-    // }
-    // println!("}}");
-
-    // result
 }
 
 // Return a determinized set of derivatives for a range
@@ -310,6 +304,7 @@ pub fn nullable_determinized(
         GenRegex::Kleene(_) => true_helper(),
         GenRegex::Complement(gre1) => nullable_negation_helper(nullable_determinized(gre1)),
         GenRegex::IfThenElse(p, g1, g2) => {
+            // TODO Caleb
             unimplemented!();
         }
         GenRegex::StringSlice(_, _) => {
