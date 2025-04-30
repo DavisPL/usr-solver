@@ -8,11 +8,11 @@
 use super::determinized::derivative_determinized;
 use super::sub_from_predicate::sub_from_predicate;
 use super::subs::{
-    merge_binary, merge_sets, sub_difference_from_merge, sub_in, union_sets, AntimirovElement,
-    SimpleSub, SubExpr,
+    merge_binary, merge_sets, sub_difference_from_merge, sub_in, sub_in_predicate, union_sets,
+    AntimirovElement, SimpleSub, SubExpr,
 };
+use super::util::get_fresh_var;
 
-use crate::brzozowski;
 use crate::types::expr::CharExpression;
 use crate::types::regex::GenRegex;
 
@@ -27,6 +27,7 @@ pub fn derivative(
     gre: &Rc<GenRegex>,
     deriv_char: &Rc<CharExpression>,
 ) -> HashSet<AntimirovElement> {
+    //Track not constraints to properly eval derivative
     // println!("taking d({}, {})", gre, deriv_char);
 
     match gre.as_ref() {
@@ -57,13 +58,15 @@ pub fn derivative(
             (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(d_var.clone(), c_expr.clone());
-                let subs = SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new());
+                let subs =
+                    SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(), BTreeMap::new());
                 AntimirovElement::new(GenRegex::epsilon(), subs).into_set()
             }
             (_, CharExpression::CharVar(c_var)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
-                let subs = SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new());
+                let subs =
+                    SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(), BTreeMap::new());
                 AntimirovElement::new(GenRegex::epsilon(), subs).into_set()
             }
         },
@@ -75,7 +78,8 @@ pub fn derivative(
             let mut string_to = BTreeMap::new();
             string_to.insert(string_var.clone(), subexpr);
 
-            let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+            let substitution =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
 
             AntimirovElement::new(gre.clone(), substitution).into_set()
         }
@@ -140,15 +144,36 @@ pub fn derivative(
                 .filter(|x| !matches!(x.get_expr().as_ref(), GenRegex::EmptySet))
                 .collect()
         }
-        GenRegex::IfThenElse(_, _, _) => {
-            // Use Brzozowski derivative
-            let deriv = brzozowski::deriv::derivative(gre, deriv_char);
-            AntimirovElement::new(deriv, SimpleSub::empty()).into_set()
+        GenRegex::IfThenElse(pred, expr1, expr2) => {
+            let derivs1 = derivative(expr1, deriv_char);
+            let derivs2 = derivative(expr2, deriv_char);
+
+            let mut ret_set = HashSet::new();
+            for d1 in &derivs1 {
+                let e1 = d1.get_expr();
+                let subs1 = d1.get_subs();
+                let pred1 = sub_in_predicate(pred, subs1);
+                let re1 = GenRegex::if_then_else(&pred1, e1, &GenRegex::empty_set());
+                let ret1 = AntimirovElement::new(re1, subs1.clone());
+                ret_set.insert(ret1);
+            }
+            for d2 in &derivs2 {
+                let e2 = d2.get_expr();
+                let subs2 = d2.get_subs();
+                let pred2 = sub_in_predicate(pred, subs2);
+                let re2 = GenRegex::if_then_else(&pred2, &GenRegex::empty_set(), e2);
+                let ret2 = AntimirovElement::new(re2, subs2.clone());
+                ret_set.insert(ret2);
+            }
+
+            ret_set
         }
         GenRegex::StringSlice(_, _) => {
+            eprintln!("TODO: Antimirov derivative does not currently support string slicing");
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
+            eprintln!("TODO: Antimirov derivative does not currently support string indexing");
             unimplemented!();
         }
     }
@@ -218,6 +243,7 @@ fn apply_deriv_kleene(left_deriv: &AntimirovElement, right: &Rc<GenRegex>) -> An
 */
 
 pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
+    //Track not constraints to properly eval nullable
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
         GenRegex::Epsilon => SimpleSub::empty().into_set(),
@@ -228,7 +254,8 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::StringVar(s_var) => {
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), SubExpr::empty());
-            let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+            let string_sub =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
             string_sub.into_set()
         }
         GenRegex::Union(side1, side2) => {
@@ -277,13 +304,17 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             // The hard case
             // Here we can just enumerate if we come across the case.
             // TODO
-            unimplemented!()
-            // let mut subs = HashSet::new();
-            // let mut string_to = BTreeMap::new();
-            // string_to.insert(s_var.clone(), SubExpr::empty());
-            // let string_sub = SimpleSub::new(string_to, BTreeMap::new());
-            // subs.insert(string_sub);
-            // subs
+            //unimplemented!();
+            let mut subs = HashSet::new();
+            let mut string_to = BTreeMap::new();
+            string_to.insert(
+                s_var.clone(),
+                SubExpr::new(vec![CharExpression::CharVar(get_fresh_var())], true),
+            );
+            let string_sub =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
+            subs.insert(string_sub);
+            subs
         }
         GenRegex::Union(side1, side2) => {
             // Matches logic for GenRegex::Intersection in the regular nullable case

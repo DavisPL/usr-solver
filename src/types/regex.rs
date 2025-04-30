@@ -67,6 +67,17 @@ impl GenRegex {
     pub fn complement(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         Rc::new(GenRegex::Complement(gre.clone()))
     }
+    pub fn if_then_else(
+        pred: &Rc<Predicate>,
+        gre1: &Rc<GenRegex>,
+        gre2: &Rc<GenRegex>,
+    ) -> Rc<GenRegex> {
+        Rc::new(GenRegex::IfThenElse(
+            pred.clone(),
+            gre1.clone(),
+            gre2.clone(),
+        ))
+    }
     pub fn union_many(args: &[Rc<GenRegex>]) -> Rc<GenRegex> {
         if args.is_empty() {
             GenRegex::empty_set()

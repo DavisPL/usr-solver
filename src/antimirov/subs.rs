@@ -10,7 +10,7 @@ use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;
 
 use std::cmp::{max, min};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ops::Index;
 use std::rc::Rc;
 
@@ -314,6 +314,7 @@ pub struct AnySub {
     string_to: BTreeMap<StringVar, Vec<SubExpr>>,
     char_to: BTreeMap<CharVar, Vec<CharExpression>>,
     range_constraints: Option<BTreeMap<CharVar, RangeConstr>>,
+    not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
 }
 
 impl AnySub {
@@ -326,6 +327,9 @@ impl AnySub {
     pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
         self.range_constraints.take()
     }
+    pub fn get_not_constraints(&self) -> &BTreeMap<CharVar, BTreeSet<CharExpression>> {
+        &self.not_constraints
+    }
 }
 
 /// Represents a simple sub (in a normalized form)
@@ -334,6 +338,7 @@ pub struct SimpleSub {
     string_to: BTreeMap<StringVar, SubExpr>,
     char_to: BTreeMap<CharVar, CharExpression>,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
+    not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
 }
 
 impl Index<&StringVar> for SimpleSub {
@@ -352,11 +357,13 @@ impl SimpleSub {
         string_to: BTreeMap<StringVar, SubExpr>,
         char_to: BTreeMap<CharVar, CharExpression>,
         range_constraints: BTreeMap<CharVar, RangeConstr>,
+        not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>>,
     ) -> Self {
         SimpleSub {
             string_to,
             char_to,
             range_constraints,
+            not_constraints,
         }
     }
     pub fn empty() -> Self {
@@ -365,6 +372,7 @@ impl SimpleSub {
             string_to: BTreeMap::new(),
             char_to: BTreeMap::new(),
             range_constraints: BTreeMap::new(),
+            not_constraints: BTreeMap::new(),
         }
     }
 
@@ -374,6 +382,8 @@ impl SimpleSub {
     pub fn union(self, other: SimpleSub) -> AnySub {
         let mut combined_string_to: BTreeMap<StringVar, Vec<SubExpr>> = BTreeMap::new();
         let mut combined_char_to: BTreeMap<CharVar, Vec<CharExpression>> = BTreeMap::new();
+        let mut combined_not_constraints: BTreeMap<CharVar, BTreeSet<CharExpression>> =
+            BTreeMap::new();
 
         for (key, value) in self.string_to {
             combined_string_to.entry(key).or_default().push(value);
@@ -389,6 +399,19 @@ impl SimpleSub {
             combined_char_to.entry(key).or_default().push(value);
         }
 
+        for (key, value) in self.not_constraints {
+            combined_not_constraints
+                .entry(key)
+                .or_default()
+                .extend(value);
+        }
+        for (key, value) in other.not_constraints {
+            combined_not_constraints
+                .entry(key)
+                .or_default()
+                .extend(value);
+        }
+
         let range_constrs =
             merge_range_constraints(&self.range_constraints, &other.range_constraints);
 
@@ -396,6 +419,7 @@ impl SimpleSub {
             string_to: combined_string_to,
             char_to: combined_char_to,
             range_constraints: range_constrs,
+            not_constraints: combined_not_constraints,
         }
     }
 
@@ -443,6 +467,14 @@ impl SimpleSub {
     pub fn add_range(&mut self, key: CharVar, start: char, end: char) {
         let value = RangeConstr::new(start, end);
         self.range_constraints.insert(key, value);
+    }
+
+    pub fn get_not_constraints(&self) -> &BTreeMap<CharVar, BTreeSet<CharExpression>> {
+        &self.not_constraints
+    }
+
+    pub fn set_not_constraints(&mut self, not_constr: BTreeMap<CharVar, BTreeSet<CharExpression>>) {
+        self.not_constraints = not_constr;
     }
 
     /*
@@ -592,7 +624,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
                 &mut canonical_map,
             ) {
                 return None;
-            } //TODO: Union everything together here (add in union_find element)
+            }
         }
     }
     let mut combined_expr: SimpleSub = SimpleSub::empty();
@@ -641,8 +673,6 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
         }
     }
 
-    //let string_subs = sub_in(string_subs, char_subs); //TODO: implement sub_in
-    //
     for (var, mut eq_exprs) in str_eq_class {
         let sub_expr_vector = eq_exprs[0].get_mut_head();
         for (i, item) in sub_expr_vector.iter_mut().enumerate() {
@@ -664,10 +694,47 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
         combined_expr.set_str_var(var.clone(), eq_exprs[0].clone());
     }
 
+    // Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
+    let mut combined_not = BTreeMap::new();
+    for (c, not_constraint_set) in substitutions.not_constraints {
+        let modified_not = find_set(not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
+        let key = CharExpression::CharVar(c.clone());
+        if !expr_to_id.contains_key(&Rc::new(key.clone())) {
+            expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
+            id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
+        }
+        let id_var = expr_to_id[&key.clone()];
+        if modified_not.contains(&id_to_expr[&union_find.find(id_var).clone()]) {
+            return None;
+        }
+        combined_not.insert(c.clone(), modified_not);
+    }
+
+    // Include not constraints
+    combined_expr.set_not_constraints(combined_not);
+
     // Include range constraints
     combined_expr.set_ranges(range_constrs);
 
     Some(combined_expr)
+}
+
+pub fn find_set(
+    queries: BTreeSet<CharExpression>,
+    union_find: &UnionFind,
+    expr_to_id: &HashMap<Rc<CharExpression>, usize>,
+    id_to_expr: &HashMap<usize, Rc<CharExpression>>,
+) -> BTreeSet<CharExpression> {
+    let mut ret_set = BTreeSet::new();
+    for query in queries {
+        if !expr_to_id.contains_key(&query) {
+            ret_set.insert(query);
+        } else {
+            let id_var = expr_to_id[&query];
+            ret_set.insert((*id_to_expr[&union_find.find(id_var)]).clone());
+        }
+    }
+    ret_set
 }
 
 pub fn merge_binary(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
@@ -813,19 +880,19 @@ pub fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
             Rc::new(GenRegex::Complement(sub_in(gen_regex, substitution)))
         }
         GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => {
-            // TODO: Placeholder
-            // Implement this case
-            expr.clone()
+            // TODO 6: Optional
+            eprintln!("TODO: Antimirov derivative does not currently fully support IfThenElse for substitutions");
+            unimplemented!()
         }
         GenRegex::StringSlice(string_var, _) => {
-            // TODO: Placeholder
-            // Implement this case
-            expr.clone()
+            // TODO 7: Optional
+            eprintln!("TODO: Antimirov derivative does not currently fully support StringSlice for substitutions");
+            unimplemented!()
         }
     }
 }
 
-fn sub_in_predicate(pred: &Rc<Predicate>, sub: &SimpleSub) -> Rc<Predicate> {
+pub fn sub_in_predicate(pred: &Rc<Predicate>, sub: &SimpleSub) -> Rc<Predicate> {
     match pred.as_ref() {
         Predicate::True => Rc::clone(pred),
         Predicate::False => Rc::clone(pred),
@@ -867,13 +934,9 @@ fn sub_in_maybe_char_expr(expr: &MaybeCharExpression, sub: &SimpleSub) -> Rc<May
             Rc::new(MaybeCharExpression::CharExpression(new_expr))
         }
         MaybeCharExpression::StringIndex(_string_index) => {
-            // TODO
+            // TODO 8: Optional
+            eprintln!("TODO: Antimirov derivative does not currently fully support String Index for substitutions");
             unimplemented!()
-            // let new_var = sub_in_string_var(&string_index.var, sub);
-            // Rc::new(MaybeCharExpression::StringIndex(StringIndex {
-            //     var: new_var,
-            //     index: string_index.index,
-            // }))
         }
     }
 }

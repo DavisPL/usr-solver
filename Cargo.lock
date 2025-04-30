@@ -196,6 +196,7 @@ dependencies = [
  "clap",
  "disjoint-sets",
  "either",
+ "lazy_static",
  "lexpr",
  "regex",
  "z3",

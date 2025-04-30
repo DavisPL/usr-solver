@@ -8,12 +8,12 @@
 #![allow(unused_variables)]
 
 use super::subs::{AntimirovElement, SimpleSub, SubExpr};
-use super::util::{char_minus_one, char_plus_one, CHAR_MAX, CHAR_MIN};
+use super::util::{char_minus_one, char_plus_one, get_fresh_var, CHAR_MAX, CHAR_MIN};
 
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::rc::Rc;
 
 /*
@@ -56,20 +56,83 @@ pub fn derivative_determinized(
                     AntimirovElement::new_empty().into_set()
                 }
             }
-            (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
-                determinize_range(d_var, *lit_val, *lit_val)
-            }
+
             (CharExpression::Literal(lit_val), CharExpression::CharVar(c_var)) => {
-                determinize_range(c_var, *lit_val, *lit_val)
+                let mut char_to = BTreeMap::new();
+                char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
+                let subs =
+                    SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(), BTreeMap::new());
+                let mut rv = AntimirovElement::new(GenRegex::epsilon(), subs).into_set();
+                let not_subs = SimpleSub::new(
+                    BTreeMap::new(),
+                    BTreeMap::new(),
+                    BTreeMap::new(),
+                    BTreeMap::from([(
+                        c_var.clone(),
+                        BTreeSet::from([deriv_char.as_ref().clone()]),
+                    )]),
+                );
+                rv.insert(AntimirovElement::new(GenRegex::empty_set(), not_subs));
+                rv
             }
-            (CharExpression::CharVar(d_var), CharExpression::CharVar(c_var)) => {
-                // TODO: Hard case, requires encoding x != y
-                unimplemented!();
+            (CharExpression::CharVar(d_var), _) => {
+                let mut char_to = BTreeMap::new();
+                char_to.insert(d_var.clone(), c_expr.clone());
+                let subs =
+                    SimpleSub::new(BTreeMap::new(), char_to, BTreeMap::new(), BTreeMap::new());
+                let mut rv = AntimirovElement::new(GenRegex::epsilon(), subs).into_set();
+                let not_subs = SimpleSub::new(
+                    BTreeMap::new(),
+                    BTreeMap::new(),
+                    BTreeMap::new(),
+                    BTreeMap::from([(d_var.clone(), BTreeSet::from([c_expr.clone()]))]),
+                );
+                rv.insert(AntimirovElement::new(GenRegex::empty_set(), not_subs));
+                rv
             }
         },
         GenRegex::StringVar(string_var) => {
-            // TODO: Hard case, requires handling w |-> xw and negation of this
-            unimplemented!();
+            // Hard case, requires handling w |-> xw and negation of this
+            eprintln!("Warning: determinized derivative case for StringVar may be unsound");
+            let name: String = match deriv_char.as_ref() {
+                CharExpression::CharVar(char_var) => char_var.name.clone(),
+                CharExpression::Literal(c) => c.to_string(),
+            };
+            let mid_char = get_fresh_var();
+            let d_char = CharExpression::CharVar(mid_char.clone());
+            let head = vec![d_char.clone()];
+
+            let subexpr = SubExpr::new(head, true);
+
+            let mut string_to = BTreeMap::new();
+            string_to.insert(string_var.clone(), subexpr);
+
+            let mut char_to = BTreeMap::new();
+            char_to.insert(mid_char.clone(), deriv_char.as_ref().clone());
+
+            let mut not_constr = BTreeMap::new();
+            not_constr.insert(
+                mid_char.clone(),
+                BTreeSet::from([deriv_char.as_ref().clone()]),
+            );
+
+            let substitution =
+                SimpleSub::new(string_to.clone(), char_to, BTreeMap::new(), BTreeMap::new());
+
+            let mut rv = AntimirovElement::new(gre.clone(), substitution).into_set();
+            let not_sub = SimpleSub::new(
+                string_to.clone(),
+                BTreeMap::new(),
+                BTreeMap::new(),
+                not_constr,
+            );
+            let mut string_to = BTreeMap::new();
+            string_to.insert(string_var.clone(), SubExpr::empty());
+            let eps_sub =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
+            rv.insert(AntimirovElement::new(GenRegex::empty_set(), not_sub));
+            rv.insert(AntimirovElement::new(GenRegex::empty_set(), eps_sub));
+            rv
             // TEMP - uncomment to run determinizing solver on examples
             // AntimirovElement::new_emptysub(gre.clone()).into_set()
         }
@@ -136,27 +199,16 @@ pub fn derivative_determinized(
                 .collect()
         }
         GenRegex::IfThenElse(_, _, _) => {
-            // Unimplemented for now
+            // TODO Caleb
             unimplemented!();
         }
         GenRegex::StringSlice(_, _) => {
-            // Unimplemented for now
             unimplemented!();
         }
         GenRegex::StringIndex(_) => {
-            // Unimplemented for now
             unimplemented!();
         }
     }
-    // ;
-
-    // print!("    d({}, {}) = {{ ", gre, deriv_char);
-    // for ele in &result {
-    //     print!("{}, ", ele.get_expr());
-    // }
-    // println!("}}");
-
-    // result
 }
 
 // Return a determinized set of derivatives for a range
@@ -254,6 +306,7 @@ pub fn nullable_or_helper(
     ))
 }
 
+//TODO: Add not constraint tracking
 pub fn nullable_determinized(
     gre: &Rc<GenRegex>,
 ) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
@@ -273,7 +326,9 @@ pub fn nullable_determinized(
         GenRegex::StringVar(s_var) => {
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), SubExpr::empty());
-            let string_sub = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+            //TODO: set correct not constraints for string_sub
+            let string_sub =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
             let true_case = AntimirovElement::new(GenRegex::empty_set(), string_sub).into_set();
 
             // TODO: Ensure var is fresh
@@ -286,7 +341,9 @@ pub fn nullable_determinized(
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), subexpr);
 
-            let substitution = SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new());
+            //TODO: set correct not constraints for substitutions
+            let substitution =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
 
             let false_case = AntimirovElement::new(GenRegex::empty_set(), substitution).into_set();
 
@@ -305,6 +362,7 @@ pub fn nullable_determinized(
         GenRegex::Kleene(_) => true_helper(),
         GenRegex::Complement(gre1) => nullable_negation_helper(nullable_determinized(gre1)),
         GenRegex::IfThenElse(p, g1, g2) => {
+            // TODO Caleb
             unimplemented!();
         }
         GenRegex::StringSlice(_, _) => {
