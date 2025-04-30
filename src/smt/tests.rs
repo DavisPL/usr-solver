@@ -468,6 +468,55 @@ fn test_not2() {
     assert_satisfiable("benchmarks/simple_not_sat_2.smt2");
 }
 
+/* Tests - range tests
+ 
+    Currently unknown what tests support these
+
+ */
+#[ignore]
+#[test]
+fn test_range_intersect1() {
+    assert_satisfiable("benchmarks/range/intersectranges_sat.smt2");
+}
+
+#[test]
+fn test_range_intersect2() {
+    assert_unsatisfiable("benchmarks/range/intersectranges_unsat.smt2");
+}
+
+#[ignore]
+#[test]
+fn test_range_outside() {
+    assert_unsatisfiable("benchmarks/range/range_out_of_range_unsat.smt2");
+}
+
+#[ignore]
+#[test]
+fn test_range_outside_2() {
+    assert_unsatisfiable("benchmarks/range/rangecomplement_unsat.smt2");
+}
+
+#[test]
+fn test_range_simple() {
+    assert_satisfiable("benchmarks/range/range_sat.smt2");
+}
+
+#[test]
+fn test_union_range1() {
+    assert_satisfiable("benchmarks/range/union_ranges_sat.smt2");
+}
+
+#[ignore]
+#[test]
+fn test_union_range2() {
+    assert_satisfiable("benchmarks/range/union_ranges_2_sat.smt2");
+}
+
+#[ignore]
+#[test]
+fn test_union_range3() {
+    assert_unsatisfiable("benchmarks/range/union_ranges_unsat.smt2");
+}
 /*
     Tests - medium cases
 

@@ -3,8 +3,8 @@
 (declare-fun x () String)
 
 (assert (and
-  (str.in.re x (re.range "m" "p"))
-  (str.in.re x (re.union (str.to.re "l") (str.to.re "p")))
+  (str.in_re x (re.range "m" "p"))
+  (str.in_re x (re.union (str.to_re "l") (str.to_re "p")))
 ))
 
 (check-sat)

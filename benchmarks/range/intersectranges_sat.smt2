@@ -2,7 +2,6 @@
 
 (declare-fun x () String)
 
-(assert (str.in.re x (re.inter (re.range "d" "h") (re.range "f" "k"))))
+(assert (str.in_re x (re.inter (re.range "d" "h") (re.range "f" "k"))))
 
 (check-sat)
-(get-model)
