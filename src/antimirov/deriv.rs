@@ -12,7 +12,7 @@ use super::subs::{
     AntimirovElement, SimpleSub, SubExpr,
 };
 
-use crate::types::expr::{CharExpression,CharVar};
+use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
 use std::collections::{BTreeMap, HashSet};
@@ -314,8 +314,15 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             //unimplemented!();
             let mut subs = HashSet::new();
             let mut string_to = BTreeMap::new();
-            string_to.insert(s_var.clone(), SubExpr::new(vec![CharExpression::CharVar(get_fresh_var(s_var.name.clone()))], true));
-            let string_sub = SimpleSub::new(string_to, BTreeMap::new(),BTreeMap::new(),BTreeMap::new());
+            string_to.insert(
+                s_var.clone(),
+                SubExpr::new(
+                    vec![CharExpression::CharVar(get_fresh_var(s_var.name.clone()))],
+                    true,
+                ),
+            );
+            let string_sub =
+                SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
             subs.insert(string_sub);
             subs
         }
