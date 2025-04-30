@@ -28,6 +28,7 @@ use std::rc::Rc;
     The idea is that we can then complement these easily by just negating each individual R.
 */
 
+// TODO: Create a global fresh var generator
 fn get_fresh_var(name: String) -> CharVar {
     let var_name = format!("{}'", name);
     CharVar {

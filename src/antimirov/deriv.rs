@@ -12,7 +12,7 @@ use super::subs::{
     AntimirovElement, SimpleSub, SubExpr,
 };
 
-use crate::types::expr::CharExpression;
+use crate::types::expr::{CharExpression,CharVar};
 use crate::types::regex::GenRegex;
 
 use std::collections::{BTreeMap, HashSet};
@@ -21,6 +21,14 @@ use std::rc::Rc;
 /*
     The main derivative operation
 */
+
+// TODO: Create a global fresh var generator
+fn get_fresh_var(name: String) -> CharVar {
+    let var_name = format!("{}'", name);
+    CharVar {
+        name: format!("{}'", var_name),
+    }
+}
 
 pub fn derivative(
     gre: &Rc<GenRegex>,
@@ -303,13 +311,13 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
             // The hard case
             // Here we can just enumerate if we come across the case.
             // TODO
-            unimplemented!()
-            // let mut subs = HashSet::new();
-            // let mut string_to = BTreeMap::new();
-            // string_to.insert(s_var.clone(), SubExpr::empty());
-            // let string_sub = SimpleSub::new(string_to, BTreeMap::new());
-            // subs.insert(string_sub);
-            // subs
+            //unimplemented!();
+            let mut subs = HashSet::new();
+            let mut string_to = BTreeMap::new();
+            string_to.insert(s_var.clone(), SubExpr::new(vec![CharExpression::CharVar(get_fresh_var(s_var.name.clone()))], true));
+            let string_sub = SimpleSub::new(string_to, BTreeMap::new(),BTreeMap::new(),BTreeMap::new());
+            subs.insert(string_sub);
+            subs
         }
         GenRegex::Union(side1, side2) => {
             // Matches logic for GenRegex::Intersection in the regular nullable case
