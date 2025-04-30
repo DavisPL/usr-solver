@@ -469,10 +469,10 @@ fn test_not2() {
 }
 
 /* Tests - range tests
- 
-    Currently unknown what tests support these
 
- */
+   Currently unknown what tests support these
+
+*/
 #[ignore]
 #[test]
 fn test_range_intersect1() {
