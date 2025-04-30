@@ -82,6 +82,9 @@ pub fn count_union_elems(substitutions: &AnySub) -> usize {
             count += sub_expr.get_head().len();
         }
     }
+    for sub in substitutions.get_not_constraints() {
+        count += 1
+    }
     for c_exprs in substitutions.get_char_map().values() {
         count += c_exprs.len() + 1;
     }

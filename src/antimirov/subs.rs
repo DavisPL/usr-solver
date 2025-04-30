@@ -327,6 +327,9 @@ impl AnySub {
     pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
         self.range_constraints.take()
     }
+    pub fn get_not_constraints(&self) -> &BTreeMap<CharVar, BTreeSet<CharExpression>> {
+        &self.not_constraints
+    }
 }
 
 /// Represents a simple sub (in a normalized form)
@@ -695,7 +698,12 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     let mut combined_not = BTreeMap::new();
     for (c, not_constraint_set) in substitutions.not_constraints {
         let modified_not = find_set(not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
-        let id_var = expr_to_id[&CharExpression::CharVar(c.clone())];
+        let key = CharExpression::CharVar(c.clone());
+        if !expr_to_id.contains_key(&Rc::new(key.clone())) {
+            expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
+            id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
+        }
+        let id_var = expr_to_id[&key.clone()];
         if modified_not.contains(&id_to_expr[&union_find.find(id_var).clone()]) {
             return None;
         }
@@ -719,8 +727,12 @@ pub fn find_set(
 ) -> BTreeSet<CharExpression> {
     let mut ret_set = BTreeSet::new();
     for query in queries {
-        let id_var = expr_to_id[&query];
-        ret_set.insert((*id_to_expr[&union_find.find(id_var)]).clone());
+        if !expr_to_id.contains_key(&query) {
+            ret_set.insert(query);
+        } else {
+            let id_var = expr_to_id[&query];
+            ret_set.insert((*id_to_expr[&union_find.find(id_var)]).clone());
+        }
     }
     ret_set
 }
