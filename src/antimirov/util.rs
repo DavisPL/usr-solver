@@ -35,7 +35,6 @@ lazy_static! {
 // TODO: Create a global fresh var generator - using a counter with lazy_static
 pub fn get_fresh_var() -> CharVar {
     // Lazy static to increment a counter, then use that to create a new var
-    eprintln!("Warning: fresh variable may not be fresh");
 
     let mut counter_handle = FRESH_COUNTER.lock().unwrap();
     *counter_handle += 1;
