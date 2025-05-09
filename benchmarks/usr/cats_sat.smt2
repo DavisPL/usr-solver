@@ -2,7 +2,8 @@
 ; Membership in intersection of
 ; w1(cat){0,3}w1
 ; w1(cat){2,5}w1
-; w2w2w2w2w2
+; (w2)^11 \cup (w2)^13
+; .*(dog).*
 
 (declare-fun w1 () String)
 (declare-fun w2 () String)
@@ -15,10 +16,11 @@
                 (str.to_re w1) ((_ re.loop 0 3) (str.to_re "cat")) (str.to_re w1)
             )
             (re.++
-                (str.to_re w1) ((_ re.loop 0 3) (str.to_re "cat")) (str.to_re w1)
+                (str.to_re w1) ((_ re.loop 2 5) (str.to_re "cat")) (str.to_re w1)
             )
+            (re.union ((_ re.^ 11) (str.to_re w2)) ((_ re.^ 13) (str.to_re w2)))
             (re.++
-                (str.to_re w2) (str.to_re w2) (str.to_re w2) (str.to_re w2) (str.to_re w2)
+                re.all (str.to_re "dog") re.all
             )
         )
     )
