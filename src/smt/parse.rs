@@ -675,6 +675,8 @@ impl SmtParser {
                 "or" => self.parse_and(tail),
                 "not" => self.parse_assert_arg_not(tail),
                 "=" => self.parse_equals(tail),
+                "<" => self.parse_less_than(tail),
+                ">" => self.parse_greater_than(tail),
                 "let" => self.parse_let_assertion(tail),
                 _ => {
                     // Check for let variable case a second time
@@ -689,6 +691,8 @@ impl SmtParser {
                 "or" => self.parse_or(tail),
                 "not" => self.parse_assert_arg_not(tail),
                 "=" => self.parse_equals(tail),
+                "<" => self.parse_less_than(tail),
+                ">" => self.parse_greater_than(tail),
                 "let" => self.parse_let_assertion(tail),
                 _ => {
                     // Check for let variable case a second time
@@ -714,73 +718,380 @@ impl SmtParser {
         Ok(res)
     }
 
+    fn is_length_operation(&mut self, v: &Value) -> bool {
+        if let Some((head, _tail)) = v.as_pair() {
+            if let Value::Symbol(s) = head {
+                return **s == *"str.len";
+            }
+        }
+        false
+    }
+
+    fn parse_len_greater_than(&mut self, v: &Value, length: i64) -> Result<Rc<GenRegex>, SmtParseError> {
+        let mut args: Vec<Rc<GenRegex>> = Vec::new();
+
+        for _ in 0..length+1 {
+            let regex = GenRegex::create_sigma();
+            args.push(regex);
+        }
+        let regex = GenRegex::sigma_star();
+        args.push(regex);
+        let un_not_gen_regex: Rc<GenRegex> = if args.is_empty() {
+            GenRegex::epsilon()
+        } else {
+            GenRegex::concat_many(&args)
+        };
+
+        let gen_regex: Rc<GenRegex> = if self.not_flag{
+            GenRegex::complement(&un_not_gen_regex)
+        }else{
+            un_not_gen_regex
+        };
+
+
+
+        if let Some((head, tail)) = v.as_pair() {
+            if let Value::Symbol(s) = head {
+                if **s == *"str.len" {
+                    let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+                    expect_null(tail)?;
+                    //let str = self.parse_string_type(str)?;
+                    //Ok(Self::strtok_to_retok(&str))
+                    let str_tok = self.parse_string_type(str)?;
+
+                    match str_tok {
+                        StringToken::Var(var_name) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&var_name),
+                                &gen_regex,
+                            ))
+                        },
+                        StringToken::Val(string) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::str_to_re(&string),
+                                &gen_regex,
+                            ))
+
+                        },
+                        _ => {
+                            return Err(SmtParseError::Unrecognized(format!(
+                                "Issue parsing length 2"
+                            )));
+                            }
+                    };
+                    //return &GenRegex::str_to_re(self.parse_string_type(tail)?);
+                }
+                
+            }
+        }
+        return Err(SmtParseError::Unrecognized(format!(
+            "Issue parsing length"
+        )));
+
+    }
+    fn parse_len_less_than(&mut self, v: &Value, length: i64) -> Result<Rc<GenRegex>, SmtParseError> {
+        let mut args: Vec<Rc<GenRegex>> = Vec::new();
+
+        for _ in 0..length {
+            let regex = GenRegex::create_sigma();
+            args.push(regex);
+        }
+        let regex = GenRegex::sigma_star();
+        args.push(regex);
+        let un_not_gen_regex: Rc<GenRegex> = if args.is_empty() {
+            GenRegex::epsilon()
+        } else {
+            GenRegex::concat_many(&args)
+        };
+
+        let gen_regex: Rc<GenRegex> = if !self.not_flag{
+            GenRegex::complement(&un_not_gen_regex)
+        }else{
+            un_not_gen_regex
+        };
+
+
+
+        if let Some((head, tail)) = v.as_pair() {
+            if let Value::Symbol(s) = head {
+                if **s == *"str.len" {
+                    let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+                    expect_null(tail)?;
+                    //let str = self.parse_string_type(str)?;
+                    //Ok(Self::strtok_to_retok(&str))
+                    let str_tok = self.parse_string_type(str)?;
+
+                    match str_tok {
+                        StringToken::Var(var_name) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&var_name),
+                                &gen_regex,
+                            ))
+                        },
+                        StringToken::Val(string) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::str_to_re(&string),
+                                &gen_regex,
+                            ))
+
+                        },
+                        _ => {
+                            return Err(SmtParseError::Unrecognized(format!(
+                                "Issue parsing length 2"
+                            )));
+                            }
+                    };
+                    //return &GenRegex::str_to_re(self.parse_string_type(tail)?);
+                }
+                
+            }
+        }
+        return Err(SmtParseError::Unrecognized(format!(
+            "Issue parsing length"
+        )));
+
+    }
+    fn parse_less_than(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError>{
+
+        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        expect_null(tail)?;
+        if regex1.is_number() && self.is_length_operation(regex2){
+            return self.parse_len_less_than(regex2, regex1.as_number().expect("Should be a number").as_i64().expect("Should be a number"));
+        }else if regex2.is_number() && self.is_length_operation(regex1){
+            return self.parse_len_less_than(regex1, regex2.as_number().expect("Should be a number").as_i64().expect("Should be a number"));
+        }
+        return Err(SmtParseError::Unrecognized(format!(
+            "Unsure how to parse RegLan"
+        )));
+    }
+
+    fn parse_greater_than(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError>{
+
+        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        expect_null(tail)?;
+        if regex1.is_number() && self.is_length_operation(regex2){
+            return self.parse_len_greater_than(regex2, regex1.as_number().expect("Should be a number").as_i64().expect("Should be a number"));
+        }else if regex2.is_number() && self.is_length_operation(regex1){
+            return self.parse_len_greater_than(regex1, regex2.as_number().expect("Should be a number").as_i64().expect("Should be a number"));
+        }
+        return Err(SmtParseError::Unrecognized(format!(
+            "Unsure how to parse RegLan"
+        )));
+    }
+
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Assumes RegLan on both sides of =
         //Todo: support String equality?
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        let parsed1 = self.parse_reglan_type(regex1)?;
-        let parsed2 = self.parse_reglan_type(regex2)?;
+        if regex1.is_symbol() && regex2.is_symbol(){
+            let parsed1 = self.parse_reglan_type(regex1)?;
+            let parsed2 = self.parse_reglan_type(regex2)?;
         //Initializes variables if its var=Regex
         //Asserts equality if Regex=Regex
         //Will return epsilon in case of initialization
-        match (parsed1, parsed2) {
-            (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(format!(
-                "Equality of uninitialized RegLan variables not supported."
-            ))),
-            (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
-                let res = self.re_var_names.get(&name);
-                if let Some(found) = res {
-                    match found {
-                        Some(_) => Err(SmtParseError::Unsupported(format!(
-                            "Conflicting RegLan initilizations are caught here instead of solver."
-                        ))),
-                        None => {
-                            self.re_var_names.insert(name, Some(gen_regex));
-                            Ok(GenRegex::epsilon())
+            return match (parsed1, parsed2) {
+                (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(format!(
+                    "Equality of uninitialized RegLan variables not supported."
+                ))),
+                (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
+                    let res = self.re_var_names.get(&name);
+                    if let Some(found) = res {
+                        match found {
+                            Some(_) => Err(SmtParseError::Unsupported(format!(
+                                "Conflicting RegLan initilizations are caught here instead of solver."
+                            ))),
+                            None => {
+                                self.re_var_names.insert(name, Some(gen_regex));
+                                Ok(GenRegex::epsilon())
+                            }
                         }
+                    } else {
+                        Err(SmtParseError::Unrecognized(format!(
+                            "RegLan variable not declared/found: {}",
+                            name
+                        )))
                     }
-                } else {
-                    Err(SmtParseError::Unrecognized(format!(
-                        "RegLan variable not declared/found: {}",
-                        name
-                    )))
                 }
-            }
-            (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
-                let res = self.re_var_names.get(&name);
-                if let Some(found) = res {
-                    match found {
-                        Some(_) => Err(SmtParseError::Unsupported(format!(
-                            "Conflicting RegLan initilizations are caught here instead of solver."
-                        ))),
-                        None => {
-                            self.re_var_names.insert(name, Some(gen_regex));
-                            Ok(GenRegex::epsilon())
+                (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
+                    let res = self.re_var_names.get(&name);
+                    if let Some(found) = res {
+                        match found {
+                            Some(_) => Err(SmtParseError::Unsupported(format!(
+                                "Conflicting RegLan initilizations are caught here instead of solver."
+                            ))),
+                            None => {
+                                self.re_var_names.insert(name, Some(gen_regex));
+                                Ok(GenRegex::epsilon())
+                            }
                         }
+                    } else {
+                        Err(SmtParseError::Unrecognized(format!(
+                            "RegLan variable not declared/found: {}",
+                            name
+                        )))
                     }
-                } else {
-                    Err(SmtParseError::Unrecognized(format!(
-                        "RegLan variable not declared/found: {}",
-                        name
-                    )))
                 }
-            }
-            (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
-                Err(SmtParseError::Unimplemented(format!(
-                    "Equals had not been fixed"
-                )))
-                /*
-                Ok(GenRegex::union(
-                    &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
-                    &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
-                ))*/
-            }
-            _ => Err(SmtParseError::Unimplemented(format!(
-                "Equals cannot handle ite currently."
-            ))),
+                (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
+                    Err(SmtParseError::Unimplemented(format!(
+                        "Equals had not been fixed"
+                    )))
+                    /*
+                    Ok(GenRegex::union(
+                        &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
+                        &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
+                    ))*/
+                }
+                _ => Err(SmtParseError::Unimplemented(format!(
+                    "Equals cannot handle ite currently."
+                ))),
+            };
+        }else if regex1.is_number() && self.is_length_operation(regex2){
+            return self.parse_len(regex2, regex1.as_number().expect("Should be a number").as_i64().expect("Should be a number"));
+        }else if regex2.is_number() && self.is_length_operation(regex1){
+            return self.parse_len(regex1, regex2.as_number().expect("Should be a number").as_i64().expect("Should be a number"));
+        }else{
+            let parsed1 = if regex1.is_string(){
+                Self::strtok_to_retok(&self.parse_string_type(regex1)?)
+
+            }else{
+                self.parse_reglan_type(regex1)?
+            };
+
+            let parsed2 = if regex2.is_string(){
+                Self::strtok_to_retok(&self.parse_string_type(regex2)?)
+
+            }else{
+                self.parse_reglan_type(regex2)?
+            };
+
+            //let parsed1 = self.parse_reglan_type(regex1)?;
+            //let parsed2 = self.parse_reglan_type(regex2)?;
+
+            return match (parsed1, parsed2) {
+                (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(format!(
+                    "Equality of uninitialized RegLan variables not supported."
+                ))),
+                (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
+                    let res = self.re_var_names.get(&name);
+                    if let Some(found) = res {
+                        match found {
+                            Some(_) => Err(SmtParseError::Unsupported(format!(
+                                "Conflicting RegLan initilizations are caught here instead of solver."
+                            ))),
+                            None => {
+                                self.re_var_names.insert(name, Some(gen_regex));
+                                Ok(GenRegex::epsilon())
+                            }
+                        }
+                    } else {
+                        Err(SmtParseError::Unrecognized(format!(
+                            "RegLan variable not declared/found: {}",
+                            name
+                        )))
+                    }
+                }
+                (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
+                    let res = self.re_var_names.get(&name);
+                    if let Some(found) = res {
+                        match found {
+                            Some(_) => Err(SmtParseError::Unsupported(format!(
+                                "Conflicting RegLan initilizations are caught here instead of solver."
+                            ))),
+                            None => {
+                                self.re_var_names.insert(name, Some(gen_regex));
+                                Ok(GenRegex::epsilon())
+                            }
+                        }
+                    } else {
+                        Err(SmtParseError::Unrecognized(format!(
+                            "RegLan variable not declared/found: {}",
+                            name
+                        )))
+                    }
+                }
+                (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
+                    println!("{}", _gen_regex1);
+                    Err(SmtParseError::Unimplemented(format!(
+                        "Equals had not been fixed"
+                    )))
+                    /*
+                    Ok(GenRegex::union(
+                        &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
+                        &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
+                    ))*/
+                }
+                _ => Err(SmtParseError::Unimplemented(format!(
+                    "Equals cannot handle ite currently."
+                ))),
+            };
         }
+        return Err(SmtParseError::Unrecognized(format!(
+            "Unsure how to parse RegLan"
+        )));
+    }
+
+    fn parse_len(&mut self, v: &Value, length: i64) -> Result<Rc<GenRegex>, SmtParseError> {
+        let mut args: Vec<Rc<GenRegex>> = Vec::new();
+
+        for _ in 0..length {
+            let regex = GenRegex::create_sigma();
+            args.push(regex);
+        }
+        let un_not_gen_regex: Rc<GenRegex> = if args.is_empty() {
+            GenRegex::epsilon()
+        } else {
+            GenRegex::concat_many(&args)
+        };
+        let gen_regex: Rc<GenRegex> = if self.not_flag{
+            GenRegex::complement(&un_not_gen_regex)
+        }else{
+            un_not_gen_regex
+        };
+
+
+
+        if let Some((head, tail)) = v.as_pair() {
+            if let Value::Symbol(s) = head {
+                if **s == *"str.len" {
+                    let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+                    expect_null(tail)?;
+                    //let str = self.parse_string_type(str)?;
+                    //Ok(Self::strtok_to_retok(&str))
+                    let str_tok = self.parse_string_type(str)?;
+
+                    match str_tok {
+                        StringToken::Var(var_name) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&var_name),
+                                &gen_regex,
+                            ))
+                        },
+                        StringToken::Val(string) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::str_to_re(&string),
+                                &gen_regex,
+                            ))
+
+                        },
+                        _ => {
+                            return Err(SmtParseError::Unrecognized(format!(
+                                "Issue parsing length 2"
+                            )));
+                            }
+                    };
+                    //return &GenRegex::str_to_re(self.parse_string_type(tail)?);
+                }
+                
+            }
+        }
+        return Err(SmtParseError::Unrecognized(format!(
+            "Issue parsing length"
+        )));
+
     }
 
     fn parse_and(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -827,7 +1138,7 @@ impl SmtParser {
     ) -> Result<Rc<GenRegex>, SmtParseError> {
         match re_tok {
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
-                "RegLan variable in str.in_re needs to be initialzied beforehand."
+                "RegLan variable in str.in_re needs to be initialized beforehand."
             ))),
             RegexToken::Val(gen_regex) => {
                 let gen_regex = if self.not_flag {
@@ -1029,6 +1340,7 @@ impl SmtParser {
             "let" => self.parse_let_regex(args),
             "str.to_re" => self.parse_str_to_re(args),
             "re.++" => self.parse_re_concat(args),
+            "str.++" => self.parse_str_re_concat(args),
             "re.union" => self.parse_re_union(args),
             "re.diff" => self.parse_re_diff(args),
             "re.*" => self.parse_re_star(args),
@@ -1118,6 +1430,30 @@ impl SmtParser {
         Ok(cur)
     }
 
+    fn parse_str_re_concat(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
+        // Syntax: (re.++ R1 R2 ...)
+        let prev = self.get_args(v)?;
+
+        let mut args = Vec::new();
+
+        // Use a for loop to transform each item
+        for item in &prev {
+            args.push(Self::strtok_to_retok(&self.parse_string_type(item)?));
+        }
+        if args.len() < 2 {
+            return Ok(args.remove(0));
+            //return Err(SmtParseError::unexpected(v, "re.++ requires at least 2 arguments."));
+        }
+        let mut regex_args: Vec<RegexToken> = Vec::new();
+        for a in args {
+            regex_args.push(a);
+        }
+        let mut cur = regex_args.pop().unwrap();
+        while let Some(next) = regex_args.pop() {
+            cur = RegexToken::concat(&next, &cur).unwrap();
+        }
+        Ok(cur)
+    }
     fn strtok_to_retok(s: &StringToken) -> RegexToken {
         match s {
             StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(name)),
