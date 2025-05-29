@@ -668,37 +668,31 @@ impl SmtParser {
         // Command cons case
         let (cmd, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let cmd_str = expect_symbol(cmd)?;
-        if self.not_flag {
-            match cmd_str {
-                "str.in_re" => self.parse_str_in_re(tail),
-                "and" => self.parse_or(tail),
-                "or" => self.parse_and(tail),
-                "not" => self.parse_assert_arg_not(tail),
-                "=" => self.parse_equals(tail),
-                "<" => self.parse_less_than(tail),
-                ">" => self.parse_greater_than(tail),
-                "let" => self.parse_let_assertion(tail),
-                _ => {
-                    // Check for let variable case a second time
-                    // println!("cmd_str: {:?}", cmd_str);
-                    self.parse_assert_arg(cmd)
+        match cmd_str {
+            "str.in_re" => self.parse_str_in_re(tail),
+            "and" => {
+                if self.not_flag {
+                    self.parse_or(tail)
+                } else {
+                    self.parse_and(tail)
                 }
             }
-        } else {
-            match cmd_str {
-                "str.in_re" => self.parse_str_in_re(tail),
-                "and" => self.parse_and(tail),
-                "or" => self.parse_or(tail),
-                "not" => self.parse_assert_arg_not(tail),
-                "=" => self.parse_equals(tail),
-                "<" => self.parse_less_than(tail),
-                ">" => self.parse_greater_than(tail),
-                "let" => self.parse_let_assertion(tail),
-                _ => {
-                    // Check for let variable case a second time
-                    // println!("cmd_str: {:?}", cmd_str);
-                    self.parse_assert_arg(cmd)
+            "or" => {
+                if self.not_flag {
+                    self.parse_and(tail)
+                } else {
+                    self.parse_or(tail)
                 }
+            }
+            "not" => self.parse_assert_arg_not(tail),
+            "=" => self.parse_equals(tail),
+            "<" => self.parse_less_than(tail),
+            ">" => self.parse_greater_than(tail),
+            "let" => self.parse_let_assertion(tail),
+            _ => {
+                // Check for let variable case a second time
+                // println!("cmd_str: {:?}", cmd_str);
+                self.parse_assert_arg(cmd)
             }
         }
     }
@@ -1619,7 +1613,10 @@ impl SmtParser {
        Parsing functions with output String/Char
     */
 
+    // TODO: add an actual parse_string_type function.
+
     //parse_string_type must be used in all places that take string as input
+    // TODO: rename this function
     fn parse_string_type(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
         //If is a variable returns var name if uninitialized and initialized value o.w.
         //If not variable parses the regex

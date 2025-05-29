@@ -6,6 +6,13 @@
     String and character variables
 */
 
+// TBD: Could be useful to add later.
+// #[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+// pub enum StringExpression {
+//     StringVar(StringVar),
+//     Literal(String),
+// }
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct StringVar {
     pub name: String,
