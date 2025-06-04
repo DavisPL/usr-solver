@@ -9,5 +9,3 @@
 
 (check-sat)
 
-(get-model)
-

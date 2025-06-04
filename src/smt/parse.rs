@@ -689,6 +689,7 @@ impl SmtParser {
             "<" => self.parse_less_than(tail),
             ">" => self.parse_greater_than(tail),
             "let" => self.parse_let_assertion(tail),
+            "str.contains" => self.parse_contains(tail),
             _ => {
                 // Check for let variable case a second time
                 // println!("cmd_str: {:?}", cmd_str);
@@ -716,6 +717,14 @@ impl SmtParser {
         if let Some((head, _tail)) = v.as_pair() {
             if let Value::Symbol(s) = head {
                 return **s == *"str.len";
+            }
+        }
+        false
+    }
+    fn is_substr_operation(&mut self, v: &Value) -> bool {
+        if let Some((head, _tail)) = v.as_pair() {
+            if let Value::Symbol(s) = head {
+                return **s == *"str.substr";
             }
         }
         false
@@ -863,7 +872,7 @@ impl SmtParser {
             );
         }
         return Err(SmtParseError::Unrecognized(format!(
-            "Unsure how to parse RegLan"
+            "Unsure how to parse RegLan less"
         )));
     }
 
@@ -891,7 +900,7 @@ impl SmtParser {
             );
         }
         return Err(SmtParseError::Unrecognized(format!(
-            "Unsure how to parse RegLan"
+            "Unsure how to parse RegLan greater"
         )));
     }
 
@@ -981,6 +990,10 @@ impl SmtParser {
                     .as_i64()
                     .expect("Should be a number"),
             );
+        } else if regex1.is_string() && self.is_substr_operation(regex2) {
+            return self.parse_substr(regex2, regex1);
+        } else if regex2.is_string() && self.is_substr_operation(regex1) {
+            return self.parse_substr(regex1, regex2);
         } else {
             let parsed1 = if regex1.is_string() {
                 Self::strtok_to_retok(&self.parse_string_type(regex1)?)
@@ -1039,11 +1052,11 @@ impl SmtParser {
                         )))
                     }
                 }
-                (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
-                    println!("{}", _gen_regex1);
-                    Err(SmtParseError::Unimplemented(format!(
+                (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
+                    Ok(GenRegex::intersect(&gen_regex1, &gen_regex2))
+                    /*Err(SmtParseError::Unimplemented(format!(
                         "Equals had not been fixed"
-                    )))
+                    )))*/
                     /*
                     Ok(GenRegex::union(
                         &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
@@ -1055,9 +1068,6 @@ impl SmtParser {
                 ))),
             };
         }
-        return Err(SmtParseError::Unrecognized(format!(
-            "Unsure how to parse RegLan"
-        )));
     }
 
     fn parse_len(&mut self, v: &Value, length: i64) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -1221,27 +1231,21 @@ impl SmtParser {
     */
 
     fn parse_let_assertion(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // println!("called let_assertion: {:?}", v);
         // Parse the let declaration part
         let expr_tail = self.parse_let_declaration(v)?;
         // Recurse on the tail expression
-        // println!("let_assertion expr_tail: {:?}", expr_tail);
         let (assert_arg, assert_tail) = expect_pair(expr_tail)?;
         expect_null(assert_tail)?;
         self.parse_assert_arg(assert_arg)
-        // println!("let_assertion result: {:?}", result);
     }
 
     fn parse_let_regex(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
-        // println!("called let_regex: {:?}", v);
         // Parse the let declaration part
         let expr_tail = self.parse_let_declaration(v)?;
         // Recurse on the tail expression
-        // println!("let_regex expr_tail: {:?}", expr_tail);
         let (regex_arg, regex_tail) = expect_pair(expr_tail)?;
         expect_null(regex_tail)?;
         self.parse_regex(regex_arg)
-        // println!("let_regex result: {:?}", result);
     }
 
     fn parse_let_declaration<'b>(&mut self, v: &'b Value) -> Result<&'b Value, SmtParseError> {
@@ -1372,6 +1376,146 @@ impl SmtParser {
         }
         // println!("parse_regex result: {:?}", result);
     }
+    fn parse_contains(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //of the form (str.contains s1 s2)
+        let args = self.get_args(v)?;
+        let big_string_gre = self.parse_string_to_gre(args[0])?; //Parse s1
+        let inner_string_gre = self.parse_string_to_gre(args[1])?; //Parse s1
+        let contains_s2 = GenRegex::concat(
+            &GenRegex::sigma_star(),
+            &GenRegex::concat(&inner_string_gre, &GenRegex::sigma_star()),
+        );
+        if self.not_flag {
+            let str_contains =
+                GenRegex::intersect(&big_string_gre, &GenRegex::complement(&contains_s2));
+            return Ok(str_contains);
+        } else {
+            let str_contains = GenRegex::intersect(&big_string_gre, &contains_s2);
+            return Ok(str_contains);
+        }
+    }
+
+    fn parse_substr(
+        &mut self,
+        substr_value: &Value,
+        str_value: &Value,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
+        //TODO: this gives us one large regex, but no variable to intersect
+        //That is fine for 1 assertion, but for multiple it doesn't work, we need to generate a new
+        //string variable for each assertion (or maybe 1 across all idk), so we should have a fresh
+        //string variable generator and at the end, before returning, intersect with this string
+        //variable :)
+        //parses expressions of the form (= (str.substr s1 i j) s2)
+        let string_gre = self.parse_string_to_gre(str_value)?; //Parse s2
+        let args = self.get_args(substr_value)?;
+        let big_string_gre = self.parse_string_to_gre(args[1])?; //Parse s1
+        let i_len = args[2]
+            .as_number()
+            .expect("Should be a number")
+            .as_i64()
+            .expect("Should be a number");
+        let j_len = args[3]
+            .as_number()
+            .expect("Should be a number")
+            .as_i64()
+            .expect("Should be a number");
+        if self.not_flag {
+            let mut args: Vec<Rc<GenRegex>> = Vec::new();
+            for _ in 0..i_len {
+                let regex = GenRegex::create_sigma();
+                args.push(regex);
+            }
+            let dot_i: Rc<GenRegex> = if args.is_empty() {
+                GenRegex::epsilon()
+            } else {
+                GenRegex::concat_many(&args)
+            };
+            let mut args: Vec<Rc<GenRegex>> = Vec::new();
+            for _ in 0..j_len {
+                let regex = GenRegex::create_sigma();
+                args.push(regex);
+            }
+            let dot_j: Rc<GenRegex> = if args.is_empty() {
+                GenRegex::epsilon()
+            } else {
+                GenRegex::concat_many(&args)
+            };
+
+            let dot_i_s2_dot_j = GenRegex::complement(&GenRegex::concat(
+                &dot_i,
+                &GenRegex::concat(&string_gre, &dot_j),
+            ));
+            let s1_case_1 = GenRegex::intersect(&big_string_gre, &dot_i_s2_dot_j);
+            let s2_case_1 = GenRegex::intersect(&string_gre, &dot_j);
+            let s1_length_1 = GenRegex::intersect(
+                &big_string_gre,
+                &GenRegex::concat(&dot_i, &GenRegex::concat(&dot_j, &GenRegex::sigma_star())),
+            );
+            let case_1 = GenRegex::concat(&s1_case_1, &GenRegex::concat(&s2_case_1, &s1_length_1));
+
+            let dot_i_s2 = GenRegex::complement(&GenRegex::concat(&dot_i, &string_gre));
+            let case_2_s1 = GenRegex::intersect(&big_string_gre, &dot_i_s2);
+            let dot_j_dot_star = GenRegex::concat(&dot_j, &GenRegex::sigma_star());
+            let s1_len_2 = GenRegex::concat(&dot_i, &GenRegex::complement(&dot_j_dot_star));
+            let s1_length_2 = GenRegex::intersect(&big_string_gre, &s1_len_2);
+            let case_2 = GenRegex::concat(&case_2_s1, &s1_length_2);
+
+            let dot_i_dot_star = GenRegex::concat(&dot_i, &GenRegex::sigma_star());
+            let s1_len_3 =
+                GenRegex::intersect(&big_string_gre, &GenRegex::complement(&dot_i_dot_star));
+            let s2_case_3 =
+                GenRegex::intersect(&string_gre, &GenRegex::complement(&GenRegex::epsilon()));
+            let case_3 = GenRegex::concat(&s1_len_3, &s2_case_3);
+
+            return Ok(GenRegex::union(&GenRegex::union(&case_1, &case_2), &case_3));
+        } else {
+            let mut args: Vec<Rc<GenRegex>> = Vec::new();
+            for _ in 0..i_len {
+                let regex = GenRegex::create_sigma();
+                args.push(regex);
+            }
+            let dot_i: Rc<GenRegex> = if args.is_empty() {
+                GenRegex::epsilon()
+            } else {
+                GenRegex::concat_many(&args)
+            };
+            let mut args: Vec<Rc<GenRegex>> = Vec::new();
+            for _ in 0..j_len {
+                let regex = GenRegex::create_sigma();
+                args.push(regex);
+            }
+            let dot_j: Rc<GenRegex> = if args.is_empty() {
+                GenRegex::epsilon()
+            } else {
+                GenRegex::concat_many(&args)
+            };
+
+            let dot_i_s2_dot_j = GenRegex::concat(&dot_i, &GenRegex::concat(&string_gre, &dot_j));
+            let s1_case_1 = GenRegex::intersect(&big_string_gre, &dot_i_s2_dot_j);
+            let s2_case_1 = GenRegex::intersect(&string_gre, &dot_j);
+            let s1_length_1 = GenRegex::intersect(
+                &big_string_gre,
+                &GenRegex::concat(&dot_i, &GenRegex::concat(&dot_j, &GenRegex::sigma_star())),
+            );
+            let case_1 = GenRegex::concat(&s1_case_1, &GenRegex::concat(&s2_case_1, &s1_length_1));
+
+            let dot_i_s2 = GenRegex::concat(&dot_i, &string_gre);
+            let case_2_s1 = GenRegex::intersect(&big_string_gre, &dot_i_s2);
+            let dot_j_dot_star = GenRegex::concat(&dot_j, &GenRegex::sigma_star());
+            let s1_len_2 = GenRegex::concat(&dot_i, &GenRegex::complement(&dot_j_dot_star));
+            let s1_length_2 = GenRegex::intersect(&big_string_gre, &s1_len_2);
+            let case_2 = GenRegex::concat(&case_2_s1, &s1_length_2);
+
+            let dot_i_dot_star = GenRegex::concat(&dot_i, &GenRegex::sigma_star());
+            let s1_len_3 =
+                GenRegex::intersect(&big_string_gre, &GenRegex::complement(&dot_i_dot_star));
+            let s2_case_3 = GenRegex::intersect(&string_gre, &GenRegex::epsilon());
+            let case_3 = GenRegex::concat(&s1_len_3, &s2_case_3);
+
+            return Ok(GenRegex::union(&GenRegex::union(&case_1, &case_2), &case_3));
+            //Need to handle |s1| >= i+j, i <= |s1| < i+j, |s1| < i
+        }
+    }
 
     fn parse_re_union(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         // Syntax: (re.union R1 R2 ...)
@@ -1457,7 +1601,7 @@ impl SmtParser {
 
         // Use a for loop to transform each item
         for item in &prev {
-            args.push(Self::strtok_to_retok(&self.parse_string_type(item)?));
+            args.push(RegexToken::Val(self.parse_string_to_gre(item)?));
         }
         if args.len() < 2 {
             return Ok(args.remove(0));
@@ -1653,6 +1797,29 @@ impl SmtParser {
         }
     }
 
+    fn parse_string_to_gre(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        //If is a variable returns var name if uninitialized and initialized value o.w.
+        //If not variable parses the regex
+        if let Some(str) = v.as_str() {
+            return Ok(GenRegex::str_to_re(str));
+        }
+        if let Some(name) = v.as_symbol() {
+            let res = self.func_names.get(name);
+            if let Some(s) = res {
+                Ok(GenRegex::str_to_re(s))
+            } else if self.str_var_names.contains(name) {
+                Ok(GenRegex::create_gre_str_var(name))
+                //Ok(StringToken::Var(name.to_string()))
+            } else {
+                Err(SmtParseError::BadLiteral(format!(
+                    "{} is not found in declared variables or defined functions.",
+                    name
+                )))
+            }
+        } else {
+            Err(SmtParseError::unrecog(v))
+        }
+    }
     fn parse_ite(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
         // Syntax: (ite (assertion) TrueString FalseString)
         let args = self.get_args(v)?;
