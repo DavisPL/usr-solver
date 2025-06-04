@@ -3,18 +3,23 @@
 
 
 (declare-const s1 String)
+(declare-const x String)
 
 (assert
-	(not (str.contains s1 "abd"))
-)
-(assert
-	(str.in_re s1
-		
+ (str.in_re x
+ (re.inter
+	(str.to_re s1)
+	(re.comp (re.++
+		(re.* re.allchar)
+		(str.to_re "abd")
+		(re.* re.allchar)
+	))
 	(re.++
 		(str.to_re "ab")
 		(re.* re.allchar)
 		(str.to_re "d")
 	)
-	)
+ )
 )
+ )
 (check-sat)

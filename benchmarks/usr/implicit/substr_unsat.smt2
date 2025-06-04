@@ -7,5 +7,3 @@
 
 (check-sat)
 
-(get-model)
-
