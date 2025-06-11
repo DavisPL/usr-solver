@@ -1390,6 +1390,9 @@ impl SmtParser {
         substr_value: &Value,
         str_value: &Value,
     ) -> Result<Rc<GenRegex>, SmtParseError> {
+        // NB: We discussed the following issue in meeting on 2025-06-11.
+        // We should debug the case benchmarks/usr/explicit/substr_sat.smt2
+        // and benchmarks/usr/implicit/substr_sat.smt2 to see why we are failing.
         //TODO: this gives us one large regex, but no variable to intersect
         //That is fine for 1 assertion, but for multiple it doesn't work, we need to generate a new
         //string variable for each assertion (or maybe 1 across all idk), so we should have a fresh
