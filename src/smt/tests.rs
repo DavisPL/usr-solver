@@ -278,7 +278,7 @@ fn test_re_all() {
 
 #[test]
 fn test_date() {
-    let smt_result = parse_smtlib_file("benchmarks/date_sat.smt2");
+    let smt_result = parse_smtlib_file("excluded/from_regexbenchmarks/date_sat.smt2");
     println!("Parsed s-expression: {:?}\n", smt_result);
 
     assert!(smt_result.is_ok());
@@ -341,7 +341,7 @@ fn test_date() {
 
 #[test]
 fn test_passw_sat1() {
-    let smt_result = parse_smtlib_file("benchmarks/passw_sat1.smt2");
+    let smt_result = parse_smtlib_file("excluded/from_regexbenchmarks/passw_sat1.smt2");
     println!("Parsed s-expression: {:?}", smt_result);
 
     assert!(smt_result.is_ok());
@@ -410,7 +410,7 @@ fn test_simple_hex() {
 #[test]
 #[ignore]
 fn test_passw_complement_3() {
-    assert_satisfiable("benchmarks/passw_sat_4.smt2");
+    assert_satisfiable("excluded/from_regexbenchmarks/passw_sat_4.smt2");
 }
 
 #[test]
@@ -450,7 +450,7 @@ fn test_define_fun2() {
 
 #[test]
 fn test_loops_1() {
-    assert_satisfiable("benchmarks/deadloop1_sat.smt2");
+    assert_satisfiable("excluded/from_regexbenchmarks/deadloop1_sat.smt2");
 }
 
 #[test]
@@ -539,7 +539,7 @@ fn test_date_2() {
 
         curr_regex
     }
-    let smt_result = parse_smtlib_file("benchmarks/date2_sat.smt2");
+    let smt_result = parse_smtlib_file("excluded/from_regexbenchmarks/date2_sat.smt2");
     println!("Parsed s-expression: {:?}\n", smt_result);
 
     assert!(smt_result.is_ok());
@@ -602,7 +602,7 @@ fn test_date_2() {
 
 #[test]
 fn test_passw_unsat1() {
-    let smt_result = parse_smtlib_file("benchmarks/passw_unsat1.smt2");
+    let smt_result = parse_smtlib_file("excluded/from_regexbenchmarks/passw_unsat1.smt2");
     println!("Parsed s-expression: {:?}", smt_result);
 
     assert!(smt_result.is_ok());
@@ -643,17 +643,17 @@ fn test_passw_unsat1() {
 
 #[test]
 fn test_let_5() {
-    assert_satisfiable_default_only("benchmarks/date_format_days_sat.smt2");
+    assert_satisfiable_default_only("excluded/from_regexbenchmarks/date_format_days_sat.smt2");
 }
 
 #[test]
 fn test_loops_2() {
-    assert_unsatisfiable_default_only("benchmarks/det_blowup_unsat_3.smt2");
+    assert_unsatisfiable_default_only("excluded/from_regexbenchmarks/det_blowup_unsat_3.smt2");
 }
 
 #[test]
 fn test_loops_3() {
-    assert_unsatisfiable_default_only("benchmarks/inter_mod2_unsat.smt2");
+    assert_unsatisfiable_default_only("excluded/from_regexbenchmarks/inter_mod2_unsat.smt2");
 }
 
 /*
@@ -666,7 +666,7 @@ fn test_loops_3() {
 #[ignore]
 #[test]
 fn test_equality() {
-    let smt_result = parse_smtlib_file("benchmarks/passw_eq_sat1.smt2");
+    let smt_result = parse_smtlib_file("excluded/from_regexbenchmarks/passw_eq_sat1.smt2");
     println!("Parsed s-expression: {:?}", smt_result);
 
     assert!(smt_result.is_ok());
@@ -750,7 +750,7 @@ fn unicode_hex_test() {
 #[ignore]
 #[test]
 fn intersect_test1() {
-    assert_satisfiable("benchmarks/intersect_0_0_sat.smt2");
+    assert_satisfiable("excluded/from_regexbenchmarks/intersect_0_0_sat.smt2");
 }
 
 // TODO: Diverging
@@ -764,35 +764,35 @@ fn test_usr_2() {
 #[ignore]
 #[test]
 fn test_passw_complement_1() {
-    assert_satisfiable_default_only("benchmarks/passw_complex_sat_1.smt2");
+    assert_satisfiable_default_only("excluded/from_regexbenchmarks/passw_complex_sat_1.smt2");
 }
 
 // TODO: Diverging
 #[ignore]
 #[test]
 fn test_passw_complement_2() {
-    assert_satisfiable_default_only("benchmarks/passw_complex_sat_2.smt2");
+    assert_satisfiable_default_only("excluded/from_regexbenchmarks/passw_complex_sat_2.smt2");
 }
 
 // TODO: Diverging
 #[ignore]
 #[test]
 fn test_passw_complement_simpler() {
-    assert_satisfiable_default_only("benchmarks/passw_simpler_sat_1.smt2");
+    assert_satisfiable_default_only("excluded/from_regexbenchmarks/passw_simpler_sat_1.smt2");
 }
 
 // TODO: Diverging
 #[ignore]
 #[test]
 fn test_passw_complement_simplest() {
-    assert_satisfiable_default_only("benchmarks/passw_simplest_sat_1.smt2");
+    assert_satisfiable_default_only("excluded/from_regexbenchmarks/passw_simplest_sat_1.smt2");
 }
 
 // TODO: Diverging
 #[ignore]
 #[test]
 fn test_passw_complement_4() {
-    assert_unsatisfiable_default_only("benchmarks/passw_very_complex_unsat.smt2");
+    assert_unsatisfiable_default_only("excluded/from_regexbenchmarks/passw_very_complex_unsat.smt2");
 }
 
 // TODO: Returning wrong answer for Antimirov
