@@ -1,6 +1,9 @@
 //!
 //! Module directory
 //!
+//!
+
+#![allow(clippy::uninlined_format_args)]
 
 pub mod antimirov;
 pub mod brzozowski;

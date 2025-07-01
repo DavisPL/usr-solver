@@ -792,7 +792,9 @@ fn test_passw_complement_simplest() {
 #[ignore]
 #[test]
 fn test_passw_complement_4() {
-    assert_unsatisfiable_default_only("excluded/from_regexbenchmarks/passw_very_complex_unsat.smt2");
+    assert_unsatisfiable_default_only(
+        "excluded/from_regexbenchmarks/passw_very_complex_unsat.smt2",
+    );
 }
 
 // TODO: Returning wrong answer for Antimirov
