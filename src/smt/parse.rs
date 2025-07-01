@@ -503,6 +503,10 @@ impl SmtParser {
         if let Some((head, tail)) = v.as_pair() {
             match head.as_symbol().ok_or(SmtParseError::unrecog(head))? {
                 "set-logic" => Ok(()),
+                "set-info" => Ok(()),
+                "exit" => Ok(()),
+                "get-model" => Ok(()),
+                "set-option" => Ok(()),
                 "declare-const" => self.parse_declare_const(tail),
                 "assert" => self.parse_assert(tail),
                 "check-sat" => self.parse_check_sat(tail),
