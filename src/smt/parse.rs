@@ -102,7 +102,7 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
     //TODO:Figure out why (set-info source |...|) breaks lexpr parsing
     //  Removes set-info source lines for now
     let smt_string = parse_bad_newlines(&smt_string)?;
-    println!("{}",smt_string);
+    println!("{}", smt_string);
 
     // Parse S-expression
     let v = lexpr::from_str(&smt_string)?;
