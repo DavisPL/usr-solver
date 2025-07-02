@@ -6,6 +6,7 @@
 #![allow(clippy::useless_format)]
 
 use super::util::{hex_to_char, parse_unicode_escape};
+use crate::smt::util::parse_bad_newlines;
 use crate::types::regex::GenRegex;
 
 use lexpr::{self, Value};
@@ -98,6 +99,9 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
     // Add an opening and closoing paren
     let smt_string = format!("(\n{}\n)", smt_string);
     let smt_string = parse_unicode_escape(&smt_string)?;
+    //TODO:Figure out why set-info source |...|) breaks lexpr parsing
+    //  Removes set-info source lines for now
+    let smt_string = parse_bad_newlines(&smt_string)?;
 
     // Parse S-expression
     let v = lexpr::from_str(&smt_string)?;
