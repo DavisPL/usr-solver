@@ -99,9 +99,10 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
     // Add an opening and closoing paren
     let smt_string = format!("(\n{}\n)", smt_string);
     let smt_string = parse_unicode_escape(&smt_string)?;
-    //TODO:Figure out why set-info source |...|) breaks lexpr parsing
+    //TODO:Figure out why (set-info source |...|) breaks lexpr parsing
     //  Removes set-info source lines for now
     let smt_string = parse_bad_newlines(&smt_string)?;
+    println!("{}",smt_string);
 
     // Parse S-expression
     let v = lexpr::from_str(&smt_string)?;
@@ -559,7 +560,7 @@ impl SmtParser {
                     "Functions with RegLan output currently not supported."
                 )))
             }
-            _ => return Err(SmtParseError::unrecog(params)),
+            _ => return Err(SmtParseError::unrecog(ret_type)),
         };
         //Parses the function definition and inserts into HashMap
         self.str_var_names.insert(name.to_string());
