@@ -137,8 +137,9 @@ enum RegexToken {
         true_re: Rc<RegexToken>,
         false_re: Rc<RegexToken>,
     },
-    Var(String),
+    Var(String), // Regex variable, not string variable
 }
+
 impl RegexToken {
     fn diff(tok1: &RegexToken, tok2: &RegexToken) -> Result<RegexToken, SmtParseError> {
         match tok1 {
@@ -439,13 +440,19 @@ enum StringToken {
         true_string: Rc<StringToken>,
         false_string: Rc<StringToken>,
     },
+    Concat {
+        left: Rc<StringToken>,
+        right: Rc<StringToken>,
+    },
 }
 
 pub struct SmtParser {
     found_assert: bool,
     found_check_sat: bool,
     str_var_names: HashSet<String>,
+    // TODO: eventually this should be replaced by StringToken
     func_names: HashMap<String, String>,
+    // And this by RegexToken probably
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
     let_vars: HashMap<String, Value>,
     regex_result: Option<Rc<GenRegex>>,
@@ -642,7 +649,7 @@ impl SmtParser {
             _ => return Err(SmtParseError::unrecog(params)),
         };
         //Parses the function definition and inserts into HashMap
-        let constructed_string = self.parse_str(defn)?;
+        let constructed_string = self.parse_str_literal(defn)?;
         self.func_names.insert(
             name.as_symbol()
                 .ok_or(SmtParseError::unrecog(name))?
@@ -763,9 +770,9 @@ impl SmtParser {
             if **s == *"str.len" {
                 let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
                 expect_null(tail)?;
-                //let str = self.parse_string_type(str)?;
+                //let str = self.parse_string_expr(str)?;
                 //Ok(Self::strtok_to_retok(&str))
-                let str_tok = self.parse_string_type(str)?;
+                let str_tok = self.parse_string_expr(str)?;
 
                 match str_tok {
                     StringToken::Var(var_name) => {
@@ -786,7 +793,7 @@ impl SmtParser {
                         )));
                     }
                 };
-                //return &GenRegex::str_to_re(self.parse_string_type(tail)?);
+                //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
         Err(SmtParseError::Unrecognized(format!("Issue parsing length")))
@@ -820,9 +827,9 @@ impl SmtParser {
             if **s == *"str.len" {
                 let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
                 expect_null(tail)?;
-                //let str = self.parse_string_type(str)?;
+                //let str = self.parse_string_expr(str)?;
                 //Ok(Self::strtok_to_retok(&str))
-                let str_tok = self.parse_string_type(str)?;
+                let str_tok = self.parse_string_expr(str)?;
 
                 match str_tok {
                     StringToken::Var(var_name) => {
@@ -843,7 +850,7 @@ impl SmtParser {
                         )));
                     }
                 };
-                //return &GenRegex::str_to_re(self.parse_string_type(tail)?);
+                //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
         Err(SmtParseError::Unrecognized(format!("Issue parsing length")))
@@ -996,13 +1003,13 @@ impl SmtParser {
             return self.parse_substr(regex1, regex2);
         } else {
             let parsed1 = if regex1.is_string() {
-                Self::strtok_to_retok(&self.parse_string_type(regex1)?)
+                Self::strtok_to_retok(&self.parse_string_expr(regex1)?)?
             } else {
                 self.parse_reglan_type(regex1)?
             };
 
             let parsed2 = if regex2.is_string() {
-                Self::strtok_to_retok(&self.parse_string_type(regex2)?)
+                Self::strtok_to_retok(&self.parse_string_expr(regex2)?)?
             } else {
                 self.parse_reglan_type(regex2)?
             };
@@ -1092,9 +1099,9 @@ impl SmtParser {
             if **s == *"str.len" {
                 let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
                 expect_null(tail)?;
-                //let str = self.parse_string_type(str)?;
+                //let str = self.parse_string_expr(str)?;
                 //Ok(Self::strtok_to_retok(&str))
-                let str_tok = self.parse_string_type(str)?;
+                let str_tok = self.parse_string_expr(str)?;
 
                 match str_tok {
                     StringToken::Var(var_name) => {
@@ -1115,7 +1122,7 @@ impl SmtParser {
                         )));
                     }
                 };
-                //return &GenRegex::str_to_re(self.parse_string_type(tail)?);
+                //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
         Err(SmtParseError::Unrecognized(format!("Issue parsing length")))
@@ -1153,15 +1160,16 @@ impl SmtParser {
         let (regex, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
         //Chooses behavior based on string and regex tokens
-        let str_tok = self.parse_string_type(string)?;
+        let str_tok = self.parse_string_expr(string)?;
         let regex_tok = self.parse_reglan_type(regex)?;
-        self.parse_str_in_re_helper(&regex_tok, &str_tok)
+        let str_as_re_token = Self::strtok_to_retok(&str_tok)?;
+        self.parse_str_in_re_helper(&regex_tok, &str_as_re_token)
     }
 
     fn parse_str_in_re_helper(
         &mut self,
         re_tok: &RegexToken,
-        string: &StringToken,
+        str_as_re_token: &RegexToken,
     ) -> Result<Rc<GenRegex>, SmtParseError> {
         match re_tok {
             RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
@@ -1173,19 +1181,15 @@ impl SmtParser {
                 } else {
                     gen_regex.clone()
                 };
-                match string {
-                    StringToken::Var(var_name) => Ok(GenRegex::intersect(
-                        &GenRegex::create_gre_str_var(var_name),
-                        &gen_regex,
-                    )),
-                    StringToken::Val(string) => Ok(GenRegex::intersect(
-                        &GenRegex::str_to_re(string),
-                        &gen_regex,
-                    )),
-                    StringToken::Conditional {
+                match str_as_re_token {
+                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                        "RegLan variable in string expression unexpected."
+                    ))),
+                    RegexToken::Val(str_as_re) => Ok(GenRegex::intersect(str_as_re, &gen_regex)),
+                    RegexToken::Conditional {
                         assertion,
-                        true_string,
-                        false_string,
+                        true_re,
+                        false_re,
                     } => {
                         let saved_not_flag = self.not_flag;
                         self.not_flag = false;
@@ -1193,14 +1197,10 @@ impl SmtParser {
                         self.not_flag = true;
                         let f = self.parse_assert_arg(assertion)?;
                         self.not_flag = saved_not_flag;
-                        let t = GenRegex::concat(
-                            &t,
-                            &self.parse_str_in_re_helper(re_tok, true_string)?,
-                        );
-                        let f = GenRegex::concat(
-                            &f,
-                            &self.parse_str_in_re_helper(re_tok, false_string)?,
-                        );
+                        let t =
+                            GenRegex::concat(&t, &self.parse_str_in_re_helper(re_tok, true_re)?);
+                        let f =
+                            GenRegex::concat(&f, &self.parse_str_in_re_helper(re_tok, false_re)?);
                         Ok(GenRegex::union(&t, &f))
                     }
                 }
@@ -1217,8 +1217,10 @@ impl SmtParser {
                 self.not_flag = true;
                 let f = self.parse_assert_arg(assertion)?;
                 self.not_flag = saved_not_flag;
-                let t = GenRegex::concat(&t, &self.parse_str_in_re_helper(true_re, string)?);
-                let f = GenRegex::concat(&f, &self.parse_str_in_re_helper(false_re, string)?);
+                let t =
+                    GenRegex::concat(&t, &self.parse_str_in_re_helper(true_re, str_as_re_token)?);
+                let f =
+                    GenRegex::concat(&f, &self.parse_str_in_re_helper(false_re, str_as_re_token)?);
                 Ok(GenRegex::union(&t, &f))
             }
         }
@@ -1620,19 +1622,24 @@ impl SmtParser {
         }
         Ok(cur)
     }
-    fn strtok_to_retok(s: &StringToken) -> RegexToken {
+    fn strtok_to_retok(s: &StringToken) -> Result<RegexToken, SmtParseError> {
         match s {
-            StringToken::Var(name) => RegexToken::Val(GenRegex::create_gre_str_var(name)),
-            StringToken::Val(str) => RegexToken::Val(GenRegex::str_to_re(str)),
+            StringToken::Var(name) => Ok(RegexToken::Val(GenRegex::create_gre_str_var(name))),
+            StringToken::Val(str) => Ok(RegexToken::Val(GenRegex::str_to_re(str))),
             StringToken::Conditional {
                 assertion,
                 true_string,
                 false_string,
-            } => RegexToken::Conditional {
+            } => Ok(RegexToken::Conditional {
                 assertion: assertion.clone(),
-                true_re: Rc::new(Self::strtok_to_retok(true_string.as_ref())),
-                false_re: Rc::new(Self::strtok_to_retok(false_string.as_ref())),
-            },
+                true_re: Rc::new(Self::strtok_to_retok(true_string.as_ref())?),
+                false_re: Rc::new(Self::strtok_to_retok(false_string.as_ref())?),
+            }),
+            StringToken::Concat { left, right } => {
+                let left_re = Self::strtok_to_retok(left.as_ref())?;
+                let right_re = Self::strtok_to_retok(right.as_ref())?;
+                RegexToken::concat(&left_re, &right_re)
+            }
         }
     }
 
@@ -1640,8 +1647,8 @@ impl SmtParser {
         // (str.to_re "String")
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        let str = self.parse_string_type(str)?;
-        Ok(Self::strtok_to_retok(&str))
+        let str = self.parse_string_expr(str)?;
+        Self::strtok_to_retok(&str)
     }
 
     fn parse_re_range(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
@@ -1650,8 +1657,8 @@ impl SmtParser {
         let (char2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         // println!("{}, 2{}, tail {}", char1, char2, tail);
         expect_null(tail)?;
-        let char1 = self.parse_string_type(char1)?;
-        let char2 = self.parse_string_type(char2)?;
+        let char1 = self.parse_string_expr(char1)?;
+        let char2 = self.parse_string_expr(char2)?;
         match (char1, char2) {
             (StringToken::Val(char1), StringToken::Val(char2)) => {
                 if let (Some(char1), Some(char2)) = (char1.chars().next(), char2.chars().next()) {
@@ -1760,11 +1767,8 @@ impl SmtParser {
        Parsing functions with output String/Char
     */
 
-    // TODO: add an actual parse_string_type function.
-
-    //parse_string_type must be used in all places that take string as input
-    // TODO: rename this function
-    fn parse_string_type(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
+    // TODO: parse_string_expr must be used in all places that take string as input
+    fn parse_string_expr(&mut self, v: &Value) -> Result<StringToken, SmtParseError> {
         //If is a variable returns var name if uninitialized and initialized value o.w.
         //If not variable parses the regex
         if let Some(str) = v.as_str() {
@@ -1773,9 +1777,10 @@ impl SmtParser {
         if let Some((head, tail)) = v.as_pair() {
             return match head
                 .as_symbol()
-                .ok_or(SmtParseError::unexpected(head, "parse_string_type: symbol"))?
+                .ok_or(SmtParseError::unexpected(head, "parse_string_expr: symbol"))?
             {
                 "ite" => self.parse_ite(tail),
+                "str.++" => self.parse_string_concat(tail),
                 "_" => {
                     let c = self.parse_char_obj(tail)?;
                     Ok(StringToken::Val(c.to_string()))
@@ -1798,6 +1803,26 @@ impl SmtParser {
         } else {
             Err(SmtParseError::unrecog(v))
         }
+    }
+
+    fn parse_string_concat(&mut self, str_tail: &Value) -> Result<StringToken, SmtParseError> {
+        // Syntax: (str.++ String String ...)
+        let args = self.get_args(str_tail)?;
+        if args.len() < 2 {
+            return self.parse_string_expr(args[0]);
+        }
+        let mut str_args: Vec<StringToken> = Vec::new();
+        for a in args {
+            str_args.push(self.parse_string_expr(a)?);
+        }
+        let mut cur = str_args.pop().unwrap();
+        while let Some(next) = str_args.pop() {
+            cur = StringToken::Concat {
+                left: Rc::new(next),
+                right: Rc::new(cur),
+            };
+        }
+        Ok(cur)
     }
 
     fn parse_string_to_gre(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -1830,8 +1855,8 @@ impl SmtParser {
             return Err(SmtParseError::unexpected(v, "ite must have 3 args."));
         }
         let (assertion, true_string, false_string) = (args[0], args[1], args[2]);
-        let true_string = self.parse_string_type(true_string)?;
-        let false_string = self.parse_string_type(false_string)?;
+        let true_string = self.parse_string_expr(true_string)?;
+        let false_string = self.parse_string_expr(false_string)?;
         Ok(StringToken::Conditional {
             assertion: assertion.clone(),
             true_string: Rc::new(true_string),
@@ -1846,7 +1871,37 @@ impl SmtParser {
         hex_to_char(hex_val)
     }
 
-    fn parse_str_at(&self, v: &Value) -> Result<String, SmtParseError> {
+    fn parse_str_literal(&self, v: &Value) -> Result<String, SmtParseError> {
+        // Handles String literals
+        if let Some(s) = v.as_str() {
+            return Ok(s.to_string());
+        }
+
+        // TODO: should be obsolete if we update to string tokens with parse_string_expr
+        let (str_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        // Handles recursive strings
+        match str_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
+            "str.at" => self.parse_str_literal_at(args),
+            "str.++" => self.parse_str_literal_concat(args),
+            _ => Err(SmtParseError::unrecog(str_type)),
+        }
+    }
+
+    // TODO: should be obsolete if we update to string tokens with parse_string_expr
+    fn parse_str_literal_concat(&self, v: &Value) -> Result<String, SmtParseError> {
+        // Syntax: (str.++ String String)
+        let args = self.get_args(v)?;
+        if args.len() != 2 {
+            return Err(SmtParseError::unrecog(v));
+        }
+        let (string1, string2) = (args[0], args[1]);
+        let string1 = self.parse_str_literal(string1)?;
+        let string2 = self.parse_str_literal(string2)?;
+        Ok(format!("{}{}", string1, string2))
+    }
+
+    // TODO: should be obsolete if we update to string tokens with parse_string_expr
+    fn parse_str_literal_at(&self, v: &Value) -> Result<String, SmtParseError> {
         let (string, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (index, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
@@ -1861,32 +1916,6 @@ impl SmtParser {
         } else {
             Err(SmtParseError::unrecog(v))
         }
-    }
-
-    fn parse_str(&self, v: &Value) -> Result<String, SmtParseError> {
-        // Handles String literals
-        if let Some(s) = v.as_str() {
-            return Ok(s.to_string());
-        }
-        let (str_type, args) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        // Handles recursive strings
-        match str_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
-            "str.at" => self.parse_str_at(args),
-            "str.++" => self.parse_str_concat(args),
-            _ => Err(SmtParseError::unrecog(str_type)),
-        }
-    }
-
-    fn parse_str_concat(&self, v: &Value) -> Result<String, SmtParseError> {
-        // Syntax: (str.++ String String)
-        let args = self.get_args(v)?;
-        if args.len() != 2 {
-            return Err(SmtParseError::unrecog(v));
-        }
-        let (string1, string2) = (args[0], args[1]);
-        let string1 = self.parse_str(string1)?;
-        let string2 = self.parse_str(string2)?;
-        Ok(format!("{}{}", string1, string2))
     }
 
     /*
@@ -1961,18 +1990,3 @@ impl Default for SmtParser {
         Self::new()
     }
 }
-
-/*
-    Entrypoint
-*/
-
-// TODO
-// pub fn genregex_from_smtlib_string(smt_string: &str) -> Result<GenRegex, SmtParseError> {
-//     let v = parse_smtlib_string(smt_string)?;
-//     parse_genregex(&v)
-// }
-
-// pub fn genregex_from_smtlib_file(file_path: &str) -> Result<GenRegex, SmtParseError> {
-//     let v = parse_smtlib_file(file_path)?;
-//     parse_genregex(&v)
-// }

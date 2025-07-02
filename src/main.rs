@@ -2,6 +2,8 @@
 //! Binary entrypoint
 //!
 
+#![allow(clippy::uninlined_format_args)]
+
 use gen_regex_impl::smt::parse::{parse_smtlib_file, SmtParser};
 use gen_regex_impl::solver::{self, Solver};
 
