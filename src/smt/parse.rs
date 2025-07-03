@@ -704,6 +704,8 @@ impl SmtParser {
             "=" => self.parse_equals(tail),
             "<" => self.parse_less_than(tail),
             ">" => self.parse_greater_than(tail),
+            "<=" => self.parse_less_than_eq(tail),
+            ">=" => self.parse_greater_than_eq(tail),
             "let" => self.parse_let_assertion(tail),
             "str.contains" => self.parse_contains(tail),
             _ => {
@@ -856,6 +858,122 @@ impl SmtParser {
         }
         Err(SmtParseError::Unrecognized(format!("Issue parsing length")))
     }
+
+fn parse_len_greater_than_eq(
+        &mut self,
+        v: &Value,
+        length: i64,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
+        let mut args: Vec<Rc<GenRegex>> = Vec::new();
+
+        for _ in 0..length {
+            let regex = GenRegex::create_sigma();
+            args.push(regex);
+        }
+        let regex = GenRegex::sigma_star();
+        args.push(regex);
+        let un_not_gen_regex: Rc<GenRegex> = if args.is_empty() {
+            GenRegex::epsilon()
+        } else {
+            GenRegex::concat_many(&args)
+        };
+
+        let gen_regex: Rc<GenRegex> = if self.not_flag {
+            GenRegex::complement(&un_not_gen_regex)
+        } else {
+            un_not_gen_regex
+        };
+
+        if let Some((Value::Symbol(s), tail)) = v.as_pair() {
+            if **s == *"str.len" {
+                let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+                expect_null(tail)?;
+                //let str = self.parse_string_expr(str)?;
+                //Ok(Self::strtok_to_retok(&str))
+                let str_tok = self.parse_string_expr(str)?;
+
+                match str_tok {
+                    StringToken::Var(var_name) => {
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(&var_name),
+                            &gen_regex,
+                        ))
+                    }
+                    StringToken::Val(string) => {
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::str_to_re(&string),
+                            &gen_regex,
+                        ))
+                    }
+                    _ => {
+                        return Err(SmtParseError::Unrecognized(format!(
+                            "Issue parsing length 2"
+                        )));
+                    }
+                };
+                //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
+            }
+        }
+        Err(SmtParseError::Unrecognized(format!("Issue parsing length")))
+    }
+    fn parse_len_less_than_eq(
+        &mut self,
+        v: &Value,
+        length: i64,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
+        let mut args: Vec<Rc<GenRegex>> = Vec::new();
+
+        for _ in 0..length + 1 {
+            let regex = GenRegex::create_sigma();
+            args.push(regex);
+        }
+        let regex = GenRegex::sigma_star();
+        args.push(regex);
+        let un_not_gen_regex: Rc<GenRegex> = if args.is_empty() {
+            GenRegex::epsilon()
+        } else {
+            GenRegex::concat_many(&args)
+        };
+
+        let gen_regex: Rc<GenRegex> = if !self.not_flag {
+            GenRegex::complement(&un_not_gen_regex)
+        } else {
+            un_not_gen_regex
+        };
+
+        if let Some((Value::Symbol(s), tail)) = v.as_pair() {
+            if **s == *"str.len" {
+                let (str, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+                expect_null(tail)?;
+                //let str = self.parse_string_expr(str)?;
+                //Ok(Self::strtok_to_retok(&str))
+                let str_tok = self.parse_string_expr(str)?;
+
+                match str_tok {
+                    StringToken::Var(var_name) => {
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(&var_name),
+                            &gen_regex,
+                        ))
+                    }
+                    StringToken::Val(string) => {
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::str_to_re(&string),
+                            &gen_regex,
+                        ))
+                    }
+                    _ => {
+                        return Err(SmtParseError::Unrecognized(format!(
+                            "Issue parsing length 2"
+                        )));
+                    }
+                };
+                //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
+            }
+        }
+        Err(SmtParseError::Unrecognized(format!("Issue parsing length")))
+    }
+
     fn parse_less_than(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
@@ -880,7 +998,7 @@ impl SmtParser {
             );
         }
         Err(SmtParseError::Unrecognized(format!(
-            "Unsure how to parse RegLan less"
+            "Currently only supports less than with str.len and concrete int"
         )))
     }
 
@@ -908,7 +1026,63 @@ impl SmtParser {
             );
         }
         Err(SmtParseError::Unrecognized(format!(
-            "Unsure how to parse RegLan greater"
+            "Currently only supports greater than with str.len and concrete int"
+        )))
+    }
+
+    fn parse_less_than_eq(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        expect_null(tail)?;
+        if regex1.is_number() && self.is_length_operation(regex2) {
+            return self.parse_len_less_than_eq(
+                regex2,
+                regex1
+                    .as_number()
+                    .expect("Should be a number")
+                    .as_i64()
+                    .expect("Should be a number"),
+            );
+        } else if regex2.is_number() && self.is_length_operation(regex1) {
+            return self.parse_len_less_than_eq(
+                regex1,
+                regex2
+                    .as_number()
+                    .expect("Should be a number")
+                    .as_i64()
+                    .expect("Should be a number"),
+            );
+        }
+        Err(SmtParseError::Unrecognized(format!(
+            "Currently only supports less than or equal with str.len and concrete int"
+        )))
+    }
+
+    fn parse_greater_than_eq(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        expect_null(tail)?;
+        if regex1.is_number() && self.is_length_operation(regex2) {
+            return self.parse_len_greater_than_eq(
+                regex2,
+                regex1
+                    .as_number()
+                    .expect("Should be a number")
+                    .as_i64()
+                    .expect("Should be a number"),
+            );
+        } else if regex2.is_number() && self.is_length_operation(regex1) {
+            return self.parse_len_greater_than_eq(
+                regex1,
+                regex2
+                    .as_number()
+                    .expect("Should be a number")
+                    .as_i64()
+                    .expect("Should be a number"),
+            );
+        }
+        Err(SmtParseError::Unrecognized(format!(
+            "Currently only supports greater than or equal with str.len and concrete int"
         )))
     }
 
