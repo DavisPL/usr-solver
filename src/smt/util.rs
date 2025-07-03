@@ -13,10 +13,10 @@ pub fn hex_to_char(number: u64) -> Result<char, SmtParseError> {
     )))
 }
 
-pub fn parse_bad_newlines(text: &str)-> Result<String, SmtParseError>{
+pub fn parse_bad_newlines(text: &str) -> Result<String, SmtParseError> {
     // Regex pattern for newlines in set-info
-    let newlines_re=Regex::new(r"(?s)\(set-info\ :source\ \|(.*)\|\)").unwrap();
-    
+    let newlines_re = Regex::new(r"(?s)\(set-info\ :source\ \|(.*)\|\)").unwrap();
+
     replace_all(&newlines_re, text, |caps: &regex::Captures| {
         //let innertext=&caps[1];
         //println!("start");
@@ -26,7 +26,6 @@ pub fn parse_bad_newlines(text: &str)-> Result<String, SmtParseError>{
         Ok("".to_string())
         //Ok(format!("(set-info :source |{}|)",modified_innertext))
     })
-    
 }
 
 pub fn parse_unicode_escape(text: &str) -> Result<String, SmtParseError> {
