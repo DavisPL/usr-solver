@@ -6,7 +6,7 @@
 #![allow(clippy::useless_format)]
 
 use super::util::{hex_to_char, parse_unicode_escape};
-use crate::smt::util::parse_bad_newlines;
+use crate::smt::util::{parse_bad_escapes, parse_bad_newlines};
 use crate::types::regex::GenRegex;
 
 use lexpr::{self, Value};
@@ -31,6 +31,12 @@ pub enum SmtParseError {
     Unimplemented(String),           // Unimplemented SMTLib feature
     BadLiteral(String),              // Bad literal in SMTLib file
     Unexpected(String, String),      // Unexpected S-expression
+}
+#[derive(Debug)]
+enum TokenTypes {
+    ReTok(RegexToken),
+    StrTok(StringToken),
+    Other,
 }
 
 impl SmtParseError {
@@ -98,10 +104,11 @@ pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
 
     // Add an opening and closoing paren
     let smt_string = format!("(\n{}\n)", smt_string);
-    let smt_string = parse_unicode_escape(&smt_string)?;
+    //let smt_string = parse_unicode_escape(&smt_string)?;
     //TODO:Figure out why (set-info source |...|) breaks lexpr parsing
     //  Removes set-info source lines for now
     let smt_string = parse_bad_newlines(&smt_string)?;
+    let smt_string = parse_bad_escapes(&smt_string)?;
     println!("{}", smt_string);
 
     // Parse S-expression
@@ -130,7 +137,7 @@ fn expect_symbol(v: &Value) -> Result<&str, SmtParseError> {
 /*
     Main parsing interface
 */
-
+#[derive(Debug)]
 enum RegexToken {
     Val(Rc<GenRegex>),
     Conditional {
@@ -432,7 +439,15 @@ impl RegexToken {
             RegexToken::Var(_) => todo!(),
         }
     }
+    fn to_re(tok: &RegexToken) -> Result<Rc<GenRegex>, SmtParseError>{
+        match tok {
+            RegexToken::Val(gen_regex) => Ok(gen_regex.clone()),
+            RegexToken::Conditional { .. } => todo!(),
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("Unintialized Regex variable cannot be converted to USR."))),
+        }
+    }
 }
+#[derive(Debug)]
 enum StringToken {
     Var(String),
     Val(String),
@@ -1086,169 +1101,204 @@ impl SmtParser {
         )))
     }
 
+    fn parse_equals_tok_type(&mut self, arg: &Value) -> Result<TokenTypes, SmtParseError> {
+        let try_re = self.parse_reglan_type(arg);
+        if let Ok(re_tok) = try_re {
+            return Ok(TokenTypes::ReTok(re_tok));
+        }
+        let try_str = self.parse_string_expr(arg);
+        if let Ok(str_tok) = try_str {
+            return Ok(TokenTypes::StrTok(str_tok));
+        }
+        Ok(TokenTypes::Other)
+    }
+
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
         //Assumes RegLan on both sides of =
         //Todo: support String equality?
-        let (regex1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
-        let (regex2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (arg1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
+        let (arg2, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
-        if regex1.is_symbol() && regex2.is_symbol() {
-            let parsed1 = self.parse_reglan_type(regex1)?;
-            let parsed2 = self.parse_reglan_type(regex2)?;
-            //Initializes variables if its var=Regex
-            //Asserts equality if Regex=Regex
-            //Will return epsilon in case of initialization
-            match (parsed1, parsed2) {
-                (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(
-                    format!("Equality of uninitialized RegLan variables not supported."),
-                )),
-                (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
-                    let res = self.re_var_names.get(&name);
-                    if let Some(found) = res {
-                        match found {
-                            Some(_) => Err(SmtParseError::Unsupported(format!(
-                                "Conflicting RegLan initilizations are caught here instead of solver."
-                            ))),
-                            None => {
-                                self.re_var_names.insert(name, Some(gen_regex));
-                                Ok(GenRegex::epsilon())
+        let tok1 = self.parse_equals_tok_type(arg1)?;
+        let tok2 = self.parse_equals_tok_type(arg2)?;
+        match (tok1, tok2) {
+            (TokenTypes::ReTok(regex_token1), TokenTypes::ReTok(regex_token2)) => {
+                match (regex_token1, regex_token2) {
+                    (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(
+                        format!("Equality of uninitialized RegLan variables not supported."),
+                    )),
+                    (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
+                        let res = self.re_var_names.get(&name);
+                        if let Some(found) = res {
+                            match found {
+                                Some(_) => Err(SmtParseError::Unsupported(format!(
+                                    "Conflicting RegLan initilizations are caught here instead of solver."
+                                ))),
+                                None => {
+                                    self.re_var_names.insert(name, Some(gen_regex));
+                                    Ok(GenRegex::epsilon())
+                                }
                             }
+                        } else {
+                            Err(SmtParseError::Unrecognized(format!(
+                                "RegLan variable not declared/found: {}",
+                                name
+                            )))
                         }
-                    } else {
-                        Err(SmtParseError::Unrecognized(format!(
-                            "RegLan variable not declared/found: {}",
-                            name
-                        )))
                     }
-                }
-                (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
-                    let res = self.re_var_names.get(&name);
-                    if let Some(found) = res {
-                        match found {
-                            Some(_) => Err(SmtParseError::Unsupported(format!(
-                                "Conflicting RegLan initilizations are caught here instead of solver."
-                            ))),
-                            None => {
-                                self.re_var_names.insert(name, Some(gen_regex));
-                                Ok(GenRegex::epsilon())
+                    (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
+                        let res = self.re_var_names.get(&name);
+                        if let Some(found) = res {
+                            match found {
+                                Some(_) => Err(SmtParseError::Unsupported(format!(
+                                    "Conflicting RegLan initilizations are caught here instead of solver."
+                                ))),
+                                None => {
+                                    self.re_var_names.insert(name, Some(gen_regex));
+                                    Ok(GenRegex::epsilon())
+                                }
                             }
+                        } else {
+                            Err(SmtParseError::Unrecognized(format!(
+                                "RegLan variable not declared/found: {}",
+                                name
+                            )))
                         }
-                    } else {
-                        Err(SmtParseError::Unrecognized(format!(
-                            "RegLan variable not declared/found: {}",
-                            name
-                        )))
                     }
+                    (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
+                        Err(SmtParseError::Unimplemented(format!(
+                            "Equals had not been fixed"
+                        )))
+                        /*
+                        Ok(GenRegex::union(
+                            &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
+                            &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
+                        ))*/
+                    }
+                    _ => Err(SmtParseError::Unimplemented(format!(
+                        "Equals cannot handle ite currently."
+                    ))),
                 }
-                (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
-                    Err(SmtParseError::Unimplemented(format!(
-                        "Equals had not been fixed"
-                    )))
-                    /*
-                    Ok(GenRegex::union(
-                        &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
-                        &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
-                    ))*/
-                }
-                _ => Err(SmtParseError::Unimplemented(format!(
-                    "Equals cannot handle ite currently."
-                ))),
             }
-        } else if regex1.is_number() && self.is_length_operation(regex2) {
-            return self.parse_len(
-                regex2,
-                regex1
-                    .as_number()
-                    .expect("Should be a number")
-                    .as_i64()
-                    .expect("Should be a number"),
-            );
-        } else if regex2.is_number() && self.is_length_operation(regex1) {
-            return self.parse_len(
-                regex1,
-                regex2
-                    .as_number()
-                    .expect("Should be a number")
-                    .as_i64()
-                    .expect("Should be a number"),
-            );
-        } else if regex1.is_string() && self.is_substr_operation(regex2) {
-            return self.parse_substr(regex2, regex1);
-        } else if regex2.is_string() && self.is_substr_operation(regex1) {
-            return self.parse_substr(regex1, regex2);
-        } else {
-            let parsed1 = if regex1.is_string() {
-                Self::strtok_to_retok(&self.parse_string_expr(regex1)?)?
-            } else {
-                self.parse_reglan_type(regex1)?
-            };
+            (TokenTypes::StrTok(string_token1), TokenTypes::StrTok(string_token2)) => {
+                match(&string_token1,&string_token2){
+                    (StringToken::Var(name1),StringToken::Var(name2)) => {
+                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name1),&&GenRegex::create_gre_str_var(&name2)))
+                    },
+                    (StringToken::Val(lit),StringToken::Var(name)) =>{
+                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name),&GenRegex::str_to_re(&lit)))
+                    },
+                    (StringToken::Var(name),StringToken::Val(lit)) =>{
+                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name),&GenRegex::str_to_re(&lit)))
+                    },
+                    (StringToken::Var(name),StringToken::Concat{..})=>{
+                        let re_tok=Self::strtok_to_retok(&string_token2)?;
+                        let gre=RegexToken::to_re(&re_tok)?;
+                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name),&gre))
+                    },
+                    _=> todo!(),
+                }
+            }
+            (TokenTypes::Other, TokenTypes::Other) => {
+                if arg1.is_number() && self.is_length_operation(arg2) {
+                    return self.parse_len(
+                        arg2,
+                        arg1.as_number()
+                            .expect("Should be a number")
+                            .as_i64()
+                            .expect("Should be a number"),
+                    );
+                } else if arg2.is_number() && self.is_length_operation(arg1) {
+                    return self.parse_len(
+                        arg1,
+                        arg2.as_number()
+                            .expect("Should be a number")
+                            .as_i64()
+                            .expect("Should be a number"),
+                    );
+                } else if arg1.is_string() && self.is_substr_operation(arg2) {
+                    return self.parse_substr(arg2, arg1);
+                } else if arg2.is_string() && self.is_substr_operation(arg1) {
+                    return self.parse_substr(arg1, arg2);
+                } else {
+                    let parsed1 = if arg1.is_string() {
+                        Self::strtok_to_retok(&self.parse_string_expr(arg1)?)?
+                    } else {
+                        self.parse_reglan_type(arg1)?
+                    };
 
-            let parsed2 = if regex2.is_string() {
-                Self::strtok_to_retok(&self.parse_string_expr(regex2)?)?
-            } else {
-                self.parse_reglan_type(regex2)?
-            };
+                    let parsed2 = if arg2.is_string() {
+                        Self::strtok_to_retok(&self.parse_string_expr(arg2)?)?
+                    } else {
+                        self.parse_reglan_type(arg2)?
+                    };
 
-            //let parsed1 = self.parse_reglan_type(regex1)?;
-            //let parsed2 = self.parse_reglan_type(regex2)?;
-
-            return match (parsed1, parsed2) {
-                (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(
-                    format!("Equality of uninitialized RegLan variables not supported."),
-                )),
-                (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
-                    let res = self.re_var_names.get(&name);
-                    if let Some(found) = res {
-                        match found {
-                            Some(_) => Err(SmtParseError::Unsupported(format!(
-                                "Conflicting RegLan initilizations are caught here instead of solver."
-                            ))),
-                            None => {
-                                self.re_var_names.insert(name, Some(gen_regex));
-                                Ok(GenRegex::epsilon())
+                    return match (parsed1, parsed2) {
+                        (RegexToken::Var(_), RegexToken::Var(_)) => {
+                            Err(SmtParseError::Unsupported(format!(
+                                "Equality of uninitialized RegLan variables not supported."
+                            )))
+                        }
+                        (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
+                            let res = self.re_var_names.get(&name);
+                            if let Some(found) = res {
+                                match found {
+                                    Some(_) => Err(SmtParseError::Unsupported(format!(
+                                        "Conflicting RegLan initilizations are caught here instead of solver."
+                                    ))),
+                                    None => {
+                                        self.re_var_names.insert(name, Some(gen_regex));
+                                        Ok(GenRegex::epsilon())
+                                    }
+                                }
+                            } else {
+                                Err(SmtParseError::Unrecognized(format!(
+                                    "RegLan variable not declared/found: {}",
+                                    name
+                                )))
                             }
                         }
-                    } else {
-                        Err(SmtParseError::Unrecognized(format!(
-                            "RegLan variable not declared/found: {}",
-                            name
-                        )))
-                    }
-                }
-                (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
-                    let res = self.re_var_names.get(&name);
-                    if let Some(found) = res {
-                        match found {
-                            Some(_) => Err(SmtParseError::Unsupported(format!(
-                                "Conflicting RegLan initilizations are caught here instead of solver."
-                            ))),
-                            None => {
-                                self.re_var_names.insert(name, Some(gen_regex));
-                                Ok(GenRegex::epsilon())
+                        (RegexToken::Val(gen_regex), RegexToken::Var(name)) => {
+                            let res = self.re_var_names.get(&name);
+                            if let Some(found) = res {
+                                match found {
+                                    Some(_) => Err(SmtParseError::Unsupported(format!(
+                                        "Conflicting RegLan initilizations are caught here instead of solver."
+                                    ))),
+                                    None => {
+                                        self.re_var_names.insert(name, Some(gen_regex));
+                                        Ok(GenRegex::epsilon())
+                                    }
+                                }
+                            } else {
+                                Err(SmtParseError::Unrecognized(format!(
+                                    "RegLan variable not declared/found: {}",
+                                    name
+                                )))
                             }
                         }
-                    } else {
-                        Err(SmtParseError::Unrecognized(format!(
-                            "RegLan variable not declared/found: {}",
-                            name
-                        )))
-                    }
+                        (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
+                            Ok(GenRegex::intersect(&gen_regex1, &gen_regex2))
+                            /*Err(SmtParseError::Unimplemented(format!(
+                                "Equals had not been fixed"
+                            )))*/
+                            /*
+                            Ok(GenRegex::union(
+                                &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
+                                &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
+                            ))*/
+                        }
+                        _ => Err(SmtParseError::Unimplemented(format!(
+                            "Equals cannot handle ite currently."
+                        ))),
+                    };
                 }
-                (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
-                    Ok(GenRegex::intersect(&gen_regex1, &gen_regex2))
-                    /*Err(SmtParseError::Unimplemented(format!(
-                        "Equals had not been fixed"
-                    )))*/
-                    /*
-                    Ok(GenRegex::union(
-                        &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
-                        &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
-                    ))*/
-                }
-                _ => Err(SmtParseError::Unimplemented(format!(
-                    "Equals cannot handle ite currently."
-                ))),
-            };
+            }
+            _ => {
+                return Err(SmtParseError::Unsupported(format!(
+                    "Mismatched in equality assertion."
+                )))
+            }
         }
     }
 
@@ -1538,7 +1588,7 @@ impl SmtParser {
             "let" => self.parse_let_regex(args),
             "str.to_re" => self.parse_str_to_re(args),
             "re.++" => self.parse_re_concat(args),
-            "str.++" => self.parse_str_re_concat(args),
+            //"str.++" => self.parse_str_re_concat(args), what was str.++ doing here? Keeping this for if some error pops up in the future.
             "re.union" => self.parse_re_union(args),
             "re.diff" => self.parse_re_diff(args),
             "re.*" => self.parse_re_star(args),

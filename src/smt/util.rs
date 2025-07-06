@@ -17,7 +17,7 @@ pub fn parse_bad_newlines(text: &str) -> Result<String, SmtParseError> {
     // Regex pattern for newlines in set-info
     let newlines_re = Regex::new(r"(?s)\(set-info\ :source\ \|(.*)\|\)").unwrap();
 
-    replace_all(&newlines_re, text, |caps: &regex::Captures| {
+    replace_all(&newlines_re, text, |_caps: &regex::Captures| {
         //let innertext=&caps[1];
         //println!("start");
         //println!("{}",innertext);
@@ -25,6 +25,15 @@ pub fn parse_bad_newlines(text: &str) -> Result<String, SmtParseError> {
         //let modified_innertext=innertext.replace("\n", " ").replace("\r", " ");
         Ok("".to_string())
         //Ok(format!("(set-info :source |{}|)",modified_innertext))
+    })
+}
+
+pub fn parse_bad_escapes(text: &str) -> Result<String, SmtParseError> {
+    // Regex pattern for newlines in set-info
+    let newlines_re = Regex::new(r"\\").unwrap();
+
+    replace_all(&newlines_re, text, |_caps: &regex::Captures| {
+        Ok("\\\\".to_string())
     })
 }
 
