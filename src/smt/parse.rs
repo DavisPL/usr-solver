@@ -439,11 +439,13 @@ impl RegexToken {
             RegexToken::Var(_) => todo!(),
         }
     }
-    fn to_re(tok: &RegexToken) -> Result<Rc<GenRegex>, SmtParseError>{
+    fn to_re(tok: &RegexToken) -> Result<Rc<GenRegex>, SmtParseError> {
         match tok {
             RegexToken::Val(gen_regex) => Ok(gen_regex.clone()),
             RegexToken::Conditional { .. } => todo!(),
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!("Unintialized Regex variable cannot be converted to USR."))),
+            RegexToken::Var(_) => Err(SmtParseError::Unsupported(format!(
+                "Unintialized Regex variable cannot be converted to USR."
+            ))),
         }
     }
 }
@@ -1181,22 +1183,34 @@ impl SmtParser {
                 }
             }
             (TokenTypes::StrTok(string_token1), TokenTypes::StrTok(string_token2)) => {
-                match(&string_token1,&string_token2){
-                    (StringToken::Var(name1),StringToken::Var(name2)) => {
-                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name1),&&GenRegex::create_gre_str_var(&name2)))
-                    },
-                    (StringToken::Val(lit),StringToken::Var(name)) =>{
-                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name),&GenRegex::str_to_re(&lit)))
-                    },
-                    (StringToken::Var(name),StringToken::Val(lit)) =>{
-                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name),&GenRegex::str_to_re(&lit)))
-                    },
-                    (StringToken::Var(name),StringToken::Concat{..})=>{
-                        let re_tok=Self::strtok_to_retok(&string_token2)?;
-                        let gre=RegexToken::to_re(&re_tok)?;
-                        return Ok(GenRegex::intersect(&GenRegex::create_gre_str_var(&name),&gre))
-                    },
-                    _=> todo!(),
+                match (&string_token1, &string_token2) {
+                    (StringToken::Var(name1), StringToken::Var(name2)) => {
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(&name1),
+                            &&GenRegex::create_gre_str_var(&name2),
+                        ))
+                    }
+                    (StringToken::Val(lit), StringToken::Var(name)) => {
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(&name),
+                            &GenRegex::str_to_re(&lit),
+                        ))
+                    }
+                    (StringToken::Var(name), StringToken::Val(lit)) => {
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(&name),
+                            &GenRegex::str_to_re(&lit),
+                        ))
+                    }
+                    (StringToken::Var(name), StringToken::Concat { .. }) => {
+                        let re_tok = Self::strtok_to_retok(&string_token2)?;
+                        let gre = RegexToken::to_re(&re_tok)?;
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(&name),
+                            &gre,
+                        ));
+                    }
+                    _ => todo!(),
                 }
             }
             (TokenTypes::Other, TokenTypes::Other) => {
