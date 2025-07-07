@@ -36,6 +36,7 @@ pub enum SmtParseError {
 enum TokenTypes {
     ReTok(RegexToken),
     StrTok(StringToken),
+    Assertion(Rc<GenRegex>, Rc<GenRegex>),
     Other,
 }
 
@@ -681,7 +682,7 @@ impl SmtParser {
     */
 
     fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        // println!("called parse_assert_arg: {:?}", v);
+        println!("called parse_assert_arg: {:?}", v);
 
         // Parse the command. Assume the command always is Cons or a single symbol
 
@@ -731,6 +732,14 @@ impl SmtParser {
                 self.parse_assert_arg(cmd)
             }
         }
+    }
+
+    fn flip_assert(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("called flip_assert: {:?}", v);
+        self.not_flag = !self.not_flag;
+        let res = self.parse_assert_arg(v)?;
+        self.not_flag = !self.not_flag;
+        Ok(res)
     }
 
     fn parse_assert_arg_not(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -1106,16 +1115,29 @@ impl SmtParser {
     fn parse_equals_tok_type(&mut self, arg: &Value) -> Result<TokenTypes, SmtParseError> {
         let try_re = self.parse_reglan_type(arg);
         if let Ok(re_tok) = try_re {
+            println!("called parse_equals_tok_type: re return");
             return Ok(TokenTypes::ReTok(re_tok));
         }
         let try_str = self.parse_string_expr(arg);
         if let Ok(str_tok) = try_str {
+            println!("called parse_equals_tok_type: str return");
             return Ok(TokenTypes::StrTok(str_tok));
         }
+        let saved_not_flag = self.not_flag;
+        self.not_flag = false;
+        let try_assert = self.parse_assert_arg(arg);
+        let try_assert_neg = self.flip_assert(arg);
+        self.not_flag = saved_not_flag;
+        if let (Ok(assert), Ok(assert_neg)) = (try_assert, try_assert_neg) {
+            println!("called parse_equals_tok_type: assertion return");
+            return Ok(TokenTypes::Assertion(assert, assert_neg));
+        }
+        println!("called parse_equals_tok_type: other return");
         Ok(TokenTypes::Other)
     }
 
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("called parse_equals: {:?}", v);
         //Assumes RegLan on both sides of =
         //Todo: support String equality?
         let (arg1, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
@@ -1125,6 +1147,11 @@ impl SmtParser {
         let tok2 = self.parse_equals_tok_type(arg2)?;
         match (tok1, tok2) {
             (TokenTypes::ReTok(regex_token1), TokenTypes::ReTok(regex_token2)) => {
+                if self.not_flag {
+                    return Err(SmtParseError::Unimplemented(format!(
+                        "Equals on RegLan doesn't handle negation yet."
+                    )));
+                }
                 match (regex_token1, regex_token2) {
                     (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(
                         format!("Equality of uninitialized RegLan variables not supported."),
@@ -1183,6 +1210,11 @@ impl SmtParser {
                 }
             }
             (TokenTypes::StrTok(string_token1), TokenTypes::StrTok(string_token2)) => {
+                if self.not_flag {
+                    return Err(SmtParseError::Unimplemented(format!(
+                        "Equals on RegLan doesn't handle negation yet."
+                    )));
+                }
                 match (&string_token1, &string_token2) {
                     (StringToken::Var(name1), StringToken::Var(name2)) => {
                         return Ok(GenRegex::intersect(
@@ -1211,6 +1243,22 @@ impl SmtParser {
                         ));
                     }
                     _ => todo!(),
+                }
+            }
+            (
+                TokenTypes::Assertion(assert1, assert1_neg),
+                TokenTypes::Assertion(assert2, assert2_neg),
+            ) => {
+                if self.not_flag {
+                    return Ok(GenRegex::union(
+                        &GenRegex::concat(&assert1, &assert2_neg),
+                        &GenRegex::concat(&assert1_neg, &assert2),
+                    ));
+                } else {
+                    return Ok(GenRegex::union(
+                        &GenRegex::concat(&assert1, &assert2),
+                        &GenRegex::concat(&assert1_neg, &assert2_neg),
+                    ));
                 }
             }
             (TokenTypes::Other, TokenTypes::Other) => {
@@ -2033,9 +2081,12 @@ impl SmtParser {
                 Ok(StringToken::Val(s.to_string()))
             } else if self.str_var_names.contains(name) {
                 Ok(StringToken::Var(name.to_string()))
+            } else if let Some(arg) = self.let_vars.get(name) {
+                let arg_clone = arg.clone();
+                self.parse_string_expr(&arg_clone)
             } else {
                 Err(SmtParseError::BadLiteral(format!(
-                    "{} is not found in declared variables or defined functions.",
+                    "{} is not found in declared variables, defined functions or let variables.",
                     name
                 )))
             }
