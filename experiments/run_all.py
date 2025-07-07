@@ -306,9 +306,8 @@ class TestResultTotals:
     cats_abbrevs = ["sat", "unsat", "other", "blank", "unchk",
                    "unk", "wrong", "tmout", "crash"]
 
-    # time_buckets = [0.01, 0.02, 0.04, 0.08, 0.16,
-    #                 0.32, 0.64, 1.3, 2.6, 5.1, 10.2]
-    time_buckets = [0.041, 0.12, 0.37, 1.1, 3.3, 10.2]
+    time_buckets = [0.041, 0.12, 0.37, 1.1, 3.3, 10.0, 30.0, 90.0]
+    time_buckets_max = 90.0
     time_buckets_str = [str(bkt) for bkt in time_buckets]
 
     def __init__(self, name):
@@ -336,7 +335,7 @@ class TestResultTotals:
             bkt = None
         else:
             time = test_result.time
-            bkt = [b for b in self.time_buckets if b > time][0]
+            bkt = ([b for b in self.time_buckets if b > time] + [self.time_buckets_max])[0]
             self.btotals[bkt] += 1
         # Save raw data
         path = test_result.path
