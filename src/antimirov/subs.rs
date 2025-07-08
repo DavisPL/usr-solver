@@ -581,8 +581,6 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
 
-    
-
     for eq_exprs in str_eq_class.values_mut() {
         let mut ind = 0;
         while eq_exprs.len() > 1 {
@@ -709,7 +707,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
             id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
         }
         let id_var = expr_to_id[&key.clone()];
-        let new_c=id_to_expr[&union_find.find(id_var).clone()].clone();
+        let new_c = id_to_expr[&union_find.find(id_var).clone()].clone();
         if modified_not.contains(&new_c) {
             return None;
         }
@@ -723,22 +721,21 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     // Include range constraints
     // Similar to handling not, just updated the char vars in range constraints using Find
     // Commented out due to index out of bounds error on Union Find
-    let mut updated_range=BTreeMap::new();
-    for (c,ranges)in range_constrs{
+    let mut updated_range = BTreeMap::new();
+    for (c, ranges) in range_constrs {
         let key = CharExpression::CharVar(c.clone());
         if !expr_to_id.contains_key(&Rc::new(key.clone())) {
             expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
             id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
         }
         let id_var = expr_to_id[&key.clone()];
-        let Some(new_var)=id_to_expr.get(&union_find.find(id_var).clone()) else{
+        let Some(new_var) = id_to_expr.get(&union_find.find(id_var).clone()) else {
             updated_range.insert(c, ranges);
             continue;
         };
-        if let CharExpression::CharVar(name)=&**new_var{
+        if let CharExpression::CharVar(name) = &**new_var {
             updated_range.insert(name.clone(), ranges);
-        }
-        else {
+        } else {
             updated_range.insert(c, ranges);
         }
     }
