@@ -209,7 +209,7 @@ impl RangeConstr {
     }
 }
 
-fn merge_range_constraints(
+pub fn merge_range_constraints(
     constraints1: &BTreeMap<CharVar, RangeConstr>,
     constraints2: &BTreeMap<CharVar, RangeConstr>,
 ) -> Option<BTreeMap<CharVar, RangeConstr>> {
@@ -714,6 +714,24 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     combined_expr.set_not_constraints(combined_not);
 
     // Include range constraints
+    // Similar to handling not, just updated the char vars in range constraints using Find
+    // Commented out due to index out of bounds error on Union Find
+    // let mut updated_range=BTreeMap::new();
+    // for (c,ranges)in range_constrs{
+    //     let key = CharExpression::CharVar(c.clone());
+    //     if !expr_to_id.contains_key(&Rc::new(key.clone())) {
+    //         expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
+    //         id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
+    //     }
+    //     let id_var = expr_to_id[&key.clone()];
+    //     let new_var=&*id_to_expr[&union_find.find(id_var).clone()];
+    //     if let CharExpression::CharVar(name)=new_var{
+    //         updated_range.insert(name.clone(), ranges);
+    //     }
+    //     else {
+    //         updated_range.insert(c, ranges);
+    //     }
+    // }
     combined_expr.set_ranges(range_constrs);
 
     Some(combined_expr)

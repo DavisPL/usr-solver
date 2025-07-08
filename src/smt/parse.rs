@@ -5,7 +5,7 @@
 // TODO fix
 #![allow(clippy::useless_format)]
 
-use super::util::{hex_to_char, parse_unicode_escape};
+use super::util::hex_to_char;
 use crate::smt::util::{parse_bad_escapes, parse_bad_newlines};
 use crate::types::regex::GenRegex;
 

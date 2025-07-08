@@ -227,10 +227,10 @@ fn determinize_range(deriv_var: &CharVar, char1: char, char2: char) -> HashSet<A
         char1,
         char2,
     ));
-    if let Some(char2) = char_plus_one(char1) {
+    if let Some(char3) = char_plus_one(char2) {
         result.insert(AntimirovElement::new_empty_range(
             deriv_var.clone(),
-            char2,
+            char3,
             CHAR_MAX,
         ));
     }
