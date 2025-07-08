@@ -324,6 +324,9 @@ impl AnySub {
     pub fn get_char_map(&self) -> &BTreeMap<CharVar, Vec<CharExpression>> {
         &self.char_to
     }
+    pub fn get_ranges(&self) -> &Option<BTreeMap<CharVar, RangeConstr>> {
+        &self.range_constraints
+    }
     pub fn take_ranges(&mut self) -> Option<BTreeMap<CharVar, RangeConstr>> {
         self.range_constraints.take()
     }
@@ -563,6 +566,12 @@ use super::union_find::{count_union_elems, union_over_set, UnionFind};
 use std::collections::HashMap;
 
 fn merge(substitutions: AnySub) -> Option<SimpleSub> {
+    //let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
+    let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
+    let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
+    let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
+    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions) + 1);
+
     // Take range constraints
     // If merge was unsuccessful, return None
     let mut substitutions = substitutions;
@@ -572,11 +581,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
 
-    //let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
-    let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
-    let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
-    let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
-    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions) + 1);
+    
 
     for eq_exprs in str_eq_class.values_mut() {
         let mut ind = 0;
@@ -704,9 +709,11 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
             id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
         }
         let id_var = expr_to_id[&key.clone()];
-        if modified_not.contains(&id_to_expr[&union_find.find(id_var).clone()]) {
+        let new_c=id_to_expr[&union_find.find(id_var).clone()].clone();
+        if modified_not.contains(&new_c) {
             return None;
         }
+        // Note: We insert c instead of new_c here which means that not all keys are fully resolved. Can be revisted later.
         combined_not.insert(c.clone(), modified_not);
     }
 
@@ -716,23 +723,26 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     // Include range constraints
     // Similar to handling not, just updated the char vars in range constraints using Find
     // Commented out due to index out of bounds error on Union Find
-    // let mut updated_range=BTreeMap::new();
-    // for (c,ranges)in range_constrs{
-    //     let key = CharExpression::CharVar(c.clone());
-    //     if !expr_to_id.contains_key(&Rc::new(key.clone())) {
-    //         expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
-    //         id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
-    //     }
-    //     let id_var = expr_to_id[&key.clone()];
-    //     let new_var=&*id_to_expr[&union_find.find(id_var).clone()];
-    //     if let CharExpression::CharVar(name)=new_var{
-    //         updated_range.insert(name.clone(), ranges);
-    //     }
-    //     else {
-    //         updated_range.insert(c, ranges);
-    //     }
-    // }
-    combined_expr.set_ranges(range_constrs);
+    let mut updated_range=BTreeMap::new();
+    for (c,ranges)in range_constrs{
+        let key = CharExpression::CharVar(c.clone());
+        if !expr_to_id.contains_key(&Rc::new(key.clone())) {
+            expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
+            id_to_expr.insert(expr_to_id.len(), Rc::new(key.clone()));
+        }
+        let id_var = expr_to_id[&key.clone()];
+        let Some(new_var)=id_to_expr.get(&union_find.find(id_var).clone()) else{
+            updated_range.insert(c, ranges);
+            continue;
+        };
+        if let CharExpression::CharVar(name)=&**new_var{
+            updated_range.insert(name.clone(), ranges);
+        }
+        else {
+            updated_range.insert(c, ranges);
+        }
+    }
+    combined_expr.set_ranges(updated_range);
 
     Some(combined_expr)
 }

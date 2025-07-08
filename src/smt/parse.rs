@@ -682,7 +682,7 @@ impl SmtParser {
     */
 
     fn parse_assert_arg(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called parse_assert_arg: {:?}", v);
+        // println!("called parse_assert_arg: {:?}", v);
 
         // Parse the command. Assume the command always is Cons or a single symbol
 
@@ -743,7 +743,7 @@ impl SmtParser {
     }
 
     fn parse_assert_arg_not(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
-        println!("called parse_assert_arg_not: {:?}", v);
+        // println!("called parse_assert_arg_not: {:?}", v);
         self.not_flag = !self.not_flag;
         let args = self.get_args(v)?;
         if args.len() != 1 {
@@ -1115,12 +1115,12 @@ impl SmtParser {
     fn parse_equals_tok_type(&mut self, arg: &Value) -> Result<TokenTypes, SmtParseError> {
         let try_re = self.parse_reglan_type(arg);
         if let Ok(re_tok) = try_re {
-            println!("called parse_equals_tok_type: re return");
+            //println!("called parse_equals_tok_type: re return");
             return Ok(TokenTypes::ReTok(re_tok));
         }
         let try_str = self.parse_string_expr(arg);
         if let Ok(str_tok) = try_str {
-            println!("called parse_equals_tok_type: str return");
+            //println!("called parse_equals_tok_type: str return");
             return Ok(TokenTypes::StrTok(str_tok));
         }
         let saved_not_flag = self.not_flag;
@@ -1129,10 +1129,10 @@ impl SmtParser {
         let try_assert_neg = self.flip_assert(arg);
         self.not_flag = saved_not_flag;
         if let (Ok(assert), Ok(assert_neg)) = (try_assert, try_assert_neg) {
-            println!("called parse_equals_tok_type: assertion return");
+            //println!("called parse_equals_tok_type: assertion return");
             return Ok(TokenTypes::Assertion(assert, assert_neg));
         }
-        println!("called parse_equals_tok_type: other return");
+        //println!("called parse_equals_tok_type: other return");
         Ok(TokenTypes::Other)
     }
 

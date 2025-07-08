@@ -88,5 +88,12 @@ pub fn count_union_elems(substitutions: &AnySub) -> usize {
     for c_exprs in substitutions.get_char_map().values() {
         count += c_exprs.len() + 1;
     }
+    let ranges=substitutions.get_ranges();
+    let Some(ranges)=ranges else{
+        return count;
+    };
+    for r in ranges{
+        count+=1;
+    }
     count
 }

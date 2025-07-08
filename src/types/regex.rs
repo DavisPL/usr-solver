@@ -130,13 +130,13 @@ impl GenRegex {
     }
     pub fn re_range(start: char, end: char) -> Rc<GenRegex> {
         // WITH RANGE OPTIMIZATION:
-        //Rc::new(GenRegex::Range(start, end))
+        Rc::new(GenRegex::Range(start, end))
         // OLD IMPL:
-        let mut retval = GenRegex::create_gre_char_lit(end);
-        for c in (start..=end).rev().skip(1) {
-            retval = GenRegex::union(&GenRegex::create_gre_char_lit(c), &retval)
-        }
-        retval
+        // let mut retval = GenRegex::create_gre_char_lit(end);
+        // for c in (start..=end).rev().skip(1) {
+        //     retval = GenRegex::union(&GenRegex::create_gre_char_lit(c), &retval)
+        // }
+        // retval
     }
     pub fn caret(n: u64, gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         if n == 0 {

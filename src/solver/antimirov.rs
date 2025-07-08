@@ -8,7 +8,7 @@
 use super::Solver;
 
 use crate::antimirov::deriv::{derivative, nullable};
-use crate::antimirov::subs::{merge_binary, merge_sets, SimpleSub};
+use crate::antimirov::subs::{merge_binary, merge_sets, merge_range_constraints, SimpleSub, RangeConstr};
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
 
@@ -23,7 +23,7 @@ pub struct AntimirovSolver {}
 struct DerivativeDepth {
     gre: Rc<GenRegex>,
     not_sub: SimpleSub,
-    //range_constraints: BTreeMap<CharVar, RangeConstr>,
+    range_constraints: BTreeMap<CharVar, RangeConstr>,
     depth: i32,
 }
 impl Ord for DerivativeDepth {
@@ -60,45 +60,55 @@ impl Solver for AntimirovSolver {
         sat_stack.push(DerivativeDepth {
             gre: expr.clone(),
             not_sub: SimpleSub::empty(),
-            //range_constraints: BTreeMap::new(),
+            range_constraints: BTreeMap::new(),
             depth: 0,
         });
         //TODO: Modify visited to compare not substitutions, not just the USR
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
-        while let Some(layer) = sat_stack.pop() {
+        let mut count=0;
+        'satloop: while let Some(layer) = sat_stack.pop() {
+            println!("Looking at: {}", layer.gre);
+            // if count>=2{
+            //     return true;
+            // }
+            // count+=1;
             if !merge_sets(
                 &HashSet::from([layer.not_sub.clone()]),
                 &nullable(&layer.gre),
             )
             .is_empty()
             {
+                println!("Nullable");
                 return true;
             } else if visited.contains(&layer.gre) {
+                println!("Pruned");
                 continue;
             } else {
                 visited.insert(layer.gre.clone());
-                println!("{}", layer.gre);
+                
                 println!("Visited count: {}", visited.len());
                 println!("Stack size: {}", sat_stack.len());
 
                 let deriv = derivative(&layer.gre, &self.get_fresh_var(layer.depth));
                 for ele in deriv {
+                    println!("{}",ele.get_expr());
+                    println!("{:?}",ele.get_subs());
                     // Check range
                     let range = ele.get_ranges();
 
-                    // let sub=ele.get_subs();
-                    // let char_map=sub.get_char_map();
-                    // let not_constr=sub.get_not_constraints();
+                    let sub=ele.get_subs();
+                    let char_map=sub.get_char_map();
+                    let not_constr=sub.get_not_constraints();
                     for (var, range) in range {
                         // Checks if there are conflicts btwn range and charvar mappings
-                        // let in_char_map=char_map.get(var);
-                        // if let Some(found)=in_char_map{
-                        //     if let CharExpression::Literal(lit)=found{
-                        //         if lit>range.get_end() || lit <range.get_start(){
-                        //             continue 'satloop;
-                        //         }
-                        //     }
-                        // }
+                        let in_char_map=char_map.get(var);
+                        if let Some(found)=in_char_map{
+                            if let CharExpression::Literal(lit)=found{
+                                if lit>range.get_end() || lit <range.get_start(){
+                                    continue 'satloop;
+                                }
+                            }
+                        }
                         // TODO Caleb
                         eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
@@ -107,24 +117,24 @@ impl Solver for AntimirovSolver {
                         continue;
                     };
                     // Potential code for fixing optimized range constraints, commented out due to Union Find index out of bounds issues
-                    // println!("Before Range Update: {:?}",layer.range_constraints);
-                    // let mut updated_range=BTreeMap::new();
-                    // for (var,ranges)in &layer.range_constraints{
-                    //     if let Some(c)=char_map.get(&var){
-                    //         if let CharExpression::CharVar(name)=c{
-                    //             updated_range.insert(name.clone(), ranges.clone());
-                    //         }
-                    //     }
-                    //     else{
-                    //         updated_range.insert(var.clone(), ranges.clone());
-                    //     }
-                    // }
-                    // println!("Updated Range: {:?}",updated_range);
-                    // let Some(r)=subs::merge_range_constraints(ele.get_ranges(), &updated_range) else {
-                    //     print!("Pruned");
-                    //     continue;
-                    // };
-                    // println!("After range merge: {:?}",r);
+                    //println!("Before Range Update: {:?}",layer.range_constraints);
+                    let mut updated_range=BTreeMap::new();
+                    for (var,ranges)in &layer.range_constraints{
+                        if let Some(c)=char_map.get(&var){
+                            if let CharExpression::CharVar(name)=c{
+                                updated_range.insert(name.clone(), ranges.clone());
+                            }
+                        }
+                        else{
+                            updated_range.insert(var.clone(), ranges.clone());
+                        }
+                    }
+                    //println!("Updated Range: {:?}",updated_range);
+                    let Some(r)=merge_range_constraints(ele.get_ranges(), &updated_range) else {
+                        print!("Pruned");
+                        continue;
+                    };
+                    //println!("After range merge: {:?}",r);
                     sat_stack.push(DerivativeDepth {
                         gre: ele.get_expr().clone(),
                         not_sub: SimpleSub::new(
@@ -133,7 +143,7 @@ impl Solver for AntimirovSolver {
                             BTreeMap::new(),
                             f.get_not_constraints().clone(),
                         ),
-                        //range_constraints:r,
+                        range_constraints:r,
                         depth: layer.depth + 1,
                     });
                 }
