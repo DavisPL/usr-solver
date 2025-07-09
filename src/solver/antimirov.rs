@@ -93,8 +93,8 @@ impl Solver for AntimirovSolver {
 
                 let deriv = derivative(&layer.gre, &self.get_fresh_var(layer.depth));
                 for ele in deriv {
-                    println!("{}", ele.get_expr());
-                    println!("{:?}", ele.get_subs());
+                    println!("Pushing expr: {}", ele.get_expr());
+                    println!("Subs: {:?}", ele.get_subs());
                     // Check range
                     let range = ele.get_ranges();
 

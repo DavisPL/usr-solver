@@ -137,11 +137,14 @@ pub fn derivative_determinized(
             // AntimirovElement::new_emptysub(gre.clone()).into_set()
         }
         GenRegex::Union(side1, side2) => {
+            //println!("Det_deriv union of: {}",gre);
             let side1_deriv = derivative_determinized(side1, deriv_char);
             let side2_deriv = derivative_determinized(side2, deriv_char);
-            merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
+            let res = merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
                 GenRegex::make_union(left.clone(), right.clone())
-            })
+            });
+            //println!("Det_deriv union result: {:?}",res);
+            res
         }
         GenRegex::Intersect(side1, side2) => {
             let side1_deriv = derivative_determinized(side1, deriv_char);
@@ -151,6 +154,8 @@ pub fn derivative_determinized(
             })
         }
         GenRegex::Concatenation(left, right) => {
+            //println!("Det_deriv concat of: {}", gre);
+
             // Derivative-of-left case
             let left_deriv = derivative_determinized(left, deriv_char);
             let right_copy = AntimirovElement::new_emptysub(right.clone()).into_set();
@@ -159,8 +164,12 @@ pub fn derivative_determinized(
             });
 
             // Derivative-of-right case
+            //println!("Det_deriv concat left: {}", left);
             let (left_nullable_yes, left_nullable_no) = nullable_determinized(left);
+            // println!("Det_deriv left_nullable_yes: {:?}", left_nullable_yes);
+            // println!("Det_deriv left_nullable_no: {:?}", left_nullable_no);
             if left_nullable_yes.is_empty() {
+                //println!("Det_deriv concat result not null: {:?}", left_result);
                 left_result
             } else {
                 let right_deriv = derivative_determinized(right, deriv_char);
@@ -178,9 +187,11 @@ pub fn derivative_determinized(
                     .collect();
 
                 // Merge both cases
-                merge_helper(&left_result, &right_result, &|left, right| {
+                let res = merge_helper(&left_result, &right_result, &|left, right| {
                     GenRegex::make_union(left.clone(), right.clone())
-                })
+                });
+                //println!("Det_deriv concat result null: {:?}", res);
+                res
             }
         }
         GenRegex::Kleene(expr) => {
@@ -287,10 +298,11 @@ pub fn nullable_and_helper(
     (right_true, right_false): (HashSet<AntimirovElement>, HashSet<AntimirovElement>),
 ) -> (HashSet<AntimirovElement>, HashSet<AntimirovElement>) {
     let true_case = merge_helper(&left_true, &right_true, &|_left, _right| {
-        GenRegex::empty_set()
+        //println!("true_case branch");
+        GenRegex::epsilon()
     });
-    let left_only = merge_helper(&left_true, &left_false, &|_left, _right| {
-        GenRegex::empty_set()
+    let left_only = merge_helper(&left_true, &right_false, &|_left, _right| {
+        GenRegex::epsilon()
     });
     let false_case = left_false.into_iter().chain(left_only).collect();
     (true_case, false_case)
@@ -329,7 +341,7 @@ pub fn nullable_determinized(
             //TODO: set correct not constraints for string_sub
             let string_sub =
                 SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
-            let true_case = AntimirovElement::new(GenRegex::empty_set(), string_sub).into_set();
+            let true_case = AntimirovElement::new(GenRegex::epsilon(), string_sub).into_set();
 
             // TODO: Ensure var is fresh
             let fresh = CharVar {
@@ -345,14 +357,21 @@ pub fn nullable_determinized(
             let substitution =
                 SimpleSub::new(string_to, BTreeMap::new(), BTreeMap::new(), BTreeMap::new());
 
-            let false_case = AntimirovElement::new(GenRegex::empty_set(), substitution).into_set();
+            let false_case = AntimirovElement::new(GenRegex::epsilon(), substitution).into_set();
 
             (true_case, false_case)
         }
         GenRegex::Union(side1, side2) => {
+            // println!("null_det of: {}", gre);
+            // println!("null_det left: {}", side1);
+            // println!("null_det right: {}", side2);
             let left = nullable_determinized(side1);
             let right = nullable_determinized(side2);
-            nullable_or_helper(left, right)
+            // println!("null_det result left: {:?}", left);
+            // println!("null_det result right: {:?}", right);
+            let res = nullable_or_helper(left, right);
+            // println!("null_det final res: {:?}", res);
+            res
         }
         GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
             let left = nullable_determinized(side1);
@@ -372,4 +391,15 @@ pub fn nullable_determinized(
             unimplemented!();
         }
     }
+}
+
+#[test]
+fn union_nullable_determinized_test() {
+    let gre = GenRegex::union(&GenRegex::create_gre_char_lit('+'), &GenRegex::epsilon());
+    let (res1, res2) = nullable_determinized(&gre);
+    println!("res1: {:?}", res1);
+    println!("res2: {:?}", res2);
+    assert!(!res1.is_empty());
+    assert!(res2.is_empty());
+    assert!(false);
 }

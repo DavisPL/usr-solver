@@ -29,7 +29,6 @@ pub fn derivative(
 ) -> HashSet<AntimirovElement> {
     //Track not constraints to properly eval derivative
     // println!("taking d({}, {})", gre, deriv_char);
-
     match gre.as_ref() {
         GenRegex::EmptySet => HashSet::new(),
         GenRegex::Epsilon => HashSet::new(),
