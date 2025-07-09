@@ -1,4 +1,5 @@
 ; from GitHub issue: https://github.com/Z3Prover/z3/issues/5140
+; simplified: (\u) replaced with 00000
 (declare-fun a () String)
 (assert
  (str.in_re a
