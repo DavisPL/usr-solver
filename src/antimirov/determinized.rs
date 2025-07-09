@@ -401,5 +401,4 @@ fn union_nullable_determinized_test() {
     println!("res2: {:?}", res2);
     assert!(!res1.is_empty());
     assert!(res2.is_empty());
-    assert!(false);
 }

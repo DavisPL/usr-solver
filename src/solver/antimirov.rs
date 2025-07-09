@@ -68,7 +68,7 @@ impl Solver for AntimirovSolver {
         //TODO: Modify visited to compare not substitutions, not just the USR
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
         let mut count = 0;
-        'satloop: while let Some(layer) = sat_stack.pop() {
+        while let Some(layer) = sat_stack.pop() {
             println!("Looking at: {}", layer.gre);
             // if count>=2{
             //     return true;
@@ -92,7 +92,8 @@ impl Solver for AntimirovSolver {
                 println!("Stack size: {}", sat_stack.len());
 
                 let deriv = derivative(&layer.gre, &self.get_fresh_var(layer.depth));
-                for ele in deriv {
+                //println!("deriv: {:?}", deriv);
+                'deriv_loop: for ele in deriv {
                     println!("Pushing expr: {}", ele.get_expr());
                     println!("Subs: {:?}", ele.get_subs());
                     // Check range
@@ -107,7 +108,8 @@ impl Solver for AntimirovSolver {
                         if let Some(found) = in_char_map {
                             if let CharExpression::Literal(lit) = found {
                                 if lit > range.get_end() || lit < range.get_start() {
-                                    continue 'satloop;
+                                    //println!("death");
+                                    continue 'deriv_loop;
                                 }
                             }
                         }
@@ -116,6 +118,7 @@ impl Solver for AntimirovSolver {
                         // For now, ignore and continue
                     }
                     let Some(f) = merge_binary(ele.get_subs(), &layer.not_sub) else {
+                        //println!("death2");
                         continue;
                     };
                     // Potential code for fixing optimized range constraints, commented out due to Union Find index out of bounds issues

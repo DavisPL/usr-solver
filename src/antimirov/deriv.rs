@@ -88,8 +88,12 @@ pub fn derivative(
             side1_deriv.union(&side2_deriv).cloned().collect()
         }
         GenRegex::Intersect(left, right) => {
+            //println!("Deriv intersect left: {}", left);
+            //println!("Deriv intersect right: {}", right);
             let p_deriv = derivative(left, deriv_char);
             let q_deriv = derivative(right, deriv_char);
+            //println!("p_deriv for {}: {:?}", left, p_deriv);
+            //println!("q_deriv for {}: {:?}", right, q_deriv);
             let mut ret_set = HashSet::new();
             for p_sub in &p_deriv {
                 for q_sub in &q_deriv {
@@ -98,6 +102,12 @@ pub fn derivative(
                     }
                 }
             }
+            // let mut count = 1;
+            // println!("ret_set elements");
+            // for ele in &ret_set {
+            //     println!("{}: {:?}", count, ele);
+            //     count += 1;
+            // }
             ret_set
         }
         GenRegex::Concatenation(left, right) => {
