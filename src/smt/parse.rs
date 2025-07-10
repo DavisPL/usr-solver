@@ -1211,15 +1211,66 @@ impl SmtParser {
             }
             (TokenTypes::StrTok(string_token1), TokenTypes::StrTok(string_token2)) => {
                 if self.not_flag {
-                    return Err(SmtParseError::Unimplemented(format!(
-                        "Equals on RegLan doesn't handle negation yet."
-                    )));
+                    match (&string_token1, &string_token2) {
+                        (StringToken::Var(name1), StringToken::Var(name2)) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&name1),
+                                &GenRegex::complement(&GenRegex::create_gre_str_var(&name2)),
+                            ))
+                        }
+                        (StringToken::Val(lit), StringToken::Var(name)) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&name),
+                                &GenRegex::complement(&GenRegex::str_to_re(&lit)),
+                            ))
+                        }
+                        (StringToken::Var(name), StringToken::Val(lit)) => {
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&name),
+                                &GenRegex::complement(&GenRegex::str_to_re(&lit)),
+                            ))
+                        }
+                        (StringToken::Var(name), StringToken::Concat { .. }) => {
+                            let re_tok = Self::strtok_to_retok(&string_token2)?;
+                            let gre = RegexToken::to_re(&re_tok)?;
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&name),
+                                &GenRegex::complement(&gre),
+                            ));
+                        }
+                        (StringToken::Concat { .. }, StringToken::Var(name)) => {
+                            let re_tok = Self::strtok_to_retok(&string_token1)?;
+                            let gre = RegexToken::to_re(&re_tok)?;
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::create_gre_str_var(&name),
+                                &GenRegex::complement(&gre),
+                            ));
+                        }
+                        (StringToken::Val(lit), StringToken::Concat { .. }) => {
+                            let re_tok = Self::strtok_to_retok(&string_token2)?;
+                            let gre = RegexToken::to_re(&re_tok)?;
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::str_to_re(&lit),
+                                &GenRegex::complement(&gre),
+                            ));
+                        }
+                        (StringToken::Concat { .. }, StringToken::Val(lit)) => {
+                            let re_tok = Self::strtok_to_retok(&string_token1)?;
+                            let gre = RegexToken::to_re(&re_tok)?;
+                            return Ok(GenRegex::intersect(
+                                &GenRegex::str_to_re(&lit),
+                                &GenRegex::complement(&gre),
+                            ));
+                        }
+                        // ITE cases left
+                        _ => todo!(),
+                    }
                 }
                 match (&string_token1, &string_token2) {
                     (StringToken::Var(name1), StringToken::Var(name2)) => {
                         return Ok(GenRegex::intersect(
                             &GenRegex::create_gre_str_var(&name1),
-                            &&GenRegex::create_gre_str_var(&name2),
+                            &GenRegex::create_gre_str_var(&name2),
                         ))
                     }
                     (StringToken::Val(lit), StringToken::Var(name)) => {
@@ -1242,6 +1293,25 @@ impl SmtParser {
                             &gre,
                         ));
                     }
+                    (StringToken::Concat { .. }, StringToken::Var(name)) => {
+                        let re_tok = Self::strtok_to_retok(&string_token1)?;
+                        let gre = RegexToken::to_re(&re_tok)?;
+                        return Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(&name),
+                            &gre,
+                        ));
+                    }
+                    (StringToken::Val(lit), StringToken::Concat { .. }) => {
+                        let re_tok = Self::strtok_to_retok(&string_token2)?;
+                        let gre = RegexToken::to_re(&re_tok)?;
+                        return Ok(GenRegex::intersect(&GenRegex::str_to_re(&lit), &gre));
+                    }
+                    (StringToken::Concat { .. }, StringToken::Val(lit)) => {
+                        let re_tok = Self::strtok_to_retok(&string_token1)?;
+                        let gre = RegexToken::to_re(&re_tok)?;
+                        return Ok(GenRegex::intersect(&GenRegex::str_to_re(&lit), &gre));
+                    }
+                    // ITE cases left
                     _ => todo!(),
                 }
             }
@@ -1261,7 +1331,7 @@ impl SmtParser {
                     ));
                 }
             }
-            (TokenTypes::Other, TokenTypes::Other) => {
+            _ => {
                 if arg1.is_number() && self.is_length_operation(arg2) {
                     return self.parse_len(
                         arg2,
@@ -1355,12 +1425,11 @@ impl SmtParser {
                         ))),
                     };
                 }
-            }
-            _ => {
-                return Err(SmtParseError::Unsupported(format!(
-                    "Mismatched in equality assertion."
-                )))
-            }
+            } // _ => {
+              //     return Err(SmtParseError::Unsupported(format!(
+              //         "Mismatched in equality assertion."
+              //     )))
+              // }
         }
     }
 
