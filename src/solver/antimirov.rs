@@ -9,7 +9,7 @@ use super::Solver;
 
 use crate::antimirov::deriv::{derivative, nullable};
 use crate::antimirov::subs::{
-    merge_binary, merge_range_constraints, merge_sets, RangeConstr, SimpleSub,
+    merge_binary, merge_range_constraints, merge_sets, sub_in, RangeConstr, SimpleSub, SubExpr
 };
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
@@ -24,6 +24,7 @@ pub struct AntimirovSolver {}
 // Stores a regex and at what depth of derivative it was found.
 struct DerivativeDepth {
     gre: Rc<GenRegex>,
+    // TODO: Maybe combine not_sub and range constraints?
     not_sub: SimpleSub,
     range_constraints: BTreeMap<CharVar, RangeConstr>,
     depth: i32,
@@ -119,10 +120,12 @@ impl Solver for AntimirovSolver {
                     }
                     println!("Subs: {:?}", ele.get_subs());
                     println!("Not subs: {:?}", layer.not_sub);
-                    let Some(f) = merge_binary(ele.get_subs(), &layer.not_sub) else {
-                        //println!("death2");
+                    let Some(mut f) = merge_binary(ele.get_subs(), &layer.not_sub) else {
+                        // println!("death2");
                         continue;
                     };
+                    *f.get_str_map_mut()= BTreeMap::new();
+                    let new_re=sub_in(ele.get_expr(), &f);
                     // Potential code for fixing optimized range constraints, commented out due to Union Find index out of bounds issues
                     //println!("Before Range Update: {:?}",layer.range_constraints);
                     let mut updated_range = BTreeMap::new();
@@ -143,7 +146,7 @@ impl Solver for AntimirovSolver {
                     //println!("After range merge: {:?}",r);
                     println! {"Not constraint pushed: {:?}",f};
                     sat_stack.push(DerivativeDepth {
-                        gre: ele.get_expr().clone(),
+                        gre: new_re.clone(),
                         not_sub: SimpleSub::new(
                             BTreeMap::new(),
                             BTreeMap::new(),
