@@ -117,8 +117,8 @@ impl Solver for AntimirovSolver {
                         eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
                     }
-                    println!("Subs: {:?}",ele.get_subs());
-                    println!("Not subs: {:?}",layer.not_sub);
+                    println!("Subs: {:?}", ele.get_subs());
+                    println!("Not subs: {:?}", layer.not_sub);
                     let Some(f) = merge_binary(ele.get_subs(), &layer.not_sub) else {
                         //println!("death2");
                         continue;
@@ -141,7 +141,7 @@ impl Solver for AntimirovSolver {
                         continue;
                     };
                     //println!("After range merge: {:?}",r);
-                    println!{"Not constraint pushed: {:?}",f};
+                    println! {"Not constraint pushed: {:?}",f};
                     sat_stack.push(DerivativeDepth {
                         gre: ele.get_expr().clone(),
                         not_sub: SimpleSub::new(

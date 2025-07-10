@@ -362,22 +362,29 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
 }
 
 #[test]
-fn char_var_test(){
+fn char_var_test() {
     // gre2 = (x & y)
-    let gre2=GenRegex::intersect(&GenRegex::create_gre_char_var("f.0"),&GenRegex::create_gre_char_var("f.1"));
-    
+    let gre2 = GenRegex::intersect(
+        &GenRegex::create_gre_char_var("f.0"),
+        &GenRegex::create_gre_char_var("f.1"),
+    );
 
-    println!("Taking derivative of: {}",gre2);
-    let res=derivative(&gre2, &Rc::new(CharExpression::CharVar(CharVar{name:"f.2".to_string()})));
-    
-    for ele in res{
-        let old_sub=ele.get_subs();
-        println!("Substitution from derivative: {:?}",old_sub);
-        let empty_subs=SimpleSub::empty();
+    println!("Taking derivative of: {}", gre2);
+    let res = derivative(
+        &gre2,
+        &Rc::new(CharExpression::CharVar(CharVar {
+            name: "f.2".to_string(),
+        })),
+    );
+
+    for ele in res {
+        let old_sub = ele.get_subs();
+        println!("Substitution from derivative: {:?}", old_sub);
+        let empty_subs = SimpleSub::empty();
 
         //Doing a merge with an empty sub
-        let new_sub=merge_binary(&old_sub, &empty_subs);
-        println!("After merge: {:?}",new_sub.unwrap());
+        let new_sub = merge_binary(&old_sub, &empty_subs);
+        println!("After merge: {:?}", new_sub.unwrap());
     }
     assert!(false);
 }
