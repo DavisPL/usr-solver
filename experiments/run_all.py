@@ -13,6 +13,15 @@ Or if this doesn't work, try one of these:
     python3.7 ./run_all.py --help
     python3.8 ./run_all.py --help
 
+The script produces as output a "summary" file and a "raw" CSV file in `results/`
+with the experiment results.
+The raw CSV data appears in the following format:
+    solver name,
+    benchmark path,
+    result category (sat/unsat/wrong/timeout/crash/etc),
+    time,
+    solver answer (sat/unsat)
+
 The script has three modes:
 - Default
   Run an experiment between one or more executables, and
@@ -45,7 +54,7 @@ SMT input syntax to replace with other syntax to make it recognized by the
 solver, and output syntax to interpret as a crash or unknown answer, etc.
 """
 
-import argparse
+import argparseT
 import contextlib
 import filecmp
 import glob
@@ -342,6 +351,8 @@ class TestResultTotals:
         answer = test_result.answer
         if len(answer) > 20:
             answer = answer[:17] + "..."
+        # Format of the raw CSV data:
+        # solver name, benchmark path, result category, time, solver answer
         self.raw.append((self.name, path, cat, time, answer))
 
     def __repr__(self):
