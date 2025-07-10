@@ -54,7 +54,7 @@ SMT input syntax to replace with other syntax to make it recognized by the
 solver, and output syntax to interpret as a crash or unknown answer, etc.
 """
 
-import argparseT
+import argparse
 import contextlib
 import filecmp
 import glob
