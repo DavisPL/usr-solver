@@ -712,7 +712,10 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
             return None;
         }
         // Note: We insert c instead of new_c here which means that not all keys are fully resolved. Can be revisted later.
-        combined_not.insert(c.clone(), modified_not);
+        match &*new_c{
+            CharExpression::CharVar(new_var) => combined_not.insert(c.clone(), modified_not),
+            CharExpression::Literal(_) => todo!(),
+        };
     }
 
     // Include not constraints
