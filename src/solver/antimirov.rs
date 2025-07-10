@@ -9,7 +9,7 @@ use super::Solver;
 
 use crate::antimirov::deriv::{derivative, nullable};
 use crate::antimirov::subs::{
-    merge_binary, merge_range_constraints, merge_sets, sub_in, RangeConstr, SimpleSub, SubExpr
+    merge_binary, merge_range_constraints, merge_sets, sub_in, RangeConstr, SimpleSub, SubExpr,
 };
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
@@ -124,8 +124,8 @@ impl Solver for AntimirovSolver {
                         // println!("death2");
                         continue;
                     };
-                    *f.get_str_map_mut()= BTreeMap::new();
-                    let new_re=sub_in(ele.get_expr(), &f);
+                    *f.get_str_map_mut() = BTreeMap::new();
+                    let new_re = sub_in(ele.get_expr(), &f);
                     // Potential code for fixing optimized range constraints, commented out due to Union Find index out of bounds issues
                     //println!("Before Range Update: {:?}",layer.range_constraints);
                     let mut updated_range = BTreeMap::new();
