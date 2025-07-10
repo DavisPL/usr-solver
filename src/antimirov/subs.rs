@@ -711,10 +711,9 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
         if modified_not.contains(&new_c) {
             return None;
         }
-        // Note: We insert c instead of new_c here which means that not all keys are fully resolved. Can be revisted later.
         match &*new_c {
             CharExpression::CharVar(new_var) => combined_not.insert(new_var.clone(), modified_not),
-            CharExpression::Literal(_) => todo!(),
+            CharExpression::Literal(_) => None,
         };
     }
 

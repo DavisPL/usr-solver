@@ -68,7 +68,7 @@ impl Solver for AntimirovSolver {
         });
         //TODO: Modify visited to compare not substitutions, not just the USR
         let mut visited: HashSet<Rc<GenRegex>> = HashSet::new();
-        let mut count = 0;
+        //let mut count = 0;
         while let Some(layer) = sat_stack.pop() {
             println!("Looking at: {}", layer.gre);
             // if count>=2{
@@ -95,8 +95,7 @@ impl Solver for AntimirovSolver {
                 let deriv = derivative(&layer.gre, &self.get_fresh_var(layer.depth));
                 //println!("deriv: {:?}", deriv);
                 'deriv_loop: for ele in deriv {
-                    println!("Pushing expr: {}", ele.get_expr());
-                    println!("Subs: {:?}", ele.get_subs());
+                    //println!("\tPushing expr: {}", ele.get_expr());
                     // Check range
                     let range = ele.get_ranges();
 
@@ -115,11 +114,11 @@ impl Solver for AntimirovSolver {
                             }
                         }
                         // TODO Caleb
-                        eprintln!("TODO: handle range constraint {} on {}", range, var);
+                        //eprintln!("TODO: handle range constraint {} on {}", range, var);
                         // For now, ignore and continue
                     }
-                    println!("Subs: {:?}", ele.get_subs());
-                    println!("Not subs: {:?}", layer.not_sub);
+                    // println!("\tSubs: {:?}", ele.get_subs());
+                    // println!("\tNot subs: {:?}", layer.not_sub);
                     let Some(mut f) = merge_binary(ele.get_subs(), &layer.not_sub) else {
                         // println!("death2");
                         continue;
@@ -140,11 +139,11 @@ impl Solver for AntimirovSolver {
                     }
                     //println!("Updated Range: {:?}",updated_range);
                     let Some(r) = merge_range_constraints(ele.get_ranges(), &updated_range) else {
-                        print!("Pruned");
+                        //println!("Pruned");
                         continue;
                     };
                     //println!("After range merge: {:?}",r);
-                    println! {"Not constraint pushed: {:?}",f};
+                    //println! {"\tNot constraint pushed: {:?}",f};
                     sat_stack.push(DerivativeDepth {
                         gre: new_re.clone(),
                         not_sub: SimpleSub::new(
