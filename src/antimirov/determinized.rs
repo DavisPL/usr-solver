@@ -1,11 +1,6 @@
 //!
 //! Determinized version of the Antimirov substitution-derivative.
 //!
-//! This is an experiment - just to see if it works.
-//!
-
-// TODO: fix and remove
-#![allow(unused_variables)]
 
 use super::subs::{AntimirovElement, SimpleSub, SubExpr};
 use super::util::{char_minus_one, char_plus_one, get_fresh_var, CHAR_MAX, CHAR_MIN};
@@ -56,8 +51,7 @@ pub fn derivative_determinized(
                     AntimirovElement::new_empty().into_set()
                 }
             }
-
-            (CharExpression::Literal(lit_val), CharExpression::CharVar(c_var)) => {
+            (CharExpression::Literal(_lit_val), CharExpression::CharVar(c_var)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(c_var.clone(), deriv_char.as_ref().clone());
                 let subs =
@@ -94,7 +88,8 @@ pub fn derivative_determinized(
         GenRegex::StringVar(string_var) => {
             // Hard case, requires handling w |-> xw and negation of this
             eprintln!("Warning: determinized derivative case for StringVar may be unsound");
-            let name: String = match deriv_char.as_ref() {
+            // TOOD: why unused?
+            let _name: String = match deriv_char.as_ref() {
                 CharExpression::CharVar(char_var) => char_var.name.clone(),
                 CharExpression::Literal(c) => c.to_string(),
             };
@@ -333,8 +328,8 @@ pub fn nullable_determinized(
         GenRegex::Epsilon => true_helper(),
         GenRegex::Sigma => false_helper(),
         GenRegex::SigmaStar => true_helper(),
-        GenRegex::Range(char1, char2) => false_helper(),
-        GenRegex::CharExpression(c_expr) => false_helper(),
+        GenRegex::Range(_, _) => false_helper(),
+        GenRegex::CharExpression(_) => false_helper(),
         GenRegex::StringVar(s_var) => {
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), SubExpr::empty());
@@ -380,7 +375,7 @@ pub fn nullable_determinized(
         }
         GenRegex::Kleene(_) => true_helper(),
         GenRegex::Complement(gre1) => nullable_negation_helper(nullable_determinized(gre1)),
-        GenRegex::IfThenElse(p, g1, g2) => {
+        GenRegex::IfThenElse(_p, _g1, _g2) => {
             // TODO Caleb
             unimplemented!();
         }

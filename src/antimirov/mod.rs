@@ -2,9 +2,6 @@
 //! Development for Antimirov derivatives
 //!
 
-// TODO: fix and remove
-#![allow(unused_variables)]
-
 pub mod deriv;
 pub mod determinized;
 pub mod matcher;

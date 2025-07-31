@@ -99,7 +99,7 @@ fn sub_from_eq(
     (true_cases, false_cases)
 }
 
-pub fn sub_from_eq_len(var: &StringVar, len: &i32) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
+pub fn sub_from_eq_len(_var: &StringVar, _len: &i32) -> (HashSet<SimpleSub>, HashSet<SimpleSub>) {
     // TODO
     unimplemented!()
 }
@@ -191,7 +191,7 @@ fn sub_from_char_compare(
 // - a (char_expr, substitution) pair, for when the index succeeds
 // - a set of (substitution)s for when the index is out of bounds.
 fn string_index_to_char_expr(
-    string_index: &StringIndex,
+    _string_index: &StringIndex,
 ) -> (CharExpression, SimpleSub, HashSet<SimpleSub>) {
     // TODO
     unimplemented!()

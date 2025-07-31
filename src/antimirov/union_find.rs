@@ -2,7 +2,6 @@
 //! Union-find functions
 //!
 
-use super::subs::AnySub;
 use crate::types::expr::CharExpression;
 
 pub use disjoint_sets::UnionFind;
@@ -58,42 +57,4 @@ pub fn union_over_set(
         prev = Some(element.clone())
     }
     true
-}
-
-pub fn count_union_elems(substitutions: &AnySub) -> usize {
-    /*let mut char_vars: HashSet<CharExpression> = HashSet::new();
-    for sub in substitutions.get_str_map().values(){
-        for sub_expr in sub{
-            for c_expr in sub_expr.get_head(){
-                char_vars.insert(c_expr);
-            }
-        }
-
-    }
-    for c_exprs in substitutions.get_char_map(){
-        for c in c_exprs{
-            char_vars.insert(c_expr);
-        }
-    }
-    return char_vars.len();*/
-    let mut count: usize = 0;
-    for sub in substitutions.get_str_map().values() {
-        for sub_expr in sub {
-            count += sub_expr.get_head().len();
-        }
-    }
-    for sub in substitutions.get_not_constraints() {
-        count += 1
-    }
-    for c_exprs in substitutions.get_char_map().values() {
-        count += c_exprs.len() + 1;
-    }
-    let ranges = substitutions.get_ranges();
-    let Some(ranges) = ranges else {
-        return count;
-    };
-    for r in ranges {
-        count += 1;
-    }
-    count
 }

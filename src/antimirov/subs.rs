@@ -2,9 +2,6 @@
 //! Substitution terms, used for Antimirov derivatives
 //!
 
-// TODO: Fix and remove
-#![allow(dead_code)]
-
 use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex, StringVar};
 use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;
@@ -333,6 +330,23 @@ impl AnySub {
     pub fn get_not_constraints(&self) -> &BTreeMap<CharVar, BTreeSet<CharExpression>> {
         &self.not_constraints
     }
+    pub fn count_union_elems(&self) -> usize {
+        let mut count: usize = 0;
+        for sub in self.get_str_map().values() {
+            for sub_expr in sub {
+                count += sub_expr.get_head().len();
+            }
+        }
+        count += self.get_not_constraints().len();
+        for c_exprs in self.get_char_map().values() {
+            count += c_exprs.len() + 1;
+        }
+        let ranges = self.get_ranges();
+        if let Some(ranges) = ranges {
+            count += ranges.len();
+        }
+        count
+    }
 }
 
 /// Represents a simple sub (in a normalized form)
@@ -562,7 +576,7 @@ impl Display for AntimirovElement {
     Substitution operations: merge, difference, and sub_in
 */
 
-use super::union_find::{count_union_elems, union_over_set, UnionFind};
+use super::union_find::{union_over_set, UnionFind};
 use std::collections::HashMap;
 
 fn merge(substitutions: AnySub) -> Option<SimpleSub> {
@@ -570,7 +584,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
     let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
     let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
-    let mut union_find: UnionFind<usize> = UnionFind::new(count_union_elems(&substitutions) + 1);
+    let mut union_find: UnionFind<usize> = UnionFind::new(substitutions.count_union_elems() + 1);
 
     // Take range constraints
     // If merge was unsuccessful, return None
@@ -678,7 +692,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
 
     for (var, mut eq_exprs) in str_eq_class {
         let sub_expr_vector = eq_exprs[0].get_mut_head();
-        for (i, item) in sub_expr_vector.iter_mut().enumerate() {
+        for item in sub_expr_vector.iter_mut() {
             if let CharExpression::CharVar(c_var) = item {
                 let substitution_value = combined_expr.get_char_var(c_var);
                 match substitution_value {
@@ -906,12 +920,12 @@ pub fn sub_in(expr: &Rc<GenRegex>, substitution: &SimpleSub) -> Rc<GenRegex> {
         GenRegex::Complement(gen_regex) => {
             Rc::new(GenRegex::Complement(sub_in(gen_regex, substitution)))
         }
-        GenRegex::IfThenElse(predicate, gen_regex1, gen_regex2) => {
+        GenRegex::IfThenElse(_predicate, _gen_regex1, _gen_regex2) => {
             // TODO 6: Optional
             eprintln!("TODO: Antimirov derivative does not currently fully support IfThenElse for substitutions");
             unimplemented!()
         }
-        GenRegex::StringSlice(string_var, _) => {
+        GenRegex::StringSlice(_string_var, _) => {
             // TODO 7: Optional
             eprintln!("TODO: Antimirov derivative does not currently fully support StringSlice for substitutions");
             unimplemented!()
@@ -945,7 +959,7 @@ pub fn sub_in_predicate(pred: &Rc<Predicate>, sub: &SimpleSub) -> Rc<Predicate> 
             let new_expr = sub_in_maybe_char_expr(expr, sub);
             Rc::new(Predicate::LessThan(new_expr, *c))
         }
-        Predicate::EqualLength(var, len) => {
+        Predicate::EqualLength(_var, _len) => {
             // TODO
             unimplemented!()
             // let new_var = sub_in_string_var(var, sub);

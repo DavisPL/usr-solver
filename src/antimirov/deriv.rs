@@ -2,9 +2,6 @@
 //! Implementation of the Antimirov Derivative
 //!
 
-// TODO: fix and remove
-#![allow(unused_variables)]
-
 use super::determinized::derivative_determinized;
 use super::sub_from_predicate::sub_from_predicate;
 use super::subs::{
@@ -54,7 +51,7 @@ pub fn derivative(
                     HashSet::new()
                 }
             }
-            (CharExpression::CharVar(d_var), CharExpression::Literal(lit_val)) => {
+            (CharExpression::CharVar(d_var), CharExpression::Literal(_)) => {
                 let mut char_to = BTreeMap::new();
                 char_to.insert(d_var.clone(), c_expr.clone());
                 let subs =
@@ -259,7 +256,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::Sigma => HashSet::new(),
         GenRegex::SigmaStar => SimpleSub::empty().into_set(),
         GenRegex::Range(_, _) => HashSet::new(),
-        GenRegex::CharExpression(c_expr) => HashSet::new(),
+        GenRegex::CharExpression(_) => HashSet::new(),
         GenRegex::StringVar(s_var) => {
             let mut string_to = BTreeMap::new();
             string_to.insert(s_var.clone(), SubExpr::empty());
@@ -308,7 +305,7 @@ pub fn nullable_complement(gre: &Rc<GenRegex>) -> HashSet<SimpleSub> {
         GenRegex::Sigma => SimpleSub::empty().into_set(),
         GenRegex::SigmaStar => HashSet::new(),
         GenRegex::Range(_, _) => SimpleSub::empty().into_set(),
-        GenRegex::CharExpression(c_expr) => SimpleSub::empty().into_set(),
+        GenRegex::CharExpression(_) => SimpleSub::empty().into_set(),
         GenRegex::StringVar(s_var) => {
             // The hard case
             // Here we can just enumerate if we come across the case.

@@ -2,9 +2,6 @@
 //! Implementation of the Brzozowski Derivative
 //!
 
-// TODO: fix and remove
-#![allow(unused_variables)]
-
 use super::predicate_evaluation::evaluate_complete;
 use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex};
 use crate::types::predicate::Predicate;
@@ -210,7 +207,7 @@ pub fn nullable(gre: &Rc<GenRegex>) -> Rc<GenRegex> {
         GenRegex::Range(_start, _end) => GenRegex::empty_set(),
         GenRegex::CharExpression(c_expr) => match c_expr {
             CharExpression::CharVar(_name) => GenRegex::empty_set(),
-            CharExpression::Literal(value) => GenRegex::empty_set(),
+            CharExpression::Literal(_value) => GenRegex::empty_set(),
         },
         GenRegex::StringSlice(string_var, index) => Rc::new(GenRegex::IfThenElse(
             Rc::new(Predicate::EqualLength(Rc::new(string_var.clone()), *index)),
@@ -255,7 +252,7 @@ fn nullable_projection_helper(expr: &Rc<GenRegex>) -> Rc<Predicate> {
         GenRegex::EmptySet => Rc::new(Predicate::False),
         GenRegex::Epsilon => Rc::new(Predicate::True),
         GenRegex::SigmaStar => Rc::new(Predicate::True),
-        GenRegex::CharExpression(c_expr) => Rc::new(Predicate::False),
+        GenRegex::CharExpression(_c_expr) => Rc::new(Predicate::False),
         GenRegex::IfThenElse(pred, true_expr, false_expr) => {
             let true_proj = nullable_projection_helper(true_expr);
             let false_proj = nullable_projection_helper(false_expr);
@@ -583,7 +580,7 @@ fn simplify_if_then_else(
     }
     if let Predicate::And(ref left_pred, ref right_pred) = pred.as_ref() {
         if let Predicate::GreaterThan(ref left_var, ref left_val) = left_pred.as_ref() {
-            if let Predicate::LessThan(ref right_var, ref right_val) = right_pred.as_ref() {
+            if let Predicate::LessThan(ref _right_var, ref _right_val) = right_pred.as_ref() {
                 //let inner_pred = Rc::new(Predicate::Not(left_pred.clone()));
                 if (*left_val as u32) == 0 {
                     return simplifies(&Rc::new(GenRegex::IfThenElse(
@@ -607,7 +604,7 @@ fn simplify_if_then_else(
                     Rc::clone(&simplified_false),
                 )));
             }
-        } else if let Predicate::LessThan(ref left_var, ref left_val) = left_pred.as_ref() {
+        } else if let Predicate::LessThan(ref _left_var, ref _left_val) = left_pred.as_ref() {
             if let Predicate::GreaterThan(ref right_var, ref right_val) = right_pred.as_ref() {
                 if (*right_val as u32) == 0 {
                     return simplifies(&Rc::new(GenRegex::IfThenElse(
@@ -633,7 +630,8 @@ fn simplify_if_then_else(
             }
         }
     }
-    if let GenRegex::IfThenElse(ref outer_pred, ref inner_true, ref inner_false) = &*simplified_true
+    if let GenRegex::IfThenElse(ref outer_pred, ref inner_true, ref _inner_false) =
+        &*simplified_true
     {
         if outer_pred == pred {
             return Rc::new(GenRegex::IfThenElse(
@@ -642,7 +640,7 @@ fn simplify_if_then_else(
                 Rc::clone(&simplified_false),
             ));
         }
-    } else if let GenRegex::IfThenElse(ref outer_pred, ref inner_true, ref inner_false) =
+    } else if let GenRegex::IfThenElse(ref outer_pred, ref _inner_true, ref inner_false) =
         &*simplified_false
     {
         if outer_pred == pred {
