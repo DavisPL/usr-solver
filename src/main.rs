@@ -2,8 +2,6 @@
 //! Binary entrypoint
 //!
 
-#![allow(clippy::uninlined_format_args)]
-
 use gen_regex_impl::smt::parse::{parse_smtlib_file, SmtParser};
 use gen_regex_impl::solver::{self, Solver};
 
@@ -59,7 +57,7 @@ fn main() {
     let re = Rc::new(parser.parse_s_expr(&v).expect("Invalid S-expr"));
 
     let solver_name = solver::lookup_solver_name(&args.solver_name);
-    println!("Using solver: {}", solver_name);
+    println!("Using solver: {solver_name}");
     let mut solver: Box<dyn Solver> = solver::solver_by_name(solver_name);
 
     let result = solver.satisfiable(&re);
