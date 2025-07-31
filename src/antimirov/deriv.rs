@@ -366,7 +366,6 @@ mod tests {
     use super::*;
     use crate::types::expr::CharVar;
 
-    // TODO: not passing
     #[test]
     fn char_var_test() {
         // gre2 = (x & y)
@@ -390,8 +389,8 @@ mod tests {
 
             //Doing a merge with an empty sub
             let new_sub = merge_binary(&old_sub, &empty_subs);
+            assert!(new_sub.is_some());
             println!("After merge: {:?}", new_sub.unwrap());
         }
-        assert!(false);
     }
 }
