@@ -32,13 +32,6 @@ pub enum SmtParseError {
     BadLiteral(String),              // Bad literal in SMTLib file
     Unexpected(String, String),      // Unexpected S-expression
 }
-#[derive(Debug)]
-enum TokenTypes {
-    ReTok(RegexToken),
-    StrTok(StringToken),
-    Assertion(Rc<GenRegex>, Rc<GenRegex>),
-    Other,
-}
 
 impl SmtParseError {
     fn unrecog(expr: &Value) -> SmtParseError {
@@ -91,53 +84,17 @@ impl fmt::Display for SmtParseError {
 impl Error for SmtParseError {}
 
 /*
-    Top-level S-expression parsing functions
+    Additional expression representations
 */
 
-pub fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
-    let v = lexpr::from_str(smt_string)?;
-    Ok(v)
+#[derive(Debug)]
+enum TokenTypes {
+    ReTok(RegexToken),
+    StrTok(StringToken),
+    Assertion(Rc<GenRegex>, Rc<GenRegex>),
+    Other,
 }
 
-pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
-    // Read in the file
-    let smt_string = std::fs::read_to_string(file_path)?;
-
-    // Add an opening and closoing paren
-    let smt_string = format!("(\n{}\n)", smt_string);
-    //let smt_string = parse_unicode_escape(&smt_string)?;
-    //TODO:Figure out why (set-info source |...|) breaks lexpr parsing
-    //  Removes set-info source lines for now
-    let smt_string = parse_bad_newlines(&smt_string)?;
-    let smt_string = parse_bad_escapes(&smt_string)?;
-    println!("{}", smt_string);
-
-    // Parse S-expression
-    let v = lexpr::from_str(&smt_string)?;
-
-    // Return
-    Ok(v)
-}
-
-/*
-    Helper functions
-*/
-
-fn expect_pair(v: &Value) -> Result<(&Value, &Value), SmtParseError> {
-    v.as_pair().ok_or(SmtParseError::unexpected(v, "pair"))
-}
-
-fn expect_null(v: &Value) -> Result<(), SmtParseError> {
-    v.as_null().ok_or(SmtParseError::unexpected(v, "null"))
-}
-
-fn expect_symbol(v: &Value) -> Result<&str, SmtParseError> {
-    v.as_symbol().ok_or(SmtParseError::unexpected(v, "symbol"))
-}
-
-/*
-    Main parsing interface
-*/
 #[derive(Debug)]
 enum RegexToken {
     Val(Rc<GenRegex>),
@@ -450,6 +407,7 @@ impl RegexToken {
         }
     }
 }
+
 #[derive(Debug)]
 enum StringToken {
     Var(String),
@@ -464,6 +422,55 @@ enum StringToken {
         right: Rc<StringToken>,
     },
 }
+
+/*
+    Top-level S-expression parsing functions
+*/
+
+pub fn parse_smtlib_string(smt_string: &str) -> Result<Value, SmtParseError> {
+    let v = lexpr::from_str(smt_string)?;
+    Ok(v)
+}
+
+pub fn parse_smtlib_file(file_path: &str) -> Result<Value, SmtParseError> {
+    // Read in the file
+    let smt_string = std::fs::read_to_string(file_path)?;
+
+    // Add an opening and closoing paren
+    let smt_string = format!("(\n{}\n)", smt_string);
+    //let smt_string = parse_unicode_escape(&smt_string)?;
+    //TODO:Figure out why (set-info source |...|) breaks lexpr parsing
+    //  Removes set-info source lines for now
+    let smt_string = parse_bad_newlines(&smt_string)?;
+    let smt_string = parse_bad_escapes(&smt_string)?;
+    println!("{}", smt_string);
+
+    // Parse S-expression
+    let v = lexpr::from_str(&smt_string)?;
+
+    // Return
+    Ok(v)
+}
+
+/*
+    Helper functions
+*/
+
+fn expect_pair(v: &Value) -> Result<(&Value, &Value), SmtParseError> {
+    v.as_pair().ok_or(SmtParseError::unexpected(v, "pair"))
+}
+
+fn expect_null(v: &Value) -> Result<(), SmtParseError> {
+    v.as_null().ok_or(SmtParseError::unexpected(v, "null"))
+}
+
+fn expect_symbol(v: &Value) -> Result<&str, SmtParseError> {
+    v.as_symbol().ok_or(SmtParseError::unexpected(v, "symbol"))
+}
+
+/*
+    Main parsing interface
+*/
 
 pub struct SmtParser {
     found_assert: bool,
