@@ -18,9 +18,9 @@
 		"rseed_opt": null,
 		"detect_crash_patterns": []
 	},
-	"usr_ab": {
+	"usr_d": {
 		"path": "../target/release/gen-regex-impl",
-		"opts": ["-s", "ab"],
+		"opts": ["-s", "d"],
 		"rseed_opt": null,
 		"detect_crash_patterns": []
 	},
@@ -31,7 +31,7 @@
 		"detect_crash_patterns": []
 	},
 	"z3str3": {
-		"path": "z3/z3",
+		"path": "z3/z3.exe",
 		"opts": ["smt.string_solver=z3str3"],
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []

@@ -18,12 +18,10 @@ pub trait Solver {
     Modules implementing the solver
 */
 
-mod ab_solver;
 mod antimirov;
 mod brzozowski;
 mod determinizing;
 
-pub use ab_solver::ABSolver;
 pub use antimirov::AntimirovSolver;
 pub use brzozowski::BrzozowskiSolver;
 pub use determinizing::DeterminizingSolver;
@@ -33,7 +31,6 @@ pub fn lookup_solver_name(name: &str) -> &str {
         "a" | "antimirov" => "Antimirov",
         "b" | "brzozowski" => "Brzozowski",
         "d" | "determinizing" => "Determinizing Antimirov",
-        "ab" => "AB Solver",
         _ => panic!("Unknown solver: {}", name),
     }
 }
@@ -42,7 +39,6 @@ pub fn solver_by_name(name: &str) -> Box<dyn Solver> {
     match name {
         "Antimirov" => Box::new(AntimirovSolver::new()),
         "Brzozowski" => Box::new(BrzozowskiSolver::new()),
-        "AB Solver" => Box::new(ABSolver::new()),
         "Determinizing Antimirov" => Box::new(DeterminizingSolver::new()),
         _ => panic!("Unknown solver: {}", name),
     }
@@ -58,10 +54,6 @@ pub fn antimirov_satisfiable(gre: &Rc<GenRegex>) -> bool {
 
 pub fn brzozowski_satisfiable(gre: &Rc<GenRegex>) -> bool {
     BrzozowskiSolver::new().satisfiable(gre)
-}
-
-pub fn ab_satisfiable(gre: &Rc<GenRegex>) -> bool {
-    ABSolver::new().satisfiable(gre)
 }
 
 pub fn determinized_satisfiable(gre: &Rc<GenRegex>) -> bool {
