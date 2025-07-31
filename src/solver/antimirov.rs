@@ -9,7 +9,7 @@ use super::Solver;
 
 use crate::antimirov::deriv::{derivative, nullable};
 use crate::antimirov::subs::{
-    merge_binary, merge_range_constraints, merge_sets, sub_in, RangeConstr, SimpleSub, SubExpr,
+    merge_binary, merge_range_constraints, merge_sets, sub_in, RangeConstr, SimpleSub,
 };
 use crate::types::expr::{CharExpression, CharVar};
 use crate::types::regex::GenRegex;
@@ -101,7 +101,8 @@ impl Solver for AntimirovSolver {
 
                     let sub = ele.get_subs();
                     let char_map = sub.get_char_map();
-                    let not_constr = sub.get_not_constraints();
+                    // TODO: not used - is this correct?
+                    let _not_constr = sub.get_not_constraints();
                     for (var, range) in range {
                         // Checks if there are conflicts btwn range and charvar mappings
                         let in_char_map = char_map.get(var);
@@ -113,9 +114,6 @@ impl Solver for AntimirovSolver {
                                 }
                             }
                         }
-                        // TODO Caleb
-                        //eprintln!("TODO: handle range constraint {} on {}", range, var);
-                        // For now, ignore and continue
                     }
                     // println!("\tSubs: {:?}", ele.get_subs());
                     // println!("\tNot subs: {:?}", layer.not_sub);

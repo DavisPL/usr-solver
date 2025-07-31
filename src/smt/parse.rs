@@ -1954,30 +1954,31 @@ impl SmtParser {
         Ok(cur)
     }
 
-    fn parse_str_re_concat(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
-        // Syntax: (re.++ R1 R2 ...)
-        let prev = self.get_args(v)?;
+    // fn parse_str_re_concat(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
+    //     // Syntax: (re.++ R1 R2 ...)
+    //     let prev = self.get_args(v)?;
 
-        let mut args = Vec::new();
+    //     let mut args = Vec::new();
 
-        // Use a for loop to transform each item
-        for item in &prev {
-            args.push(RegexToken::Val(self.parse_string_to_gre(item)?));
-        }
-        if args.len() < 2 {
-            return Ok(args.remove(0));
-            //return Err(SmtParseError::unexpected(v, "re.++ requires at least 2 arguments."));
-        }
-        let mut regex_args: Vec<RegexToken> = Vec::new();
-        for a in args {
-            regex_args.push(a);
-        }
-        let mut cur = regex_args.pop().unwrap();
-        while let Some(next) = regex_args.pop() {
-            cur = RegexToken::concat(&next, &cur).unwrap();
-        }
-        Ok(cur)
-    }
+    //     // Use a for loop to transform each item
+    //     for item in &prev {
+    //         args.push(RegexToken::Val(self.parse_string_to_gre(item)?));
+    //     }
+    //     if args.len() < 2 {
+    //         return Ok(args.remove(0));
+    //         //return Err(SmtParseError::unexpected(v, "re.++ requires at least 2 arguments."));
+    //     }
+    //     let mut regex_args: Vec<RegexToken> = Vec::new();
+    //     for a in args {
+    //         regex_args.push(a);
+    //     }
+    //     let mut cur = regex_args.pop().unwrap();
+    //     while let Some(next) = regex_args.pop() {
+    //         cur = RegexToken::concat(&next, &cur).unwrap();
+    //     }
+    //     Ok(cur)
+    // }
+
     fn strtok_to_retok(s: &StringToken) -> Result<RegexToken, SmtParseError> {
         match s {
             StringToken::Var(name) => Ok(RegexToken::Val(GenRegex::create_gre_str_var(name))),
