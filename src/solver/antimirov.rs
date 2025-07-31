@@ -106,12 +106,10 @@ impl Solver for AntimirovSolver {
                     for (var, range) in range {
                         // Checks if there are conflicts btwn range and charvar mappings
                         let in_char_map = char_map.get(var);
-                        if let Some(found) = in_char_map {
-                            if let CharExpression::Literal(lit) = found {
-                                if lit > range.get_end() || lit < range.get_start() {
-                                    //println!("death");
-                                    continue 'deriv_loop;
-                                }
+                        if let Some(CharExpression::Literal(lit)) = in_char_map {
+                            if lit > range.get_end() || lit < range.get_start() {
+                                //println!("death");
+                                continue 'deriv_loop;
                             }
                         }
                     }
@@ -127,7 +125,7 @@ impl Solver for AntimirovSolver {
                     //println!("Before Range Update: {:?}",layer.range_constraints);
                     let mut updated_range = BTreeMap::new();
                     for (var, ranges) in &layer.range_constraints {
-                        if let Some(c) = char_map.get(&var) {
+                        if let Some(c) = char_map.get(var) {
                             if let CharExpression::CharVar(name) = c {
                                 updated_range.insert(name.clone(), ranges.clone());
                             }

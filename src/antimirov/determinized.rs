@@ -140,11 +140,11 @@ pub fn derivative_determinized(
             //println!("Det_deriv union of: {}",gre);
             let side1_deriv = derivative_determinized(side1, deriv_char);
             let side2_deriv = derivative_determinized(side2, deriv_char);
-            let res = merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
+            merge_helper(&side1_deriv, &side2_deriv, &|left, right| {
                 GenRegex::make_union(left.clone(), right.clone())
-            });
+            })
             //println!("Det_deriv union result: {:?}",res);
-            res
+            // res
         }
         GenRegex::Intersect(side1, side2) => {
             let side1_deriv = derivative_determinized(side1, deriv_char);
@@ -187,11 +187,11 @@ pub fn derivative_determinized(
                     .collect();
 
                 // Merge both cases
-                let res = merge_helper(&left_result, &right_result, &|left, right| {
+                merge_helper(&left_result, &right_result, &|left, right| {
                     GenRegex::make_union(left.clone(), right.clone())
-                });
+                })
                 //println!("Det_deriv concat result null: {:?}", res);
-                res
+                // res
             }
         }
         GenRegex::Kleene(expr) => {
@@ -369,9 +369,9 @@ pub fn nullable_determinized(
             let right = nullable_determinized(side2);
             // println!("null_det result left: {:?}", left);
             // println!("null_det result right: {:?}", right);
-            let res = nullable_or_helper(left, right);
+            nullable_or_helper(left, right)
             // println!("null_det final res: {:?}", res);
-            res
+            // res
         }
         GenRegex::Intersect(side1, side2) | GenRegex::Concatenation(side1, side2) => {
             let left = nullable_determinized(side1);

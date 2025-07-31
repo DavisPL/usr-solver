@@ -727,6 +727,7 @@ impl SmtParser {
             "let" => self.parse_let_assertion(tail),
             "str.contains" => self.parse_contains(tail),
             _ => {
+                // TODO: this is weird, is this correct?
                 // Check for let variable case a second time
                 // println!("cmd_str: {:?}", cmd_str);
                 self.parse_assert_arg(cmd)
@@ -816,7 +817,7 @@ impl SmtParser {
                             &gen_regex,
                         ))
                     }
-                    _ => {
+                    StringToken::Conditional { .. } | StringToken::Concat { .. } => {
                         return Err(SmtParseError::Unrecognized(format!(
                             "Issue parsing length 2"
                         )));
@@ -865,15 +866,15 @@ impl SmtParser {
                         return Ok(GenRegex::intersect(
                             &GenRegex::create_gre_str_var(&var_name),
                             &gen_regex,
-                        ))
+                        ));
                     }
                     StringToken::Val(string) => {
                         return Ok(GenRegex::intersect(
                             &GenRegex::str_to_re(&string),
                             &gen_regex,
-                        ))
+                        ));
                     }
-                    _ => {
+                    StringToken::Conditional { .. } | StringToken::Concat { .. } => {
                         return Err(SmtParseError::Unrecognized(format!(
                             "Issue parsing length 2"
                         )));
@@ -931,7 +932,7 @@ impl SmtParser {
                             &gen_regex,
                         ))
                     }
-                    _ => {
+                    StringToken::Conditional { .. } | StringToken::Concat { .. } => {
                         return Err(SmtParseError::Unrecognized(format!(
                             "Issue parsing length 2"
                         )));
@@ -988,7 +989,7 @@ impl SmtParser {
                             &gen_regex,
                         ))
                     }
-                    _ => {
+                    StringToken::Conditional { .. } | StringToken::Concat { .. } => {
                         return Err(SmtParseError::Unrecognized(format!(
                             "Issue parsing length 2"
                         )));
@@ -1204,9 +1205,11 @@ impl SmtParser {
                             &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
                         ))*/
                     }
-                    _ => Err(SmtParseError::Unimplemented(format!(
-                        "Equals cannot handle ite currently."
-                    ))),
+                    (RegexToken::Conditional { .. }, _) | (_, RegexToken::Conditional { .. }) => {
+                        Err(SmtParseError::Unimplemented(format!(
+                            "Equals cannot handle ite currently."
+                        )))
+                    }
                 }
             }
             (TokenTypes::StrTok(string_token1), TokenTypes::StrTok(string_token2)) => {
@@ -1214,27 +1217,27 @@ impl SmtParser {
                     match (&string_token1, &string_token2) {
                         (StringToken::Var(name1), StringToken::Var(name2)) => {
                             return Ok(GenRegex::intersect(
-                                &GenRegex::create_gre_str_var(&name1),
-                                &GenRegex::complement(&GenRegex::create_gre_str_var(&name2)),
+                                &GenRegex::create_gre_str_var(name1),
+                                &GenRegex::complement(&GenRegex::create_gre_str_var(name2)),
                             ))
                         }
                         (StringToken::Val(lit), StringToken::Var(name)) => {
                             return Ok(GenRegex::intersect(
-                                &GenRegex::create_gre_str_var(&name),
-                                &GenRegex::complement(&GenRegex::str_to_re(&lit)),
+                                &GenRegex::create_gre_str_var(name),
+                                &GenRegex::complement(&GenRegex::str_to_re(lit)),
                             ))
                         }
                         (StringToken::Var(name), StringToken::Val(lit)) => {
                             return Ok(GenRegex::intersect(
-                                &GenRegex::create_gre_str_var(&name),
-                                &GenRegex::complement(&GenRegex::str_to_re(&lit)),
+                                &GenRegex::create_gre_str_var(name),
+                                &GenRegex::complement(&GenRegex::str_to_re(lit)),
                             ))
                         }
                         (StringToken::Var(name), StringToken::Concat { .. }) => {
                             let re_tok = Self::strtok_to_retok(&string_token2)?;
                             let gre = RegexToken::to_re(&re_tok)?;
                             return Ok(GenRegex::intersect(
-                                &GenRegex::create_gre_str_var(&name),
+                                &GenRegex::create_gre_str_var(name),
                                 &GenRegex::complement(&gre),
                             ));
                         }
@@ -1242,7 +1245,7 @@ impl SmtParser {
                             let re_tok = Self::strtok_to_retok(&string_token1)?;
                             let gre = RegexToken::to_re(&re_tok)?;
                             return Ok(GenRegex::intersect(
-                                &GenRegex::create_gre_str_var(&name),
+                                &GenRegex::create_gre_str_var(name),
                                 &GenRegex::complement(&gre),
                             ));
                         }
@@ -1250,7 +1253,7 @@ impl SmtParser {
                             let re_tok = Self::strtok_to_retok(&string_token2)?;
                             let gre = RegexToken::to_re(&re_tok)?;
                             return Ok(GenRegex::intersect(
-                                &GenRegex::str_to_re(&lit),
+                                &GenRegex::str_to_re(lit),
                                 &GenRegex::complement(&gre),
                             ));
                         }
@@ -1258,61 +1261,78 @@ impl SmtParser {
                             let re_tok = Self::strtok_to_retok(&string_token1)?;
                             let gre = RegexToken::to_re(&re_tok)?;
                             return Ok(GenRegex::intersect(
-                                &GenRegex::str_to_re(&lit),
+                                &GenRegex::str_to_re(lit),
                                 &GenRegex::complement(&gre),
                             ));
                         }
-                        // ITE cases left
-                        _ => todo!(),
+                        (StringToken::Val(_), StringToken::Val(_)) => {
+                            // TODO
+                            todo!()
+                        }
+                        (StringToken::Concat { .. }, StringToken::Concat { .. }) => {
+                            // TODO
+                            todo!()
+                        }
+                        (StringToken::Conditional { .. }, _)
+                        | (_, StringToken::Conditional { .. }) => {
+                            return Err(SmtParseError::Unimplemented(format!(
+                                "Equals cannot handle ite currently."
+                            )));
+                        }
                     }
                 }
                 match (&string_token1, &string_token2) {
-                    (StringToken::Var(name1), StringToken::Var(name2)) => {
-                        return Ok(GenRegex::intersect(
-                            &GenRegex::create_gre_str_var(&name1),
-                            &GenRegex::create_gre_str_var(&name2),
-                        ))
-                    }
-                    (StringToken::Val(lit), StringToken::Var(name)) => {
-                        return Ok(GenRegex::intersect(
-                            &GenRegex::create_gre_str_var(&name),
-                            &GenRegex::str_to_re(&lit),
-                        ))
-                    }
-                    (StringToken::Var(name), StringToken::Val(lit)) => {
-                        return Ok(GenRegex::intersect(
-                            &GenRegex::create_gre_str_var(&name),
-                            &GenRegex::str_to_re(&lit),
-                        ))
-                    }
+                    (StringToken::Var(name1), StringToken::Var(name2)) => Ok(GenRegex::intersect(
+                        &GenRegex::create_gre_str_var(name1),
+                        &GenRegex::create_gre_str_var(name2),
+                    )),
+                    (StringToken::Val(lit), StringToken::Var(name)) => Ok(GenRegex::intersect(
+                        &GenRegex::create_gre_str_var(name),
+                        &GenRegex::str_to_re(lit),
+                    )),
+                    (StringToken::Var(name), StringToken::Val(lit)) => Ok(GenRegex::intersect(
+                        &GenRegex::create_gre_str_var(name),
+                        &GenRegex::str_to_re(lit),
+                    )),
                     (StringToken::Var(name), StringToken::Concat { .. }) => {
                         let re_tok = Self::strtok_to_retok(&string_token2)?;
                         let gre = RegexToken::to_re(&re_tok)?;
-                        return Ok(GenRegex::intersect(
-                            &GenRegex::create_gre_str_var(&name),
+                        Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(name),
                             &gre,
-                        ));
+                        ))
                     }
                     (StringToken::Concat { .. }, StringToken::Var(name)) => {
                         let re_tok = Self::strtok_to_retok(&string_token1)?;
                         let gre = RegexToken::to_re(&re_tok)?;
-                        return Ok(GenRegex::intersect(
-                            &GenRegex::create_gre_str_var(&name),
+                        Ok(GenRegex::intersect(
+                            &GenRegex::create_gre_str_var(name),
                             &gre,
-                        ));
+                        ))
                     }
                     (StringToken::Val(lit), StringToken::Concat { .. }) => {
                         let re_tok = Self::strtok_to_retok(&string_token2)?;
                         let gre = RegexToken::to_re(&re_tok)?;
-                        return Ok(GenRegex::intersect(&GenRegex::str_to_re(&lit), &gre));
+                        Ok(GenRegex::intersect(&GenRegex::str_to_re(lit), &gre))
                     }
                     (StringToken::Concat { .. }, StringToken::Val(lit)) => {
                         let re_tok = Self::strtok_to_retok(&string_token1)?;
                         let gre = RegexToken::to_re(&re_tok)?;
-                        return Ok(GenRegex::intersect(&GenRegex::str_to_re(&lit), &gre));
+                        Ok(GenRegex::intersect(&GenRegex::str_to_re(lit), &gre))
                     }
-                    // ITE cases left
-                    _ => todo!(),
+                    (StringToken::Val(_), StringToken::Val(_)) => {
+                        // TODO
+                        todo!()
+                    }
+                    (StringToken::Concat { .. }, StringToken::Concat { .. }) => {
+                        // TODO
+                        todo!()
+                    }
+                    (StringToken::Conditional { .. }, _) | (_, StringToken::Conditional { .. }) => {
+                        Err(SmtParseError::Unimplemented(format!(
+                            "Equals cannot handle ite currently."
+                        )))
+                    }
                 }
             }
             (
@@ -1320,38 +1340,39 @@ impl SmtParser {
                 TokenTypes::Assertion(assert2, assert2_neg),
             ) => {
                 if self.not_flag {
-                    return Ok(GenRegex::union(
+                    Ok(GenRegex::union(
                         &GenRegex::concat(&assert1, &assert2_neg),
                         &GenRegex::concat(&assert1_neg, &assert2),
-                    ));
+                    ))
                 } else {
-                    return Ok(GenRegex::union(
+                    Ok(GenRegex::union(
                         &GenRegex::concat(&assert1, &assert2),
                         &GenRegex::concat(&assert1_neg, &assert2_neg),
-                    ));
+                    ))
                 }
             }
+            // TODO: remove exhaustive fallback pattern
             _ => {
                 if arg1.is_number() && self.is_length_operation(arg2) {
-                    return self.parse_len(
+                    self.parse_len(
                         arg2,
                         arg1.as_number()
                             .expect("Should be a number")
                             .as_i64()
                             .expect("Should be a number"),
-                    );
+                    )
                 } else if arg2.is_number() && self.is_length_operation(arg1) {
-                    return self.parse_len(
+                    self.parse_len(
                         arg1,
                         arg2.as_number()
                             .expect("Should be a number")
                             .as_i64()
                             .expect("Should be a number"),
-                    );
+                    )
                 } else if arg1.is_string() && self.is_substr_operation(arg2) {
-                    return self.parse_substr(arg2, arg1);
+                    self.parse_substr(arg2, arg1)
                 } else if arg2.is_string() && self.is_substr_operation(arg1) {
-                    return self.parse_substr(arg1, arg2);
+                    self.parse_substr(arg1, arg2)
                 } else {
                     let parsed1 = if arg1.is_string() {
                         Self::strtok_to_retok(&self.parse_string_expr(arg1)?)?
@@ -1420,16 +1441,13 @@ impl SmtParser {
                                 &GenRegex::intersect(&GenRegex::complement(&gen_regex1), &gen_regex2),
                             ))*/
                         }
-                        _ => Err(SmtParseError::Unimplemented(format!(
-                            "Equals cannot handle ite currently."
-                        ))),
+                        (RegexToken::Conditional { .. }, _)
+                        | (_, RegexToken::Conditional { .. }) => Err(SmtParseError::Unimplemented(
+                            format!("Equals cannot handle ite currently."),
+                        )),
                     };
                 }
-            } // _ => {
-              //     return Err(SmtParseError::Unsupported(format!(
-              //         "Mismatched in equality assertion."
-              //     )))
-              // }
+            }
         }
     }
 
@@ -1472,7 +1490,7 @@ impl SmtParser {
                             &gen_regex,
                         ))
                     }
-                    _ => {
+                    StringToken::Concat { .. } | StringToken::Conditional { .. } => {
                         return Err(SmtParseError::Unrecognized(format!(
                             "Issue parsing length 2"
                         )));
