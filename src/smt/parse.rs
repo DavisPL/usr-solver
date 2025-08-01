@@ -21,21 +21,33 @@ use std::rc::Rc;
 pub enum SmtParseError {
     FileError(String),               // File not found
     SexprError(lexpr::parse::Error), // Error parsing S-expression
-    MissingAssertion(),              // Missing (assert) statement in SMTLib file
     BadCheckSat(),                   // Bad or missing (check-sat) statement in SMTLib file
+    BadLiteral(String),              // Bad literal in SMTLib file
+    MissingAssertion(),              // Missing (assert) statement in SMTLib file
     Unsupported(String),             // Unsupported SMTLib feature
     Unrecognized(String),            // Unrecognized SMTLib feature
     Unimplemented(String),           // Unimplemented SMTLib feature
-    BadLiteral(String),              // Bad literal in SMTLib file
     Unexpected(String, String),      // Unexpected S-expression
 }
 
 impl SmtParseError {
+    fn bad_literal(expr: &Value) -> SmtParseError {
+        SmtParseError::BadLiteral(expr.to_string())
+    }
+    fn unsupported(expr: &Value) -> SmtParseError {
+        SmtParseError::Unsupported(expr.to_string())
+    }
+    fn unsupported_note(note: &str) -> SmtParseError {
+        SmtParseError::Unsupported(note.to_string())
+    }
     fn unrecog(expr: &Value) -> SmtParseError {
         SmtParseError::Unrecognized(expr.to_string())
     }
-    fn bad_literal(expr: &Value) -> SmtParseError {
-        SmtParseError::BadLiteral(expr.to_string())
+    fn unrecog_note(note: &str) -> SmtParseError {
+        SmtParseError::Unrecognized(note.to_string())
+    }
+    fn unimplemented(feature: &str) -> SmtParseError {
+        SmtParseError::Unimplemented(feature.to_string())
     }
     fn unexpected(got: &Value, expected: &str) -> SmtParseError {
         SmtParseError::Unexpected(got.to_string(), expected.to_string())
@@ -65,7 +77,7 @@ impl fmt::Display for SmtParseError {
             }
             SmtParseError::Unsupported(s) => write!(f, "Unsupported SMTLib feature: {}", s),
             SmtParseError::Unrecognized(s) => write!(f, "Unrecognized S-expression: {}", s),
-            SmtParseError::Unimplemented(s) => write!(f, "Unimplemented SMTLib feature: {}", s),
+            SmtParseError::Unimplemented(s) => write!(f, "Unimplemented feature: {}", s),
             SmtParseError::BadLiteral(s) => write!(f, "Bad literal in S-expression: {}", s),
             SmtParseError::Unexpected(got, expected) => {
                 write!(
@@ -123,8 +135,8 @@ impl RegexToken {
                         false_re,
                     })
                 }
-                RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                    "RegLan operations not supported with variables.".to_string(),
+                RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                    "RegLan operations not supported with variables.",
                 )),
             },
             RegexToken::Conditional {
@@ -140,8 +152,8 @@ impl RegexToken {
                     false_re,
                 })
             }
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                "RegLan operations not supported with variables.".to_string(),
+            RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                "RegLan operations not supported with variables.",
             )),
         }
     }
@@ -164,8 +176,8 @@ impl RegexToken {
                         false_re,
                     })
                 }
-                RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                    "RegLan operations not supported with variables.".to_string(),
+                RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                    "RegLan operations not supported with variables.",
                 )),
             },
             RegexToken::Conditional {
@@ -181,8 +193,8 @@ impl RegexToken {
                     false_re,
                 })
             }
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                "RegLan operations not supported with variables.".to_string(),
+            RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                "RegLan operations not supported with variables.",
             )),
         }
     }
@@ -205,8 +217,8 @@ impl RegexToken {
                         false_re,
                     })
                 }
-                RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                    "RegLan operations not supported with variables.".to_string(),
+                RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                    "RegLan operations not supported with variables.",
                 )),
             },
             RegexToken::Conditional {
@@ -222,8 +234,8 @@ impl RegexToken {
                     false_re,
                 })
             }
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                "RegLan operations not supported with variables.".to_string(),
+            RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                "RegLan operations not supported with variables.",
             )),
         }
     }
@@ -246,8 +258,8 @@ impl RegexToken {
                         false_re,
                     })
                 }
-                RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                    "RegLan operations not supported with variables.".to_string(),
+                RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                    "RegLan operations not supported with variables.",
                 )),
             },
             RegexToken::Conditional {
@@ -263,8 +275,8 @@ impl RegexToken {
                     false_re,
                 })
             }
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                "RegLan operations not supported with variables.".to_string(),
+            RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                "RegLan operations not supported with variables.",
             )),
         }
     }
@@ -398,8 +410,8 @@ impl RegexToken {
         match tok {
             RegexToken::Val(gen_regex) => Ok(gen_regex.clone()),
             RegexToken::Conditional { .. } => todo!(),
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                "Unintialized Regex variable cannot be converted to USR.".to_string(),
+            RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                "Unintialized Regex variable cannot be converted to USR.",
             )),
         }
     }
@@ -546,10 +558,7 @@ impl SmtParser {
                 "check-sat" => self.parse_check_sat(tail),
                 "define-fun" => self.parse_define_fun(tail),
                 "declare-fun" => self.parse_declare_fun(tail),
-                _ => Err(SmtParseError::Unsupported(format!(
-                    "Unsupported SMTLib command: {}",
-                    head
-                ))),
+                _ => Err(SmtParseError::unsupported(head)),
             }
         } else {
             Err(SmtParseError::unrecog(v))
@@ -565,11 +574,7 @@ impl SmtParser {
         //Ensure params and return type are valid
         match params {
             Value::Null => (),
-            Value::Cons(_) => {
-                return Err(SmtParseError::Unsupported(
-                    "Function parameters currently not supported.".to_string(),
-                ))
-            }
+            Value::Cons(_) => return Err(SmtParseError::unsupported(params)),
             _ => return Err(SmtParseError::unrecog(params)),
         };
         match ret_type
@@ -577,13 +582,10 @@ impl SmtParser {
             .ok_or(SmtParseError::unrecog(ret_type))?
         {
             "String" => (),
-            "RegLan" => {
-                return Err(SmtParseError::Unsupported(
-                    "Functions with RegLan output currently not supported.".to_string(),
-                ))
-            }
+            "RegLan" => return Err(SmtParseError::unsupported(ret_type)),
             _ => return Err(SmtParseError::unrecog(ret_type)),
         };
+
         //Parses the function definition and inserts into HashMap
         self.str_var_names.insert(name.to_string());
         Ok(())
@@ -652,11 +654,7 @@ impl SmtParser {
         //Ensure params and return type are valid
         match params {
             Value::Null => (),
-            Value::Cons(_) => {
-                return Err(SmtParseError::Unsupported(
-                    "Function parameters currently not supported.".to_string(),
-                ))
-            }
+            Value::Cons(_) => return Err(SmtParseError::unsupported(params)),
             _ => return Err(SmtParseError::unrecog(params)),
         };
         match ret_type
@@ -664,13 +662,10 @@ impl SmtParser {
             .ok_or(SmtParseError::unrecog(ret_type))?
         {
             "String" => (),
-            "RegLan" => {
-                return Err(SmtParseError::Unsupported(
-                    "Functions with RegLan output currently not supported.".to_string(),
-                ))
-            }
-            _ => return Err(SmtParseError::unrecog(params)),
+            "RegLan" => return Err(SmtParseError::unsupported(ret_type)),
+            _ => return Err(SmtParseError::unrecog(ret_type)),
         };
+
         //Parses the function definition and inserts into HashMap
         let constructed_string = self.parse_str_literal(defn)?;
         self.func_names.insert(
@@ -822,17 +817,13 @@ impl SmtParser {
                         ))
                     }
                     StringToken::Conditional { .. } | StringToken::Concat { .. } => {
-                        return Err(SmtParseError::Unrecognized(
-                            "Issue parsing length 2".to_string(),
-                        ));
+                        return Err(SmtParseError::unrecog_note("Issue parsing length 2"));
                     }
                 };
                 //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
-        Err(SmtParseError::Unrecognized(
-            "Issue parsing length".to_string(),
-        ))
+        Err(SmtParseError::unrecog_note("Issue parsing length"))
     }
     fn parse_len_less_than(
         &mut self,
@@ -881,17 +872,13 @@ impl SmtParser {
                         ));
                     }
                     StringToken::Conditional { .. } | StringToken::Concat { .. } => {
-                        return Err(SmtParseError::Unrecognized(
-                            "Issue parsing length 2".to_string(),
-                        ));
+                        return Err(SmtParseError::unrecog_note("Issue parsing length 2"));
                     }
                 };
                 //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
-        Err(SmtParseError::Unrecognized(
-            "Issue parsing length".to_string(),
-        ))
+        Err(SmtParseError::unrecog_note("Issue parsing length"))
     }
 
     fn parse_len_greater_than_eq(
@@ -941,18 +928,15 @@ impl SmtParser {
                         ))
                     }
                     StringToken::Conditional { .. } | StringToken::Concat { .. } => {
-                        return Err(SmtParseError::Unrecognized(
-                            "Issue parsing length 2".to_string(),
-                        ));
+                        return Err(SmtParseError::unrecog_note("Issue parsing length 2"));
                     }
                 };
                 //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
-        Err(SmtParseError::Unrecognized(
-            "Issue parsing length".to_string(),
-        ))
+        Err(SmtParseError::unrecog_note("Issue parsing length 2"))
     }
+
     fn parse_len_less_than_eq(
         &mut self,
         v: &Value,
@@ -1000,17 +984,13 @@ impl SmtParser {
                         ))
                     }
                     StringToken::Conditional { .. } | StringToken::Concat { .. } => {
-                        return Err(SmtParseError::Unrecognized(
-                            "Issue parsing length 2".to_string(),
-                        ));
+                        return Err(SmtParseError::unrecog_note("Issue parsing length 2"));
                     }
                 };
                 //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
-        Err(SmtParseError::Unrecognized(
-            "Issue parsing length".to_string(),
-        ))
+        Err(SmtParseError::unrecog_note("Issue parsing length"))
     }
 
     fn parse_less_than(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -1036,8 +1016,8 @@ impl SmtParser {
                     .expect("Should be a number"),
             );
         }
-        Err(SmtParseError::Unrecognized(
-            "Currently only supports less than with str.len and concrete int".to_string(),
+        Err(SmtParseError::unrecog_note(
+            "Currently only supports less than with str.len and concrete int",
         ))
     }
 
@@ -1064,8 +1044,8 @@ impl SmtParser {
                     .expect("Should be a number"),
             );
         }
-        Err(SmtParseError::Unrecognized(
-            "Currently only supports greater than with str.len and concrete int".to_string(),
+        Err(SmtParseError::unrecog_note(
+            "Currently only supports greater than with str.len and concrete int",
         ))
     }
 
@@ -1092,8 +1072,8 @@ impl SmtParser {
                     .expect("Should be a number"),
             );
         }
-        Err(SmtParseError::Unrecognized(
-            "Currently only supports less than or equal with str.len and concrete int".to_string(),
+        Err(SmtParseError::unrecog_note(
+            "Currently only supports less than or equal with str.len and concrete int",
         ))
     }
 
@@ -1120,9 +1100,8 @@ impl SmtParser {
                     .expect("Should be a number"),
             );
         }
-        Err(SmtParseError::Unrecognized(
-            "Currently only supports greater than or equal with str.len and concrete int"
-                .to_string(),
+        Err(SmtParseError::unrecog_note(
+            "Currently only supports greater than or equal with str.len and concrete int",
         ))
     }
 
@@ -1162,20 +1141,22 @@ impl SmtParser {
         match (tok1, tok2) {
             (TokenTypes::ReTok(regex_token1), TokenTypes::ReTok(regex_token2)) => {
                 if self.not_flag {
-                    return Err(SmtParseError::Unimplemented(
-                        "Equals on RegLan doesn't handle negation yet.".to_string(),
+                    return Err(SmtParseError::unimplemented(
+                        "Equals on RegLan doesn't handle negation yet.",
                     ));
                 }
                 match (regex_token1, regex_token2) {
-                    (RegexToken::Var(_), RegexToken::Var(_)) => Err(SmtParseError::Unsupported(
-                        "Equality of uninitialized RegLan variables not supported.".to_string(),
-                    )),
+                    (RegexToken::Var(_), RegexToken::Var(_)) => {
+                        Err(SmtParseError::unsupported_note(
+                            "Equality of uninitialized RegLan variables",
+                        ))
+                    }
                     (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
                         let res = self.re_var_names.get(&name);
                         if let Some(found) = res {
                             match found {
-                                Some(_) => Err(SmtParseError::Unsupported(
-                                    "Conflicting RegLan initilizations are caught here instead of solver.".to_string()
+                                Some(_) => Err(SmtParseError::unsupported_note(
+                                    "Conflicting RegLan initilizations are caught here instead of solver."
                                 )),
                                 None => {
                                     self.re_var_names.insert(name, Some(gen_regex));
@@ -1193,8 +1174,8 @@ impl SmtParser {
                         let res = self.re_var_names.get(&name);
                         if let Some(found) = res {
                             match found {
-                                Some(_) => Err(SmtParseError::Unsupported(
-                                    "Conflicting RegLan initilizations are caught here instead of solver.".to_string()
+                                Some(_) => Err(SmtParseError::unsupported_note(
+                                    "Conflicting RegLan initilizations are caught here instead of solver."
                                 )),
                                 None => {
                                     self.re_var_names.insert(name, Some(gen_regex));
@@ -1209,9 +1190,7 @@ impl SmtParser {
                         }
                     }
                     (RegexToken::Val(_gen_regex1), RegexToken::Val(_gen_regex2)) => {
-                        Err(SmtParseError::Unimplemented(
-                            "Equals had not been fixed".to_string(),
-                        ))
+                        Err(SmtParseError::unimplemented("Equals had not been fixed"))
                         /*
                         Ok(GenRegex::union(
                             &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
@@ -1219,8 +1198,8 @@ impl SmtParser {
                         ))*/
                     }
                     (RegexToken::Conditional { .. }, _) | (_, RegexToken::Conditional { .. }) => {
-                        Err(SmtParseError::Unimplemented(
-                            "Equals cannot handle ite currently.".to_string(),
+                        Err(SmtParseError::unimplemented(
+                            "Equals cannot handle ite currently.",
                         ))
                     }
                 }
@@ -1288,8 +1267,8 @@ impl SmtParser {
                         }
                         (StringToken::Conditional { .. }, _)
                         | (_, StringToken::Conditional { .. }) => {
-                            return Err(SmtParseError::Unimplemented(
-                                "Equals cannot handle ite currently.".to_string(),
+                            return Err(SmtParseError::unimplemented(
+                                "Equals cannot handle ite currently.",
                             ));
                         }
                     }
@@ -1342,8 +1321,8 @@ impl SmtParser {
                         todo!()
                     }
                     (StringToken::Conditional { .. }, _) | (_, StringToken::Conditional { .. }) => {
-                        Err(SmtParseError::Unimplemented(
-                            "Equals cannot handle ite currently.".to_string(),
+                        Err(SmtParseError::unimplemented(
+                            "Equals cannot handle ite currently.",
                         ))
                     }
                 }
@@ -1401,17 +1380,16 @@ impl SmtParser {
 
                     return match (parsed1, parsed2) {
                         (RegexToken::Var(_), RegexToken::Var(_)) => {
-                            Err(SmtParseError::Unsupported(
-                                "Equality of uninitialized RegLan variables not supported."
-                                    .to_string(),
+                            Err(SmtParseError::unsupported_note(
+                                "Equality of uninitialized RegLan variables",
                             ))
                         }
                         (RegexToken::Var(name), RegexToken::Val(gen_regex)) => {
                             let res = self.re_var_names.get(&name);
                             if let Some(found) = res {
                                 match found {
-                                    Some(_) => Err(SmtParseError::Unsupported(
-                                        "Conflicting RegLan initilizations are caught here instead of solver.".to_string()
+                                    Some(_) => Err(SmtParseError::unsupported_note(
+                                        "Conflicting RegLan initilizations are caught here instead of solver."
                                     )),
                                     None => {
                                         self.re_var_names.insert(name, Some(gen_regex));
@@ -1429,8 +1407,8 @@ impl SmtParser {
                             let res = self.re_var_names.get(&name);
                             if let Some(found) = res {
                                 match found {
-                                    Some(_) => Err(SmtParseError::Unsupported(
-                                        "Conflicting RegLan initilizations are caught here instead of solver.".to_string()
+                                    Some(_) => Err(SmtParseError::unsupported_note(
+                                        "Conflicting RegLan initilizations are caught here instead of solver."
                                     )),
                                     None => {
                                         self.re_var_names.insert(name, Some(gen_regex));
@@ -1446,9 +1424,6 @@ impl SmtParser {
                         }
                         (RegexToken::Val(gen_regex1), RegexToken::Val(gen_regex2)) => {
                             Ok(GenRegex::intersect(&gen_regex1, &gen_regex2))
-                            /*Err(SmtParseError::Unimplemented(format!(
-                                "Equals had not been fixed"
-                            )))*/
                             /*
                             Ok(GenRegex::union(
                                 &GenRegex::intersect(&gen_regex1, &GenRegex::complement(&gen_regex2)),
@@ -1456,8 +1431,8 @@ impl SmtParser {
                             ))*/
                         }
                         (RegexToken::Conditional { .. }, _)
-                        | (_, RegexToken::Conditional { .. }) => Err(SmtParseError::Unimplemented(
-                            "Equals cannot handle ite currently.".to_string(),
+                        | (_, RegexToken::Conditional { .. }) => Err(SmtParseError::unimplemented(
+                            "Equals cannot handle ite currently.",
                         )),
                     };
                 }
@@ -1505,17 +1480,13 @@ impl SmtParser {
                         ))
                     }
                     StringToken::Concat { .. } | StringToken::Conditional { .. } => {
-                        return Err(SmtParseError::Unrecognized(
-                            "Issue parsing length 2".to_string(),
-                        ));
+                        return Err(SmtParseError::unrecog_note("Issue parsing length 2"));
                     }
                 };
                 //return &GenRegex::str_to_re(self.parse_string_expr(tail)?);
             }
         }
-        Err(SmtParseError::Unrecognized(
-            "Issue parsing length".to_string(),
-        ))
+        Err(SmtParseError::unrecog_note("Issue parsing length"))
     }
 
     fn parse_and(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -1562,8 +1533,8 @@ impl SmtParser {
         str_as_re_token: &RegexToken,
     ) -> Result<Rc<GenRegex>, SmtParseError> {
         match re_tok {
-            RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                "RegLan variable in str.in_re needs to be initialized beforehand.".to_string(),
+            RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                "RegLan variable in str.in_re needs to be initialized beforehand.",
             )),
             RegexToken::Val(gen_regex) => {
                 let gen_regex = if self.not_flag {
@@ -1572,8 +1543,8 @@ impl SmtParser {
                     gen_regex.clone()
                 };
                 match str_as_re_token {
-                    RegexToken::Var(_) => Err(SmtParseError::Unsupported(
-                        "RegLan variable in string expression unexpected.".to_string(),
+                    RegexToken::Var(_) => Err(SmtParseError::unsupported_note(
+                        "RegLan variable in string expression unexpected.",
                     )),
                     RegexToken::Val(str_as_re) => Ok(GenRegex::intersect(str_as_re, &gen_regex)),
                     RegexToken::Conditional {
@@ -2057,8 +2028,8 @@ impl SmtParser {
                 }
                 Err(SmtParseError::unrecog(v))
             }
-            _ => Err(SmtParseError::Unimplemented(
-                "No String variables in re.range yet.".to_string(),
+            _ => Err(SmtParseError::unimplemented(
+                "No String variables in re.range yet.",
             )),
         }
     }
@@ -2106,8 +2077,8 @@ impl SmtParser {
     ) -> Result<RegexToken, SmtParseError> {
         let p1 = param1.as_number();
         let p1 = p1.ok_or(SmtParseError::unrecog(param1))?;
-        let p1 = p1.as_u64().ok_or(SmtParseError::Unrecognized(
-            "Integer for re.loop should be positive.".to_string(),
+        let p1 = p1.as_u64().ok_or(SmtParseError::unrecog_note(
+            "Integer for re.loop should be positive.",
         ))?;
         let regex_base = self.parse_regex(regex)?;
         RegexToken::caret(p1, &regex_base)
@@ -2122,11 +2093,11 @@ impl SmtParser {
         let (p1, p2) = (param1.as_number(), param2.as_number());
         let p1 = p1.ok_or(SmtParseError::unrecog(param1))?;
         let p2 = p2.ok_or(SmtParseError::unrecog(param1))?;
-        let p1 = p1.as_u64().ok_or(SmtParseError::Unrecognized(
-            "Integer for re.loop should be positive.".to_string(),
+        let p1 = p1.as_u64().ok_or(SmtParseError::unrecog_note(
+            "Integer for re.loop should be positive.",
         ))?;
-        let p2 = p2.as_u64().ok_or(SmtParseError::Unrecognized(
-            "Integer for re.loop should be positive.".to_string(),
+        let p2 = p2.as_u64().ok_or(SmtParseError::unrecog_note(
+            "Integer for re.loop should be positive.",
         ))?;
         let regex_base = self.parse_regex(regex)?;
         RegexToken::tok_loop(p1, p2, &regex_base)
@@ -2332,16 +2303,12 @@ impl SmtParser {
 
     pub fn parse_empty(&self) -> Result<GenRegex, SmtParseError> {
         eprintln!("TODO: Implement parse_empty");
-        Err(SmtParseError::Unimplemented(
-            "Empty S-expression".to_string(),
-        ))
+        Err(SmtParseError::unimplemented("Empty S-expression"))
     }
 
     pub fn parse_cons(&self, _c: &lexpr::Cons) -> Result<GenRegex, SmtParseError> {
         eprintln!("TODO: Implement parse_empty");
-        Err(SmtParseError::Unimplemented(
-            "Cons S-expression".to_string(),
-        ))
+        Err(SmtParseError::unimplemented("Cons S-expression"))
 
         // let mut iter = c.iter();
         // let head = iter.next().unwrap();
@@ -2369,9 +2336,7 @@ impl SmtParser {
 
     pub fn parse_symbol(&self, _s: &str) -> Result<GenRegex, SmtParseError> {
         eprintln!("TODO: Implement parse_symbol");
-        Err(SmtParseError::Unimplemented(
-            "Symbol S-expression".to_string(),
-        ))
+        Err(SmtParseError::unimplemented("Symbol S-expression"))
     }
 }
 
