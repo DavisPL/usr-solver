@@ -1856,7 +1856,7 @@ impl SmtParser {
                 GenRegex::concat_many(&args)
             };
 
-            let dot_i_s2_dot_j = GenRegex::concat(&dot_i, &GenRegex::concat(&string_gre, &dot_j));
+            let dot_i_s2_dot_j = GenRegex::concat(&dot_i, &GenRegex::concat(&string_gre, &GenRegex::sigma_star()));
             let s1_case_1 = GenRegex::intersect(&big_string_gre, &dot_i_s2_dot_j);
             let s2_case_1 = GenRegex::intersect(&string_gre, &dot_j);
             let s1_length_1 = GenRegex::intersect(
@@ -1868,8 +1868,8 @@ impl SmtParser {
             let dot_i_s2 = GenRegex::concat(&dot_i, &string_gre);
             let case_2_s1 = GenRegex::intersect(&big_string_gre, &dot_i_s2);
             let dot_j_dot_star = GenRegex::concat(&dot_j, &GenRegex::sigma_star());
-            let s1_len_2 = GenRegex::concat(&dot_i, &GenRegex::complement(&dot_j_dot_star));
-            let s1_length_2 = GenRegex::intersect(&big_string_gre, &s1_len_2);
+            let s1_len_2 = &GenRegex::complement(&dot_j_dot_star);
+            let s1_length_2 = GenRegex::intersect(&string_gre, &s1_len_2);
             let case_2 = GenRegex::concat(&case_2_s1, &s1_length_2);
 
             let dot_i_dot_star = GenRegex::concat(&dot_i, &GenRegex::sigma_star());
