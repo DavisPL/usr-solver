@@ -1389,9 +1389,20 @@ impl SmtParser {
                 let cmd = head.as_symbol().ok_or(SmtParseError::unrecog(head))?;
                 match cmd {
                     "str.indexof" => self.parse_indexof(tail, num as u64),
+                    "str.len" => self.parse_len(&val, num),
                     _ => Err(SmtParseError::unrecog(head)),
                 }
             }
+            /*(TokenTypes::StrTok(str_token), TokenTypes::Other(val))
+            | (TokenTypes::Other(val), TokenTypes::StrTok(str_token)) => {
+                let str_re=Self::strtok_to_re(&str_token)?;
+                let (head, tail) = val.as_pair().ok_or(SmtParseError::unrecog(&val))?;
+                let cmd = head.as_symbol().ok_or(SmtParseError::unrecog(head))?;
+                match cmd {
+                    "str.at" => todo!(),
+                    _ => Err(SmtParseError::unrecog(head)),
+                }
+            }*/
             // TODO: remove exhaustive fallback pattern
             _ => {
                 if arg1.is_number() && self.is_length_operation(arg2) {
@@ -2427,30 +2438,6 @@ impl SmtParser {
         println!("{}", final_constraint);
         return Ok(GenRegex::intersect(&str1, &final_constraint));
     }
-
-    /*
-    fn parse_indexof(&mut self, args: &Value) -> Result<IntToken,SmtParseError> {
-        let arg_vec=self.get_args(args)?;
-        if arg_vec.len()!=3{
-            return Err(SmtParseError::unrecog(args));
-        }
-        let (str1, str2, num)=(arg_vec[0],arg_vec[1],arg_vec[2]);
-        let str1=Self::strtok_to_re(&self.parse_string_expr(str1)?)?;
-        let str2=Self::strtok_to_re(&self.parse_string_expr(str2)?)?;
-        let IntToken::Val(num)=self.parse_int_expr(num)? else{
-            return Err(SmtParseError::unsupported(args));
-        };
-        let offset_re=GenRegex::caret(num as u64-1, &Rc::new(GenRegex::Sigma));
-        let make_indexof = move |num:i64| -> Rc<GenRegex>{
-            let found_index=num as u64;
-            let found_index_re=GenRegex::caret(num as u64, &Rc::new(GenRegex::Sigma));
-            let concat_list=[offset_re,found_index_re,str2,GenRegex::sigma_star()];
-            let true_constraint=GenRegex::concat_many(&concat_list);
-            true_constraint
-        };
-        return make_indexof;
-    }
-    */
 
     /*
        Helper Functions
