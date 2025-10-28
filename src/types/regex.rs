@@ -227,6 +227,12 @@ impl GenRegex {
         }
     }
 
+    pub fn make_equals(gre1: Rc<GenRegex>, gre2: Rc<GenRegex>) -> Rc<GenRegex> {
+        let c1 = GenRegex::make_union(gre1.clone(), GenRegex::complement(&gre2.clone()));
+        let c2 = GenRegex::make_union(gre2.clone(), GenRegex::complement(&gre1.clone()));
+        return GenRegex::make_intersection(c1.clone(), c2.clone());
+    }
+
     /*
         Helper for regex length
     */

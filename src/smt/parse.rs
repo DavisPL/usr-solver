@@ -100,8 +100,9 @@ impl Error for SmtParseError {}
 enum TokenTypes {
     ReTok(RegexToken),
     StrTok(StringToken),
+    IntTok(IntToken),
     Assertion(Rc<GenRegex>, Rc<GenRegex>),
-    Other,
+    Other(Value),
 }
 
 #[derive(Debug)]
@@ -432,6 +433,12 @@ enum StringToken {
     },
 }
 
+#[derive(Debug)]
+enum IntToken {
+    Var(String),
+    Val(i64),
+}
+
 /*
     Top-level S-expression parsing functions
 */
@@ -486,6 +493,7 @@ pub struct SmtParser {
     found_check_sat: bool,
     str_var_names: HashSet<String>,
     // TODO: eventually this should be replaced by StringToken
+    int_var_names: HashSet<String>,
     func_names: HashMap<String, String>,
     // And this by RegexToken probably
     re_var_names: HashMap<String, Option<Rc<GenRegex>>>,
@@ -500,6 +508,7 @@ impl SmtParser {
             found_assert: false,
             found_check_sat: false,
             str_var_names: HashSet::new(),
+            int_var_names: HashSet::new(),
             func_names: HashMap::new(),
             re_var_names: HashMap::new(),
             let_vars: HashMap::new(),
@@ -565,7 +574,7 @@ impl SmtParser {
         }
     }
     fn parse_declare_fun(&mut self, v: &Value) -> Result<(), SmtParseError> {
-        // Syntax: (define-fun [fun name] () String )
+        // Syntax: (define-fun [fun name] () [Type] )
         let args = self.get_args(v)?;
         if args.len() != 3 {
             return Err(SmtParseError::unrecog(v));
@@ -577,17 +586,16 @@ impl SmtParser {
             Value::Cons(_) => return Err(SmtParseError::unsupported(params)),
             _ => return Err(SmtParseError::unrecog(params)),
         };
+        println!("declar_fun found {}", ret_type);
         match ret_type
             .as_symbol()
             .ok_or(SmtParseError::unrecog(ret_type))?
         {
-            "String" => (),
+            "String" => self.str_var_names.insert(name.to_string()),
+            "Int" => self.int_var_names.insert(name.to_string()),
             "RegLan" => return Err(SmtParseError::unsupported(ret_type)),
             _ => return Err(SmtParseError::unrecog(ret_type)),
         };
-
-        //Parses the function definition and inserts into HashMap
-        self.str_var_names.insert(name.to_string());
         Ok(())
     }
 
@@ -600,17 +608,17 @@ impl SmtParser {
         let (var_name, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
         let (var_type, tail) = tail.as_pair().ok_or(SmtParseError::unrecog(v))?;
         expect_null(tail)?;
+        println!("declar_const found {}", var_type);
         match var_type.as_symbol().ok_or(SmtParseError::unrecog(v))? {
-            "String" => {
-                self.str_var_names.insert(var_name.to_string());
-                Ok(())
-            }
-            "RegLan" => {
-                self.re_var_names.insert(var_name.to_string(), None);
-                Ok(())
-            }
-            _ => Err(SmtParseError::unrecog(v)),
-        }
+            "String" => self.str_var_names.insert(var_name.to_string()),
+            "Int" => self.int_var_names.insert(var_name.to_string()),
+            "RegLan" => self
+                .re_var_names
+                .insert(var_name.to_string(), None)
+                .is_none(),
+            _ => return Err(SmtParseError::unrecog(v)),
+        };
+        Ok(())
     }
 
     fn parse_assert(&mut self, v: &Value) -> Result<(), SmtParseError> {
@@ -1116,6 +1124,11 @@ impl SmtParser {
             //println!("called parse_equals_tok_type: str return");
             return Ok(TokenTypes::StrTok(str_tok));
         }
+        let try_int = self.parse_int_expr(arg);
+        if let Ok(int_tok) = try_int {
+            println!("called parse_equals_tok_type: int return");
+            return Ok(TokenTypes::IntTok(int_tok));
+        }
         let saved_not_flag = self.not_flag;
         self.not_flag = false;
         let try_assert = self.parse_assert_arg(arg);
@@ -1125,8 +1138,8 @@ impl SmtParser {
             //println!("called parse_equals_tok_type: assertion return");
             return Ok(TokenTypes::Assertion(assert, assert_neg));
         }
-        //println!("called parse_equals_tok_type: other return");
-        Ok(TokenTypes::Other)
+        println!("called parse_equals_tok_type: other return");
+        Ok(TokenTypes::Other(arg.clone()))
     }
 
     fn parse_equals(&mut self, v: &Value) -> Result<Rc<GenRegex>, SmtParseError> {
@@ -1327,6 +1340,30 @@ impl SmtParser {
                     }
                 }
             }
+            (TokenTypes::IntTok(int_token1), TokenTypes::IntTok(int_token2)) => {
+                match (int_token1, int_token2) {
+                    (IntToken::Var(v1), IntToken::Var(v2)) => {
+                        let gre1 = GenRegex::create_gre_str_var(&v1);
+                        let gre2 = GenRegex::create_gre_str_var(&v2);
+                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                    }
+                    (IntToken::Var(v), IntToken::Val(num)) => {
+                        let gre1 = GenRegex::create_gre_str_var(&v);
+                        let gre2 = GenRegex::caret(num as u64, &Rc::new(GenRegex::Sigma));
+                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                    }
+                    (IntToken::Val(num), IntToken::Var(v)) => {
+                        let gre1 = GenRegex::create_gre_str_var(&v);
+                        let gre2 = GenRegex::caret(num as u64, &Rc::new(GenRegex::Sigma));
+                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                    }
+                    (IntToken::Val(num1), IntToken::Val(num2)) => {
+                        let gre1 = GenRegex::caret(num1 as u64, &Rc::new(GenRegex::Sigma));
+                        let gre2 = GenRegex::caret(num2 as u64, &Rc::new(GenRegex::Sigma));
+                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                    }
+                }
+            }
             (
                 TokenTypes::Assertion(assert1, assert1_neg),
                 TokenTypes::Assertion(assert2, assert2_neg),
@@ -1341,6 +1378,18 @@ impl SmtParser {
                         &GenRegex::concat(&assert1, &assert2),
                         &GenRegex::concat(&assert1_neg, &assert2_neg),
                     ))
+                }
+            }
+            (TokenTypes::IntTok(int_token), TokenTypes::Other(val))
+            | (TokenTypes::Other(val), TokenTypes::IntTok(int_token)) => {
+                let IntToken::Val(num) = int_token else {
+                    return Err(SmtParseError::unsupported_note("Ints must be concrete."));
+                };
+                let (head, tail) = val.as_pair().ok_or(SmtParseError::unrecog(&val))?;
+                let cmd = head.as_symbol().ok_or(SmtParseError::unrecog(head))?;
+                match cmd {
+                    "str.indexof" => self.parse_indexof(tail, num as u64),
+                    _ => Err(SmtParseError::unrecog(head)),
                 }
             }
             // TODO: remove exhaustive fallback pattern
@@ -2008,6 +2057,16 @@ impl SmtParser {
         }
     }
 
+    fn strtok_to_re(s: &StringToken) -> Result<Rc<GenRegex>, SmtParseError> {
+        let retok = Self::strtok_to_retok(s)?;
+        match retok {
+            RegexToken::Val(gen_regex) => Ok(gen_regex),
+            RegexToken::Conditional { .. } => todo!(),
+            //StringToken should never result to a Regex variables
+            RegexToken::Var(_) => unreachable!(),
+        }
+    }
+
     fn parse_str_to_re(&mut self, v: &Value) -> Result<RegexToken, SmtParseError> {
         // (str.to_re "String")
         let (str, tail) = v.as_pair().ok_or(SmtParseError::unrecog(v))?;
@@ -2285,6 +2344,113 @@ impl SmtParser {
             Err(SmtParseError::unrecog(v))
         }
     }
+
+    /*
+       Parsing functions with output Int
+    */
+
+    fn parse_int_expr(&mut self, v: &Value) -> Result<IntToken, SmtParseError> {
+        if let Some(num) = v.as_i64() {
+            return Ok(IntToken::Val(num));
+        }
+        if let Some(name) = v.as_symbol() {
+            if self.int_var_names.contains(name) {
+                return Ok(IntToken::Var(name.to_string()));
+            } else {
+                Err(SmtParseError::BadLiteral(format!(
+                    "{} is not found in declared variables, defined functions or let variables.",
+                    name
+                )))
+            }
+        } else {
+            Err(SmtParseError::unrecog(v))
+        }
+    }
+
+    fn parse_indexof(
+        &mut self,
+        args: &Value,
+        found_index: u64,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("We made it to indexof!!!");
+        let arg_vec = self.get_args(args)?;
+        if arg_vec.len() != 3 {
+            return Err(SmtParseError::unexpected(args, "3 arguments for indexof"));
+        }
+        let str1 = Self::strtok_to_re(&self.parse_string_expr(arg_vec[0])?)?;
+        let str2 = Self::strtok_to_re(&self.parse_string_expr(arg_vec[1])?)?;
+        let IntToken::Val(offset) = self.parse_int_expr(arg_vec[2])? else {
+            return Err(SmtParseError::unsupported(arg_vec[2]));
+        };
+        println!("{},{},{}", str1, str2, offset);
+        let offset_re = GenRegex::caret(offset as u64, &Rc::new(GenRegex::Sigma));
+        let found_index_re = GenRegex::caret(found_index, &Rc::new(GenRegex::Sigma));
+        let concat_list = [
+            offset_re.clone(),
+            found_index_re.clone(),
+            str2.clone(),
+            GenRegex::sigma_star(),
+        ];
+        let true_constraint = if self.not_flag {
+            GenRegex::complement(&GenRegex::concat_many(&concat_list))
+        } else {
+            GenRegex::concat_many(&concat_list)
+        };
+        println!("{}", true_constraint);
+        let concat_list = [offset_re.clone(), str2.clone(), GenRegex::sigma_star()];
+        let mut false_constraint = if self.not_flag {
+            GenRegex::concat_many(&concat_list)
+        } else {
+            GenRegex::complement(&GenRegex::concat_many(&concat_list))
+        };
+        println!("{}", false_constraint);
+        for i in 1..found_index {
+            let found_index_re = GenRegex::caret(i, &Rc::new(GenRegex::Sigma));
+            let concat_list = [
+                offset_re.clone(),
+                found_index_re.clone(),
+                str2.clone(),
+                GenRegex::sigma_star(),
+            ];
+            if self.not_flag {
+                false_constraint =
+                    GenRegex::intersect(&false_constraint, &GenRegex::concat_many(&concat_list));
+            } else {
+                false_constraint = GenRegex::intersect(
+                    &false_constraint,
+                    &GenRegex::complement(&GenRegex::concat_many(&concat_list)),
+                );
+            }
+        }
+        println!("{}", false_constraint);
+        let final_constraint = GenRegex::intersect(&true_constraint, &false_constraint);
+        println!("{}", final_constraint);
+        return Ok(GenRegex::intersect(&str1, &final_constraint));
+    }
+
+    /*
+    fn parse_indexof(&mut self, args: &Value) -> Result<IntToken,SmtParseError> {
+        let arg_vec=self.get_args(args)?;
+        if arg_vec.len()!=3{
+            return Err(SmtParseError::unrecog(args));
+        }
+        let (str1, str2, num)=(arg_vec[0],arg_vec[1],arg_vec[2]);
+        let str1=Self::strtok_to_re(&self.parse_string_expr(str1)?)?;
+        let str2=Self::strtok_to_re(&self.parse_string_expr(str2)?)?;
+        let IntToken::Val(num)=self.parse_int_expr(num)? else{
+            return Err(SmtParseError::unsupported(args));
+        };
+        let offset_re=GenRegex::caret(num as u64-1, &Rc::new(GenRegex::Sigma));
+        let make_indexof = move |num:i64| -> Rc<GenRegex>{
+            let found_index=num as u64;
+            let found_index_re=GenRegex::caret(num as u64, &Rc::new(GenRegex::Sigma));
+            let concat_list=[offset_re,found_index_re,str2,GenRegex::sigma_star()];
+            let true_constraint=GenRegex::concat_many(&concat_list);
+            true_constraint
+        };
+        return make_indexof;
+    }
+    */
 
     /*
        Helper Functions
