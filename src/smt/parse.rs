@@ -771,12 +771,6 @@ impl SmtParser {
         }
         false
     }
-    fn is_substr_operation(&mut self, v: &Value) -> bool {
-        if let Some((Value::Symbol(s), _tail)) = v.as_pair() {
-            return **s == *"str.substr";
-        }
-        false
-    }
 
     fn parse_len_greater_than(
         &mut self,
@@ -1345,22 +1339,22 @@ impl SmtParser {
                     (IntToken::Var(v1), IntToken::Var(v2)) => {
                         let gre1 = GenRegex::create_gre_str_var(&v1);
                         let gre2 = GenRegex::create_gre_str_var(&v2);
-                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                        Ok(GenRegex::intersect(&gre1, &gre2))
                     }
                     (IntToken::Var(v), IntToken::Val(num)) => {
                         let gre1 = GenRegex::create_gre_str_var(&v);
                         let gre2 = GenRegex::caret(num as u64, &Rc::new(GenRegex::Sigma));
-                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                        Ok(GenRegex::intersect(&gre1, &gre2))
                     }
                     (IntToken::Val(num), IntToken::Var(v)) => {
                         let gre1 = GenRegex::create_gre_str_var(&v);
                         let gre2 = GenRegex::caret(num as u64, &Rc::new(GenRegex::Sigma));
-                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                        Ok(GenRegex::intersect(&gre1, &gre2))
                     }
                     (IntToken::Val(num1), IntToken::Val(num2)) => {
                         let gre1 = GenRegex::caret(num1 as u64, &Rc::new(GenRegex::Sigma));
                         let gre2 = GenRegex::caret(num2 as u64, &Rc::new(GenRegex::Sigma));
-                        return Ok(GenRegex::intersect(&gre1, &gre2));
+                        Ok(GenRegex::intersect(&gre1, &gre2))
                     }
                 }
             }
@@ -1874,17 +1868,17 @@ impl SmtParser {
 
             let dot_i_s2_dot_j = GenRegex::complement(&GenRegex::concat(
                 &dot_i,
-                &GenRegex::concat(&string_gre, &dot_j),
+                &GenRegex::concat(string_gre, &dot_j),
             ));
             let s1_case_1 = GenRegex::intersect(&big_string_gre, &dot_i_s2_dot_j);
-            let s2_case_1 = GenRegex::intersect(&string_gre, &dot_j);
+            let s2_case_1 = GenRegex::intersect(string_gre, &dot_j);
             let s1_length_1 = GenRegex::intersect(
                 &big_string_gre,
                 &GenRegex::concat(&dot_i, &GenRegex::concat(&dot_j, &GenRegex::sigma_star())),
             );
             let case_1 = GenRegex::concat(&s1_case_1, &GenRegex::concat(&s2_case_1, &s1_length_1));
 
-            let dot_i_s2 = GenRegex::complement(&GenRegex::concat(&dot_i, &string_gre));
+            let dot_i_s2 = GenRegex::complement(&GenRegex::concat(&dot_i, string_gre));
             let case_2_s1 = GenRegex::intersect(&big_string_gre, &dot_i_s2);
             let dot_j_dot_star = GenRegex::concat(&dot_j, &GenRegex::sigma_star());
             let s1_len_2 = GenRegex::concat(&dot_i, &GenRegex::complement(&dot_j_dot_star));
@@ -1895,7 +1889,7 @@ impl SmtParser {
             let s1_len_3 =
                 GenRegex::intersect(&big_string_gre, &GenRegex::complement(&dot_i_dot_star));
             let s2_case_3 =
-                GenRegex::intersect(&string_gre, &GenRegex::complement(&GenRegex::epsilon()));
+                GenRegex::intersect(string_gre, &GenRegex::complement(&GenRegex::epsilon()));
             let case_3 = GenRegex::concat(&s1_len_3, &s2_case_3);
 
             Ok(GenRegex::union(&GenRegex::union(&case_1, &case_2), &case_3))
@@ -1923,27 +1917,27 @@ impl SmtParser {
 
             let dot_i_s2_dot_j = GenRegex::concat(
                 &dot_i,
-                &GenRegex::concat(&string_gre, &GenRegex::sigma_star()),
+                &GenRegex::concat(string_gre, &GenRegex::sigma_star()),
             );
             let s1_case_1 = GenRegex::intersect(&big_string_gre, &dot_i_s2_dot_j);
-            let s2_case_1 = GenRegex::intersect(&string_gre, &dot_j);
+            let s2_case_1 = GenRegex::intersect(string_gre, &dot_j);
             let s1_length_1 = GenRegex::intersect(
                 &big_string_gre,
                 &GenRegex::concat(&dot_i, &GenRegex::concat(&dot_j, &GenRegex::sigma_star())),
             );
             let case_1 = GenRegex::concat(&s1_case_1, &GenRegex::concat(&s2_case_1, &s1_length_1));
 
-            let dot_i_s2 = GenRegex::concat(&dot_i, &string_gre);
+            let dot_i_s2 = GenRegex::concat(&dot_i, string_gre);
             let case_2_s1 = GenRegex::intersect(&big_string_gre, &dot_i_s2);
             let dot_j_dot_star = GenRegex::concat(&dot_j, &GenRegex::sigma_star());
             let s1_len_2 = &GenRegex::complement(&dot_j_dot_star);
-            let s1_length_2 = GenRegex::intersect(&string_gre, &s1_len_2);
+            let s1_length_2 = GenRegex::intersect(string_gre, s1_len_2);
             let case_2 = GenRegex::concat(&case_2_s1, &s1_length_2);
 
             let dot_i_dot_star = GenRegex::concat(&dot_i, &GenRegex::sigma_star());
             let s1_len_3 =
                 GenRegex::intersect(&big_string_gre, &GenRegex::complement(&dot_i_dot_star));
-            let s2_case_3 = GenRegex::intersect(&string_gre, &GenRegex::epsilon());
+            let s2_case_3 = GenRegex::intersect(string_gre, &GenRegex::epsilon());
             let case_3 = GenRegex::concat(&s1_len_3, &s2_case_3);
 
             Ok(GenRegex::union(&GenRegex::union(&case_1, &case_2), &case_3))
@@ -2383,12 +2377,27 @@ impl SmtParser {
             found_str.clone(),
             GenRegex::sigma_star(),
         ];
-        let string_constraint1 =
-            GenRegex::intersect(&string.clone(), &GenRegex::concat_many(&args));
+        let string_constraint1 =if self.not_flag {
+            GenRegex::intersect(&string.clone(), &GenRegex::complement(&GenRegex::concat_many(&args)))
+        } else {
+            GenRegex::intersect(&string.clone(), &GenRegex::concat_many(&args))
+        };
         let constraint1 =
             GenRegex::concat(&string_constraint1.clone(), &found_str_constraint1.clone());
         println!("{}", constraint1);
-        let constraint2 = GenRegex::concat(
+        let constraint2 = if self.not_flag {
+            GenRegex::concat(
+                &GenRegex::intersect(
+                    &string.clone(),
+                    &GenRegex::complement(&GenRegex::concat(
+                        &GenRegex::caret(index as u64, &GenRegex::create_sigma()),
+                        &GenRegex::sigma_star(),
+                    )),
+                ),
+                    &GenRegex::intersect(&found_str, &GenRegex::complement(&GenRegex::epsilon())),
+                )
+        } else {
+            GenRegex::concat(
             &GenRegex::intersect(
                 &string.clone(),
                 &GenRegex::complement(&GenRegex::concat(
@@ -2396,10 +2405,25 @@ impl SmtParser {
                     &GenRegex::sigma_star(),
                 )),
             ),
-            &GenRegex::intersect(&found_str, &GenRegex::epsilon()),
-        );
+                &GenRegex::intersect(&found_str, &GenRegex::epsilon()),
+            )
+        };
         println!("{}", constraint2);
-        Ok(GenRegex::union(&constraint1, &constraint2))
+        if self.not_flag {
+            let constraint3=GenRegex::concat(
+                &GenRegex::intersect(
+                    &string.clone(),
+                    &GenRegex::concat(
+                        &GenRegex::caret(index as u64, &GenRegex::create_sigma()),
+                        &GenRegex::sigma_star(),
+                    ),
+                ),
+                    &GenRegex::intersect(&found_str, &GenRegex::complement(&GenRegex::create_sigma())),
+                );
+            Ok(GenRegex::union_many(&[constraint1,constraint2,constraint3]))
+        } else {
+            Ok(GenRegex::union(&constraint1, &constraint2))
+        }
     }
     /*
        Parsing functions with output Int
@@ -2411,7 +2435,7 @@ impl SmtParser {
         }
         if let Some(name) = v.as_symbol() {
             if self.int_var_names.contains(name) {
-                return Ok(IntToken::Var(name.to_string()));
+                Ok(IntToken::Var(name.to_string()))
             } else {
                 Err(SmtParseError::BadLiteral(format!(
                     "{} is not found in declared variables, defined functions or let variables.",
@@ -2481,7 +2505,7 @@ impl SmtParser {
         println!("{}", false_constraint);
         let final_constraint = GenRegex::intersect(&true_constraint, &false_constraint);
         println!("{}", final_constraint);
-        return Ok(GenRegex::intersect(&str1, &final_constraint));
+        Ok(GenRegex::intersect(&str1, &final_constraint))
     }
 
     /*
