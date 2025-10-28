@@ -1393,16 +1393,18 @@ impl SmtParser {
                     _ => Err(SmtParseError::unrecog(head)),
                 }
             }
-            /*(TokenTypes::StrTok(str_token), TokenTypes::Other(val))
+            (TokenTypes::StrTok(str_token), TokenTypes::Other(val))
             | (TokenTypes::Other(val), TokenTypes::StrTok(str_token)) => {
-                let str_re=Self::strtok_to_re(&str_token)?;
+                println!("yipppeeee");
+                let str_re = Self::strtok_to_re(&str_token)?;
                 let (head, tail) = val.as_pair().ok_or(SmtParseError::unrecog(&val))?;
                 let cmd = head.as_symbol().ok_or(SmtParseError::unrecog(head))?;
                 match cmd {
-                    "str.at" => todo!(),
+                    "str.at" => self.parse_str_at(tail, str_re),
+                    "str.substr" => self.parse_substr(&val, &str_re),
                     _ => Err(SmtParseError::unrecog(head)),
                 }
-            }*/
+            }
             // TODO: remove exhaustive fallback pattern
             _ => {
                 if arg1.is_number() && self.is_length_operation(arg2) {
@@ -1421,11 +1423,13 @@ impl SmtParser {
                             .as_i64()
                             .expect("Should be a number"),
                     )
-                } else if arg1.is_string() && self.is_substr_operation(arg2) {
+                }
+                /*else if arg1.is_string() && self.is_substr_operation(arg2) {
                     self.parse_substr(arg2, arg1)
                 } else if arg2.is_string() && self.is_substr_operation(arg1) {
                     self.parse_substr(arg1, arg2)
-                } else {
+                } */
+                else {
                     let parsed1 = if arg1.is_string() {
                         Self::strtok_to_retok(&self.parse_string_expr(arg1)?)?
                     } else {
@@ -1819,8 +1823,9 @@ impl SmtParser {
     fn parse_substr(
         &mut self,
         substr_value: &Value,
-        str_value: &Value,
+        string_gre: &Rc<GenRegex>,
     ) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("{}", substr_value);
         // NB: We discussed the following issue in meeting on 2025-06-11.
         // We should debug the case benchmarks/usr/explicit/substr_sat.smt2
         // and benchmarks/usr/implicit/substr_sat.smt2 to see why we are failing.
@@ -1832,7 +1837,7 @@ impl SmtParser {
         //TODO: the same idea might need to be applied to all equals expressions, not sure though,
         //worth checking out
         //parses expressions of the form (= (str.substr s1 i j) s2)
-        let string_gre = self.parse_string_to_gre(str_value)?; //Parse s2
+        //let string_gre = self.parse_string_to_gre(str_value)?; //Parse s2
         let args = self.get_args(substr_value)?;
         let big_string_gre = self.parse_string_to_gre(args[1])?; //Parse s1
         let i_len = args[2]
@@ -2356,6 +2361,46 @@ impl SmtParser {
         }
     }
 
+    fn parse_str_at(
+        &mut self,
+        args: &Value,
+        found_str: Rc<GenRegex>,
+    ) -> Result<Rc<GenRegex>, SmtParseError> {
+        println!("We made it to str.at!!!");
+        let arg_vec = self.get_args(args)?;
+        if arg_vec.len() != 2 {
+            return Err(SmtParseError::unexpected(args, "2 arguments for str.at"));
+        }
+        let string = Self::strtok_to_re(&self.parse_string_expr(arg_vec[0])?)?;
+        let IntToken::Val(index) = self.parse_int_expr(arg_vec[1])? else {
+            return Err(SmtParseError::unsupported(arg_vec[1]));
+        };
+        println!("{},{},{}", string, index, found_str);
+        let found_str_constraint1 =
+            GenRegex::intersect(&found_str.clone(), &GenRegex::create_sigma());
+        let args = [
+            GenRegex::caret(index as u64, &GenRegex::create_sigma()),
+            found_str.clone(),
+            GenRegex::sigma_star(),
+        ];
+        let string_constraint1 =
+            GenRegex::intersect(&string.clone(), &GenRegex::concat_many(&args));
+        let constraint1 =
+            GenRegex::concat(&string_constraint1.clone(), &found_str_constraint1.clone());
+        println!("{}", constraint1);
+        let constraint2 = GenRegex::concat(
+            &GenRegex::intersect(
+                &string.clone(),
+                &GenRegex::complement(&GenRegex::concat(
+                    &GenRegex::caret(index as u64, &GenRegex::create_sigma()),
+                    &GenRegex::sigma_star(),
+                )),
+            ),
+            &GenRegex::intersect(&found_str, &GenRegex::epsilon()),
+        );
+        println!("{}", constraint2);
+        Ok(GenRegex::union(&constraint1, &constraint2))
+    }
     /*
        Parsing functions with output Int
     */
