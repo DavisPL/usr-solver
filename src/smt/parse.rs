@@ -2377,8 +2377,11 @@ impl SmtParser {
             found_str.clone(),
             GenRegex::sigma_star(),
         ];
-        let string_constraint1 =if self.not_flag {
-            GenRegex::intersect(&string.clone(), &GenRegex::complement(&GenRegex::concat_many(&args)))
+        let string_constraint1 = if self.not_flag {
+            GenRegex::intersect(
+                &string.clone(),
+                &GenRegex::complement(&GenRegex::concat_many(&args)),
+            )
         } else {
             GenRegex::intersect(&string.clone(), &GenRegex::concat_many(&args))
         };
@@ -2394,23 +2397,23 @@ impl SmtParser {
                         &GenRegex::sigma_star(),
                     )),
                 ),
-                    &GenRegex::intersect(&found_str, &GenRegex::complement(&GenRegex::epsilon())),
-                )
+                &GenRegex::intersect(&found_str, &GenRegex::complement(&GenRegex::epsilon())),
+            )
         } else {
             GenRegex::concat(
-            &GenRegex::intersect(
-                &string.clone(),
-                &GenRegex::complement(&GenRegex::concat(
-                    &GenRegex::caret(index as u64, &GenRegex::create_sigma()),
-                    &GenRegex::sigma_star(),
-                )),
-            ),
+                &GenRegex::intersect(
+                    &string.clone(),
+                    &GenRegex::complement(&GenRegex::concat(
+                        &GenRegex::caret(index as u64, &GenRegex::create_sigma()),
+                        &GenRegex::sigma_star(),
+                    )),
+                ),
                 &GenRegex::intersect(&found_str, &GenRegex::epsilon()),
             )
         };
         println!("{}", constraint2);
         if self.not_flag {
-            let constraint3=GenRegex::concat(
+            let constraint3 = GenRegex::concat(
                 &GenRegex::intersect(
                     &string.clone(),
                     &GenRegex::concat(
@@ -2418,9 +2421,13 @@ impl SmtParser {
                         &GenRegex::sigma_star(),
                     ),
                 ),
-                    &GenRegex::intersect(&found_str, &GenRegex::complement(&GenRegex::create_sigma())),
-                );
-            Ok(GenRegex::union_many(&[constraint1,constraint2,constraint3]))
+                &GenRegex::intersect(&found_str, &GenRegex::complement(&GenRegex::create_sigma())),
+            );
+            Ok(GenRegex::union_many(&[
+                constraint1,
+                constraint2,
+                constraint3,
+            ]))
         } else {
             Ok(GenRegex::union(&constraint1, &constraint2))
         }
