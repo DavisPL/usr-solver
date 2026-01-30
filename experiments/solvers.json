@@ -25,19 +25,19 @@
 		"detect_crash_patterns": []
 	},
 	"z3": {
-		"path": "z3/z3.exe",
+		"path": "z3/z3",
 		"opts": [],
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []
 	},
 	"z3str3": {
-		"path": "z3/z3.exe",
+		"path": "z3/z3",
 		"opts": ["smt.string_solver=z3str3"],
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []
 	},
 	"cvc5": {
-		"path": "cvc5/bin/cvc5.exe",
+		"path": "cvc5/bin/cvc5",
 		"opts": [],
 		"rseed_opt": "--random-seed=",
 		"detect_crash_patterns": []
