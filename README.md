@@ -1,6 +1,6 @@
 # Uninterpreted String Regexes
 
-SMT solver for regular expressions over uninterpreted string variables.
+SMT solver for regular expressions over uninterpreted string variables, based on Antimirov and Brzozowski derivatives.
 
 ## Developers
 
