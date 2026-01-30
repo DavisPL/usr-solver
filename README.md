@@ -1,6 +1,6 @@
 # Uninterpreted String Regexes
 
-Algorithms and solvers for regular expressions over uninterpreted string variables.
+SMT solver for regular expressions over uninterpreted string variables.
 
 ## Developers
 
