@@ -1,4 +1,4 @@
-# Uninterpreted Symbolic Regexes
+# Uninterpreted String Regexes
 
 Algorithms and solvers for regular expressions over uninterpreted string variables.
 
