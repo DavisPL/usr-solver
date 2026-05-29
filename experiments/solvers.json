@@ -25,7 +25,13 @@
 		"detect_crash_patterns": []
 	},
 	"z3": {
-		"path": "z3/z3.exe",
+		"path": "z3/z3",
+		"opts": [],
+		"rseed_opt": "smt.random_seed=",
+		"detect_crash_patterns": []
+	},
+	"z3-noodler": {
+		"path": "z3-noodler/z3-noodler-macos-15-arm64-shared",
 		"opts": [],
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []
@@ -37,19 +43,18 @@
 		"detect_crash_patterns": []
 	},
 	"cvc5": {
-		"path": "cvc5/bin/cvc5.exe",
+		"path": "cvc5/bin/cvc5",
 		"opts": [],
 		"rseed_opt": "--random-seed=",
 		"detect_crash_patterns": []
 	},
 	"ostrich": {
-		"path": "../solvers/ostrich/release/ostrich",
+		"path": "ostrich-2.0.1/bin/ostrich",
 		"opts": ["+incremental"],
 		"rseed_opt": null,
 		"detect_crash_patterns": [
 			"\\n\\(error \"",
-			"\\nerror\\n",
-			"\\nWarning: (?!ignoring|assuming -length=on to handle length constraints|assuming that recursive function.*is partial)"
+			"\\nerror\\n"
 		]
 	},
 	"z3trau": {
