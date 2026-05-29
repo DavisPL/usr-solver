@@ -1,0 +1,665 @@
+/**
+ * This file is part of Ostrich, an SMT solver for strings.
+ * Copyright (c) 2018-2022 Matthew Hague, Philipp Ruemmer. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the authors nor the names of their
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ * COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package ostrich.preop
+
+import ap.terfor.TerForConvenience.{l, v}
+import ap.terfor.linearcombination.LinearCombination
+import ostrich.automata.{AtomicStateAutomaton, Automaton, BricsTransducer, CaleyGraph, InitFinalAutomaton, NestedAutomaton, PostImageAutomaton, PreImageAutomaton, ProductAutomaton, ReplaceCharAutomaton, Transducer}
+import ap.terfor.{Formula, TerForConvenience, Term, TermOrder}
+import ap.terfor.preds.PredConj
+import ap.theories.Theory
+import dk.brics.automaton.RegExp
+import ostrich.OstrichStringTheory
+
+import scala.collection.mutable.{HashMap => MHashMap, HashSet => MHashSet, Stack => MStack}
+
+abstract class ReplaceAllPreOpBase {
+  def apply(a : Char) : PreOp = new ReplaceAllPreOpChar(a)
+
+  def apply(w : Seq[Char]) : PreOp = {
+    if (w.size == 1) {
+      new ReplaceAllPreOpChar(w(0))
+    } else {
+      ReplaceAllPreOpWord(w)
+    }
+  }
+
+  def apply(s : String) : PreOp = ReplaceAllPreOpWord(s.toSeq)
+}
+
+object ReplaceAllLongestPreOp extends ReplaceAllPreOpBase {
+  /**
+   * PreOp for x = replaceall(y, e, z) for regex e
+   */
+//  def apply(c : Term, context : PredConj) : PreOp =
+//    ReplaceAllPreOpRegEx(c, context)
+
+  /**
+   * PreOp for x = replaceall(y, e, z) for regex e represented as
+   * automaton aut
+   */
+  def apply(aut : AtomicStateAutomaton) : PreOp =
+    ReplaceAllLongestPreOpRegEx(aut)
+}
+
+object ReplaceAllShortestPreOp extends ReplaceAllPreOpBase {
+  /**
+   * PreOp for x = replaceall(y, e, z) for regex e represented as
+   * automaton aut under shortest match semantics
+   */
+  def apply(aut : AtomicStateAutomaton) : PreOp =
+    ReplaceAllShortestPreOpRegEx(aut)
+}
+
+/**
+* Representation of x = replaceall(y, a, z) where a is a single
+* character.
+*/
+class ReplaceAllPreOpChar(a : Char) extends PreOp {
+
+  override def toString = "replaceall"
+
+  def eval(arguments : Seq[Seq[Int]]) : Option[Seq[Int]] =
+    Some((for (c <- arguments(0).iterator;
+               d <- if (c == a)
+                      arguments(1).iterator
+                    else
+                      Iterator single c)
+          yield d).toList)
+
+  override def lengthApproximation(arguments : Seq[Term], result : Term,
+                                   order : TermOrder) : Formula = {
+    import TerForConvenience._
+    implicit val _ = order
+    (arguments(1) === 1 & result === arguments(0)) |
+    (arguments(1) < 1 & result <= arguments(0)) |
+    (arguments(1) > 1 & result >= arguments(0))
+  }
+  /**
+   * Generate a formula that approximates the character count (Parikh) relationship
+   * between the arguments and the result for the `replace_all` string operation.
+   *
+   * This implementation specifically handles cases where:
+   * - `search` is a single character.
+   * - `replace` is a constant string (may consist of multiple characters).
+   *
+   * The relationship is defined as follows:
+   * - Each occurrence of `search` in `input` is replaced by the entire `replace` string in `result`.
+   * - Characters in `input` other than `search` are propagated unchanged to `result`.
+   *
+   * For example:
+   *   `replace_all(input, "0", "12", result)` implies:
+   *   - `charCount(result, "1") = charCount(input, "0") + charCount(input, "1")`
+   *   - `charCount(result, "2") = charCount(input, "0") + charCount(input, "2")`
+   *   - `charCount(result, "a") = charCount(input, "a")` (for characters not equal to "0")
+   *
+   * @param char The character of interest (not used in this specific implementation
+   *             for `replace_all`, as constraints depend on all relevant characters).
+   * @param arguments A sequence of terms representing:
+   *                  - `input`: The input string.
+   *                  - `search`: The singleton character to search for in `input`.
+   *                  - `replace`: The constant string to replace each occurrence of `search`.
+   * @param result A term representing the result of the `replace_all` operation.
+   * @param characters A sequence of all relevant characters involved in the operation.
+   *                   This includes:
+   *                   - Characters in `input`.
+   *                   - Characters in `replace`.
+   *                   - The `search` character.
+   *                   This parameter is necessary to recompute variables for character counts.
+   * @return A formula that captures the relationship between the character counts of
+   *         `input`, `search`, `replace`, and `result`.
+   *
+   * The formula enforces:
+   * - For each character in `replace`, its count in `result` is equal to the count of `search`
+   *   in `input`, plus any unaffected counts of that character in `input`.
+   * - For characters not in `replace` or `search`, their counts remain unchanged in `result`.
+   * - The total character count in `result` corresponds to the combined effects of the replacement.
+   */
+
+  override def charCountApproximation(char: Int, arguments: Seq[Term], result: Term, order: TermOrder,characters : Seq[Int], args : Seq[Term], theory : OstrichStringTheory): Formula = {
+    import TerForConvenience._
+    implicit val _ = order
+    def charCountVar(argNum : Int, char : Int) =
+      l(v(argNum * (characters.size +1) + char + 1))
+
+    // Attempt to retrieve the string representation from the database
+    val strRepresentationOpt = theory.strDatabase.term2Str(args(1))
+
+    val resultFormula: Formula = strRepresentationOpt match {
+      case None =>
+        // If no string representation is found, fallback to superclass implementation
+        super.charCountApproximation(char, arguments, result, order, characters, args, theory)
+
+      case Some(strRepresentation) =>
+        if (strRepresentation.contains(char.toChar)) {
+          // Case 1: `char` is is contained inside the replacement string
+          val charCount = theory.strDatabase.term2Str(args(1)).get.count(_ == char.toChar)
+          //println(s"Returning: ${result === charCount * charCountVar(0,characters.indexOf(this.a.toInt)) + charCountVar(0,characters.indexOf(char))}")
+          result === charCount * charCountVar(0,characters.indexOf(this.a.toInt)) + charCountVar(0,characters.indexOf(char))
+        }
+        else if (char.toChar == this.a) {
+          // Case 2: `char` is equal to search char a
+          //println(s"Character ${this.a} is found in the replace: ${this.a} return ${result === 0}")
+          result === 0
+        }
+        else {
+          // Case 3: Neither condition is true
+         // println(s"Character ${char.toChar} is neither equal to ${this.a} nor found in the string representation. Returning ${result === charCountVar(0,characters.indexOf(char))}")
+          result === charCountVar(0,characters.indexOf(char))
+        }
+    }
+    resultFormula
+  }
+
+  def apply(argumentConstraints : Seq[Seq[Automaton]],
+            resultConstraint : Automaton)
+          : (Iterator[Seq[Automaton]], Seq[Seq[Automaton]]) = {
+    val rc : AtomicStateAutomaton = resultConstraint match {
+      case resCon : AtomicStateAutomaton => resCon
+      case _ => throw new IllegalArgumentException("ReplaceAllPreOp needs an AtomicStateAutomaton")
+    }
+    val zcons = argumentConstraints(1).map(_ match {
+      case zcon : AtomicStateAutomaton => zcon
+      case _ => throw new IllegalArgumentException("ReplaceAllPreOp can only use AtomicStateAutomaton constraints.")
+    })
+    val cg = CaleyGraph[rc.type](rc, zcons)
+
+    val res =
+    for (box <- cg.getAcceptNodes.iterator;
+         newYCon = ReplaceCharAutomaton(rc, a, box.getEdges)) yield {
+      val newZCons = box.getEdges.map({ case (q1, q2) =>
+        val fin = Set(q2).asInstanceOf[Set[AtomicStateAutomaton#State]]
+        InitFinalAutomaton(rc, q1, fin)
+      }).toSeq
+      val newZCon = ProductAutomaton(newZCons)
+      Seq(newYCon, newZCon)
+    }
+
+    (res, argumentConstraints)
+  }
+
+  override def forwardApprox(argumentConstraints : Seq[Seq[Automaton]]) : Automaton = {
+    val yCons = argumentConstraints(0).map(_ match {
+        case saut : AtomicStateAutomaton => saut
+        case _ => throw new IllegalArgumentException("ConcatPreOp.forwardApprox can only approximate AtomicStateAutomata")
+    })
+    val zCons = argumentConstraints(1).map(_ match {
+        case saut : AtomicStateAutomaton => saut
+        case _ => throw new IllegalArgumentException("ConcatPreOp.forwardApprox can only approximate AtomicStateAutomata")
+    })
+    val yProd = ProductAutomaton(yCons)
+    val zProd = ProductAutomaton(zCons)
+
+    NestedAutomaton(yProd, a, zProd)
+  }
+}
+
+/**
+ * Companion object for ReplaceAllPreOpWord, does precomputation of
+ * transducer representation of word
+ */
+object ReplaceAllPreOpWord {
+  import Transducer._
+
+  def apply(w : Seq[Char]) = {
+    if (w.isEmpty) {
+      NOPPreOp
+    } else {
+      val wtran = buildWordTransducer(w)
+      new ReplaceAllPreOpTran(wtran)
+    }
+  }
+
+  private def buildWordTransducer(w : Seq[Char]) : Transducer = {
+    val builder = BricsTransducer.getBuilder
+
+    val initState = builder.initialState
+    val states = initState::(List.fill(w.size - 1)(builder.getNewState))
+    val finstates = List.fill(w.size)(builder.getNewState)
+    val nop = OutputOp("", NOP, "")
+    val internal = OutputOp("", Internal, "")
+    val end = w.size - 1
+
+    builder.setAccept(initState, true)
+    finstates.foreach(builder.setAccept(_, true))
+
+    // recognise word
+    // deliberately miss last element
+    for (i <- 0 until w.size - 1) {
+      builder.addTransition(states(i), (w(i), w(i)), nop, states(i+1))
+    }
+    builder.addTransition(states(end), (w(end), w(end)), internal, states(0))
+
+    for (i <- 0 until w.size) {
+      // the amount of w read up to state i
+      val buffer = w.slice(0, i)
+      // for when we need to output whole prefix read so far
+      val output = OutputOp(w.slice(0, i), Plus(0), "")
+
+      // if mismatch, look for the largest suffix of the output buffer
+      // that is a correct prefix of the word being searched for. Then
+      // return to the state corresponding to that part of the word.
+      val anyLbl = builder.LabelOps.sigmaLabel
+
+      // chars that are handled specially (do not return to start)
+      // e.g. the next letter in w
+      val handledChars= new MHashSet[Char]
+      handledChars.add(w(i))
+
+      // for each prefix - we go in reverse so we get the longest ones
+      // first
+      for (j <- i - 1 to 0 by -1) {
+        val prefix = w.slice(0, j)
+        val charNext = w(prefix.size)
+
+        if (!handledChars.contains(charNext) && buffer.endsWith(prefix)) {
+          val rejectedOldMatchSize = buffer.size - prefix.size
+          val rejectedOldMatchPart = buffer.slice(0, rejectedOldMatchSize)
+          // next char either part of next match or last char and not
+          // buffered
+          val rejectedOutput = OutputOp(rejectedOldMatchPart, NOP, "")
+          val rejectedOutputFin = OutputOp(rejectedOldMatchPart, Plus(0), "")
+
+          builder.addTransition(states(i),
+                                (charNext, charNext),
+                                rejectedOutput,
+                                states(prefix.size + 1))
+          // or word ends here...
+          builder.addTransition(states(i),
+                                (charNext, charNext),
+                                rejectedOutputFin,
+                                finstates(i))
+
+          handledChars.add(charNext)
+        }
+      }
+
+      // letters that should return to start
+      for (lbl <- builder.LabelOps.subtractLetters(handledChars, anyLbl)) {
+        builder.addTransition(states(i), lbl, output, states(0))
+      }
+
+      // handle word ending in middle of match
+      val outop = if (i == w.size -1) internal else output
+      builder.addTransition(states(i), (w(i), w(i)), outop, finstates(i))
+    }
+
+    val res = builder.getTransducer
+    res
+  }
+}
+
+/**
+ * Companion class for building representation of x = replaceall(y, e,
+ * z) for a regular expression e.
+ */
+object ReplaceAllLongestPreOpRegEx {
+  import Transducer._
+
+  /**
+   * Build preop from c and context giving regex to be replaced
+   */
+//  def apply(c : Term, context : PredConj) : PreOp = {
+//    val tran = buildTransducer(c, context)
+//    new ReplaceAllPreOpTran(tran)
+//  }
+
+  /**
+   * Build preop from aut giving regex to be replaced
+   */
+  def apply(aut : AtomicStateAutomaton) : PreOp = {
+    val tran = buildTransducer(aut)
+    new ReplaceAllPreOpTran(tran)
+  }
+
+  /**
+   * Builds transducer that identifies leftmost and longest matches of
+   * regex by rewriting matches to internalChar
+   */
+//  private def buildTransducer(c : Term, context : PredConj) : Transducer =
+//    buildTransducer(BricsAutomaton(c, context))
+
+  /**
+   * Builds transducer that identifies leftmost and longest matches of
+   * regex by rewriting matches to internalChar.
+   *
+   * TODO: currently does not handle empty matches
+   */
+  private def buildTransducer(aut : AtomicStateAutomaton) : Transducer = {
+    abstract class Mode
+    // not matching
+    case object NotMatching extends Mode
+    // matching, word read so far could reach any state in frontier
+    case class Matching(val frontier : Set[aut.State]) extends Mode
+    // last transition finished a match and reached frontier
+    case class EndMatch(val frontier : Set[aut.State]) extends Mode
+
+    val labels = aut.labelEnumerator.enumDisjointLabelsComplete
+    val builder = aut.getTransducerBuilder
+    val nop = OutputOp("", NOP, "")
+    val copy = OutputOp("", Plus(0), "")
+    val internal = OutputOp("", Internal, "")
+
+    // TODO: encapsulate this worklist automaton construction
+
+    // states of transducer have current mode and a set of states that
+    // should never reach a final state (if they do, a match has been
+    // missed)
+    val sMap = new MHashMap[aut.State, (Mode, Set[aut.State])]
+    val sMapRev = new MHashMap[(Mode, Set[aut.State]), aut.State]
+
+    // states of new transducer to be constructed
+    val worklist = new MStack[aut.State]
+
+    def mapState(s : aut.State, q : (Mode, Set[aut.State])) = {
+      sMap += (s -> q)
+      sMapRev += (q -> s)
+    }
+
+    // creates and adds to worklist any new states if needed
+    def getState(m : Mode, noreach : Set[aut.State]) : aut.State = {
+      sMapRev.getOrElse((m, noreach), {
+        val s = builder.getNewState
+        mapState(s, (m, noreach))
+        val goodNoreach = !noreach.exists(aut.isAccept(_))
+        builder.setAccept(s, m match {
+          case NotMatching => goodNoreach
+          case EndMatch(_) => goodNoreach
+          case Matching(_) => false
+        })
+        if (goodNoreach)
+          worklist.push(s)
+        s
+      })
+    }
+
+    val autInit = aut.initialState
+    val tranInit = builder.initialState
+
+    mapState(tranInit, (NotMatching, Set.empty[aut.State]))
+    builder.setAccept(tranInit, true)
+    worklist.push(tranInit)
+
+    while (!worklist.isEmpty) {
+      val ts = worklist.pop()
+      val (mode, noreach) = sMap(ts)
+
+      mode match {
+        case NotMatching => {
+          for (lbl <- labels) {
+            val initImg = aut.getImage(autInit, lbl)
+            val noreachImg = aut.getImage(noreach, lbl)
+
+            val dontMatch = getState(NotMatching, noreachImg ++ initImg)
+            builder.addTransition(ts, lbl, copy, dontMatch)
+
+            if (!initImg.isEmpty) {
+              val newMatch = getState(Matching(initImg), noreachImg)
+              builder.addTransition(ts, lbl, nop, newMatch)
+            }
+
+            if (initImg.exists(aut.isAccept(_))) {
+              val oneCharMatch = getState(EndMatch(initImg), noreachImg)
+              builder.addTransition(ts, lbl, internal, oneCharMatch)
+            }
+          }
+        }
+        case Matching(frontier) => {
+          for (lbl <- labels) {
+            val frontImg = aut.getImage(frontier, lbl)
+            val noreachImg = aut.getImage(noreach, lbl)
+
+            if (!frontImg.isEmpty) {
+              val contMatch = getState(Matching(frontImg), noreachImg)
+              builder.addTransition(ts, lbl, nop, contMatch)
+            }
+
+            if (frontImg.exists(aut.isAccept(_))) {
+                val stopMatch = getState(EndMatch(frontImg), noreachImg)
+                builder.addTransition(ts, lbl, internal, stopMatch)
+            }
+          }
+        }
+        case EndMatch(frontier) => {
+          for (lbl <- labels) {
+            val initImg = aut.getImage(autInit, lbl)
+            val frontImg = aut.getImage(frontier, lbl)
+            val noreachImg = aut.getImage(noreach, lbl)
+
+            val noMatch = getState(NotMatching, initImg ++ frontImg ++ noreachImg)
+            builder.addTransition(ts, lbl, copy, noMatch)
+
+            if (!initImg.isEmpty) {
+              val newMatch = getState(Matching(initImg), frontImg ++ noreachImg)
+              builder.addTransition(ts, lbl, nop, newMatch)
+            }
+
+            if (initImg.exists(aut.isAccept(_))) {
+              val oneCharMatch = getState(EndMatch(initImg), frontImg ++ noreachImg)
+              builder.addTransition(ts, lbl, internal, oneCharMatch)
+            }
+          }
+        }
+      }
+    }
+
+    val tran = builder.getTransducer
+    tran
+  }
+}
+
+/**
+ * Companion class for building representation of x = replaceall(y, e,
+ * z) for a regular expression e under the shortest match replaced
+ * semantics. SMT-LIB semantics is only non-empty matches are replaced.
+ */
+object ReplaceAllShortestPreOpRegEx {
+  import Transducer._
+
+  /**
+   * Build preop from aut giving regex to be replaced
+   */
+  def apply(aut : AtomicStateAutomaton) : PreOp = {
+    val tran = buildTransducer(aut)
+    new ReplaceAllPreOpTran(tran)
+  }
+
+  /**
+   * Builds transducer that identifies leftmost and shortest matches of
+   * regex by rewriting matches to internalChar.
+   *
+   * Assumes that aut does not accept epsilon (in which case SMT-LIB
+   * semantics are that the string should be returned unchanged).
+   */
+  private def buildTransducer(aut : AtomicStateAutomaton) : Transducer = {
+    abstract class Mode
+    // not matching
+    case object NotMatching extends Mode
+    // matching, word read so far could reach any state in frontier
+    case class Matching(val frontier : Set[aut.State]) extends Mode
+
+    val labels = aut.labelEnumerator.enumDisjointLabelsComplete
+    val builder = aut.getTransducerBuilder
+    val nop = OutputOp("", NOP, "")
+    val copy = OutputOp("", Plus(0), "")
+    val internal = OutputOp("", Internal, "")
+
+    // states of transducer have current mode and a set of states that
+    // should never reach a final state (if they do, a match has been
+    // missed)
+    val sMap = new MHashMap[aut.State, (Mode, Set[aut.State])]
+    val sMapRev = new MHashMap[(Mode, Set[aut.State]), aut.State]
+
+    // states of new transducer to be constructed
+    val worklist = new MStack[aut.State]
+
+    def mapState(s : aut.State, q : (Mode, Set[aut.State])) = {
+      sMap += (s -> q)
+      sMapRev += (q -> s)
+    }
+
+    // creates and adds to worklist any new states if needed
+    def getState(m : Mode, noreach : Set[aut.State]) : aut.State = {
+      sMapRev.getOrElse((m, noreach), {
+        val s = builder.getNewState
+        mapState(s, (m, noreach))
+        val goodNoreach = !noreach.exists(aut.isAccept(_))
+        builder.setAccept(s, m match {
+          case NotMatching => goodNoreach
+          case Matching(_) => false
+        })
+        if (goodNoreach)
+          worklist.push(s)
+        s
+      })
+    }
+
+    val autInit = aut.initialState
+    val tranInit = builder.initialState
+
+    mapState(tranInit, (NotMatching, Set.empty[aut.State]))
+    builder.setAccept(tranInit, true)
+    worklist.push(tranInit)
+
+    while (!worklist.isEmpty) {
+      val ts = worklist.pop()
+      val (mode, noreach) = sMap(ts)
+
+      mode match {
+        case NotMatching => {
+          for (lbl <- labels) {
+            val initImg = aut.getImage(autInit, lbl)
+            val noreachImg = aut.getImage(noreach, lbl)
+
+            val dontMatch = getState(NotMatching, noreachImg ++ initImg)
+            builder.addTransition(ts, lbl, copy, dontMatch)
+
+            // either we do a 1-char match (shortest) or we have to keep
+            // the frontier
+            if (initImg.exists(aut.isAccept(_))) {
+              val oneCharMatch = getState(NotMatching, noreachImg)
+              builder.addTransition(ts, lbl, internal, oneCharMatch)
+            } else if (!initImg.isEmpty) {
+              val newMatch = getState(Matching(initImg), noreachImg)
+              builder.addTransition(ts, lbl, nop, newMatch)
+            }
+          }
+        }
+        case Matching(frontier) => {
+          for (lbl <- labels) {
+            val frontImg = aut.getImage(frontier, lbl)
+            val noreachImg = aut.getImage(noreach, lbl)
+
+            // if we found a match, we stop because shortest
+            if (frontImg.exists(aut.isAccept(_))) {
+                val stopMatch = getState(NotMatching, noreachImg)
+                builder.addTransition(ts, lbl, internal, stopMatch)
+            } else if (!frontImg.isEmpty) {
+              val contMatch = getState(Matching(frontImg), noreachImg)
+              builder.addTransition(ts, lbl, nop, contMatch)
+            }
+          }
+        }
+      }
+    }
+
+    val tran = builder.getTransducer
+    tran
+  }
+}
+
+/**
+ * Representation of x = replaceall(y, tran, z) where tran is a
+ * transducer that replaces parts of the word to be replaced with
+ * internalChar.  Build with companion object ReplaceAllPreOpWord or
+ * ReplaceAllPreOpTran
+ */
+class ReplaceAllPreOpTran(tran : Transducer) extends PreOp {
+
+  override def toString = "replaceall-tran"
+
+  def eval(arguments : Seq[Seq[Int]]) : Option[Seq[Int]] = {
+    val arg1 = arguments(0).map(_.toChar).mkString
+    val arg2 = arguments(1).map(_.toChar).mkString
+    for (s <- tran(arg1, arg2)) yield s.toSeq.map(_.toInt)
+  }
+
+  override def lengthApproximation(arguments : Seq[Term], result : Term,
+                                   order : TermOrder) : Formula =
+    tran.lengthApproximation(arguments(0), arguments(1), result, order)
+
+  def apply(argumentConstraints : Seq[Seq[Automaton]],
+            resultConstraint : Automaton)
+          : (Iterator[Seq[Automaton]], Seq[Seq[Automaton]]) = {
+    val rc : AtomicStateAutomaton = resultConstraint match {
+      case resCon : AtomicStateAutomaton => resCon
+      case _ => throw new IllegalArgumentException("ReplaceAllPreOp needs an AtomicStateAutomaton")
+    }
+    val zcons = argumentConstraints(1).map(_ match {
+      case zcon : AtomicStateAutomaton => zcon
+      case _ => throw new IllegalArgumentException("ReplaceAllPreOp can only use AtomicStateAutomaton constraints.")
+    })
+
+    // x = replaceall(y, w, z) internally translated to
+    // y' = tran(y); x = replaceall(y', w, z)
+    val cg = CaleyGraph[rc.type](rc, zcons)
+    val res =
+    for (box <- cg.getAcceptNodes.iterator;
+         newYCon = PreImageAutomaton(tran, rc, box.getEdges)) yield {
+      val newZCons = box.getEdges.map({ case (q1, q2) =>
+        val fin = Set(q2).asInstanceOf[Set[AtomicStateAutomaton#State]]
+        InitFinalAutomaton(rc, q1, fin)
+      }).toSeq
+      val newZCon = ProductAutomaton(newZCons)
+      Seq(newYCon, newZCon)
+    }
+
+    (res, argumentConstraints)
+  }
+
+  override def forwardApprox(argumentConstraints : Seq[Seq[Automaton]]) : Automaton = {
+    val yCons = argumentConstraints(0).map(_ match {
+        case saut : AtomicStateAutomaton => saut
+        case _ => throw new IllegalArgumentException("ConcatPreOp.forwardApprox can only approximate AtomicStateAutomata")
+    })
+    val zCons = argumentConstraints(1).map(_ match {
+        case saut : AtomicStateAutomaton => saut
+        case _ => throw new IllegalArgumentException("ConcatPreOp.forwardApprox can only approximate AtomicStateAutomata")
+    })
+    val yProd = ProductAutomaton(yCons)
+    val zProd = ProductAutomaton(zCons)
+
+    PostImageAutomaton(yProd, tran, Some(zProd))
+  }
+}
+
