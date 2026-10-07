@@ -31,7 +31,7 @@
 		"detect_crash_patterns": []
 	},
 	"z3-noodler": {
-		"path": "z3-noodler/z3-noodler-macos-15-arm64-shared",
+		"path": "z3-noodler/z3-noodler-ubuntu-24.04-x86_64-static-libz3",
 		"opts": [],
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []
@@ -43,13 +43,13 @@
 		"detect_crash_patterns": []
 	},
 	"cvc5": {
-		"path": "cvc5/bin/cvc5",
+		"path": "cvc5/bin/cvc5.exe",
 		"opts": [],
 		"rseed_opt": "--random-seed=",
 		"detect_crash_patterns": []
 	},
 	"ostrich": {
-		"path": "ostrich-2.0.1/bin/ostrich",
+		"path": "ostrich-2.1-x64-linux-static/ostrich",
 		"opts": ["+incremental"],
 		"rseed_opt": null,
 		"detect_crash_patterns": [
