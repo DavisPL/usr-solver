@@ -1,0 +1,12 @@
+/.bloop/
+/.metals/
+/target/
+*.swo
+*.swp
+/.bsp
+# More metals ignores
+/project/.bloop/
+/project/metals.sbt
+/project/project
+/project/target
+/project/build.properties

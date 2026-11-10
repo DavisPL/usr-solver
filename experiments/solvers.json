@@ -30,6 +30,12 @@
 		"rseed_opt": "smt.random_seed=",
 		"detect_crash_patterns": []
 	},
+	"z3-noodler": {
+		"path": "z3-noodler/z3-noodler-ubuntu-24.04-x86_64-static-libz3",
+		"opts": [],
+		"rseed_opt": "smt.random_seed=",
+		"detect_crash_patterns": []
+	},
 	"z3str3": {
 		"path": "z3/z3",
 		"opts": ["smt.string_solver=z3str3"],
@@ -43,13 +49,12 @@
 		"detect_crash_patterns": []
 	},
 	"ostrich": {
-		"path": "../solvers/ostrich/release/ostrich",
+		"path": "ostrich-2.1-x64-linux-static/ostrich",
 		"opts": ["+incremental"],
 		"rseed_opt": null,
 		"detect_crash_patterns": [
 			"\\n\\(error \"",
-			"\\nerror\\n",
-			"\\nWarning: (?!ignoring|assuming -length=on to handle length constraints|assuming that recursive function.*is partial)"
+			"\\nerror\\n"
 		]
 	},
 	"z3trau": {
