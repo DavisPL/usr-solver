@@ -13,11 +13,11 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct SubMerger {
-    union_find: UnionFind<usize>,
-    union_set: HashSet<Rc<CharExpression>>,
-    expr_to_id: HashMap<Rc<CharExpression>, usize>,
-    id_to_expr: HashMap<usize, Rc<CharExpression>>,
-    canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>>,
+    pub union_find: UnionFind<usize>,
+    pub union_set: HashSet<Rc<CharExpression>>,
+    pub expr_to_id: HashMap<Rc<CharExpression>, usize>,
+    pub id_to_expr: HashMap<usize, Rc<CharExpression>>,
+    pub canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>>,
 }
 
 impl SubMerger {
@@ -155,11 +155,11 @@ impl SubMerger {
                     }
                 })
                 .collect();
-            let mut u_set: HashSet<_> = eq_exprs
+            self.union_set = eq_exprs
                 .iter()
                 .map(|expr| Rc::new((expr).clone())) // Dereference `expr` (&&CharExpression) and clone
                 .collect();
-            u_set.insert(Rc::new(CharExpression::CharVar(var.clone())));
+            self.union_set.insert(Rc::new(CharExpression::CharVar(var.clone())));
             temp_set.insert(Rc::new(var.clone()));
 
             if !self.union_over_set() {
@@ -267,7 +267,7 @@ impl SubMerger {
     }
 }
 
-fn find_set(
+pub fn find_set(
     queries: &BTreeSet<CharExpression>,
     union_find: &UnionFind,
     expr_to_id: &HashMap<Rc<CharExpression>, usize>,

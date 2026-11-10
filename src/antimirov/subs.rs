@@ -6,6 +6,7 @@
 // use super::union_find::SubMerger;
 use super::union_find::{self, UnionFind};
 
+use crate::antimirov::union_find::SubMerger;
 use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex, StringVar};
 use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;
@@ -585,6 +586,12 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
 
     ///// ORIG CODE
     //let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
+    // let mut merger = SubMerger::new_for_sub(&substitutions);
+    // let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = merger.expr_to_id;
+    // let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = merger.id_to_expr;
+    // let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = merger.canonical_map;
+    // let mut union_find: UnionFind<usize> = merger.union_find;
+
     let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
     let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
     let mut canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
@@ -594,7 +601,6 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     // If merge was unsuccessful, return None
     let mut substitutions = substitutions;
     let range_constrs = substitutions.take_ranges()?;
-    let substitutions = substitutions;
 
     let mut str_eq_class = substitutions.get_str_map().clone();
     let char_eq_class = substitutions.get_char_map().clone();
@@ -718,7 +724,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     // Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
     let mut combined_not = BTreeMap::new();
     for (c, not_constraint_set) in substitutions.not_constraints {
-        let modified_not = find_set_TEMP(not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
+        let modified_not = union_find::find_set(&not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
         let key = CharExpression::CharVar(c.clone());
         if !expr_to_id.contains_key(&Rc::new(key.clone())) {
             expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
@@ -762,25 +768,6 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     combined_expr.set_ranges(updated_range);
 
     Some(combined_expr)
-}
-
-pub fn find_set_TEMP(
-    queries: BTreeSet<CharExpression>,
-    union_find: &UnionFind,
-    expr_to_id: &HashMap<Rc<CharExpression>, usize>,
-    id_to_expr: &HashMap<usize, Rc<CharExpression>>,
-) -> BTreeSet<CharExpression> {
-    /// TODO: remove this function, deprecate in favor of union_find.rs version
-    let mut ret_set = BTreeSet::new();
-    for query in queries {
-        if !expr_to_id.contains_key(&query) {
-            ret_set.insert(query);
-        } else {
-            let id_var = expr_to_id[&query];
-            ret_set.insert((*id_to_expr[&union_find.find(id_var)]).clone());
-        }
-    }
-    ret_set
 }
 
 pub fn merge_binary(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
