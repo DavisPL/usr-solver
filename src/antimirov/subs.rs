@@ -724,7 +724,8 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     // Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
     let mut combined_not = BTreeMap::new();
     for (c, not_constraint_set) in substitutions.not_constraints {
-        let modified_not = union_find::find_set(&not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
+        let modified_not =
+            union_find::find_set(&not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
         let key = CharExpression::CharVar(c.clone());
         if !expr_to_id.contains_key(&Rc::new(key.clone())) {
             expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);

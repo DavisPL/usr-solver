@@ -159,7 +159,8 @@ impl SubMerger {
                 .iter()
                 .map(|expr| Rc::new((expr).clone())) // Dereference `expr` (&&CharExpression) and clone
                 .collect();
-            self.union_set.insert(Rc::new(CharExpression::CharVar(var.clone())));
+            self.union_set
+                .insert(Rc::new(CharExpression::CharVar(var.clone())));
             temp_set.insert(Rc::new(var.clone()));
 
             if !self.union_over_set() {
