@@ -2,12 +2,16 @@
 //! Substitution terms, used for Antimirov derivatives
 //!
 
+//// TODO
+// use super::union_find::SubMerger;
+use super::union_find::{self, UnionFind};
+
 use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex, StringVar};
 use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;
 
 use std::cmp::{max, min};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ops::Index;
 use std::rc::Rc;
 
@@ -540,17 +544,15 @@ impl Display for AnySub {
 
 impl Display for SimpleSub {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "string_to: {{ ")?;
+        write!(f, "< ")?;
         for (key, value) in self.get_str_map() {
             write!(f, "{} => {}, ", key, value)?;
         }
-        writeln!(f, "}}")?;
-
-        write!(f, "char_to: {{ ")?;
+        write!(f, "; ")?;
         for (key, value) in self.get_char_map() {
             write!(f, "{} => {}, ", key, value)?;
         }
-        write!(f, "}}")?;
+        write!(f, ">")?;
 
         Ok(())
     }
@@ -576,10 +578,12 @@ impl Display for AntimirovElement {
     Substitution operations: merge, difference, and sub_in
 */
 
-use super::union_find::{union_over_set, UnionFind};
-use std::collections::HashMap;
-
 fn merge(substitutions: AnySub) -> Option<SimpleSub> {
+    ///// TODO: debug difference with new SubMerger
+    // let mut merger = SubMerger::new_for_sub(&substitutions);
+    // merger.merge(substitutions)
+
+    ///// ORIG CODE
     //let mut union_set: HashSet<Rc<CharExpression>> = HashSet::new();
     let mut expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
     let mut id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
@@ -633,7 +637,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
                 break;
             }
             ind += 1;
-            if !union_over_set(
+            if !union_find::union_over_set_TEMP(
                 &mut union_find,
                 &union_set,
                 &mut expr_to_id,
@@ -664,7 +668,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
         u_set.insert(Rc::new(CharExpression::CharVar(var.clone())));
         temp_set.insert(Rc::new(var.clone()));
 
-        if !union_over_set(
+        if !union_find::union_over_set_TEMP(
             &mut union_find,
             &u_set,
             &mut expr_to_id,
@@ -714,7 +718,7 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     // Update not constraints using Find. Check for invalid not constraints. Put not constraints into combined_expr
     let mut combined_not = BTreeMap::new();
     for (c, not_constraint_set) in substitutions.not_constraints {
-        let modified_not = find_set(not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
+        let modified_not = find_set_TEMP(not_constraint_set, &union_find, &expr_to_id, &id_to_expr);
         let key = CharExpression::CharVar(c.clone());
         if !expr_to_id.contains_key(&Rc::new(key.clone())) {
             expr_to_id.insert(Rc::new(key.clone()), expr_to_id.len() + 1);
@@ -760,12 +764,13 @@ fn merge(substitutions: AnySub) -> Option<SimpleSub> {
     Some(combined_expr)
 }
 
-pub fn find_set(
+pub fn find_set_TEMP(
     queries: BTreeSet<CharExpression>,
     union_find: &UnionFind,
     expr_to_id: &HashMap<Rc<CharExpression>, usize>,
     id_to_expr: &HashMap<usize, Rc<CharExpression>>,
 ) -> BTreeSet<CharExpression> {
+    /// TODO: remove this function, deprecate in favor of union_find.rs version
     let mut ret_set = BTreeSet::new();
     for query in queries {
         if !expr_to_id.contains_key(&query) {
@@ -781,6 +786,36 @@ pub fn find_set(
 pub fn merge_binary(sub1: &SimpleSub, sub2: &SimpleSub) -> Option<SimpleSub> {
     let union_lr: AnySub = sub1.clone().union(sub2.clone());
     merge(union_lr)
+}
+
+#[test]
+fn test_merge_binary_ex() {
+    // Bugs identified 2026-11
+
+    let c1 = CharVar::from_str("c1");
+    let c1_expr = CharExpression::CharVar(c1.clone());
+    let c2 = CharVar::from_str("c2");
+    let c2_expr = CharExpression::CharVar(c2.clone());
+    let a = CharExpression::Literal('a');
+
+    let mut sub1a = SimpleSub::empty();
+    sub1a.set_char_var(c1.clone(), c2_expr);
+    let mut sub1b = SimpleSub::empty();
+    sub1b.set_char_var(c2.clone(), c1_expr);
+    let mut sub2 = SimpleSub::empty();
+    sub2.set_char_var(c2.clone(), a.clone());
+
+    let result_a = merge_binary(&sub1a, &sub2);
+    let result_b = merge_binary(&sub1b, &sub2);
+    println!("{} # {} = {}", sub1a, sub2, result_a.as_ref().unwrap());
+    println!("{} # {} = {}", sub1b, sub2, result_b.as_ref().unwrap());
+
+    let mut expected = SimpleSub::empty();
+    expected.set_char_var(c1, a.clone());
+    expected.set_char_var(c2, a);
+
+    assert_eq!(result_a, Some(expected.clone()));
+    assert_eq!(result_b, Some(expected));
 }
 
 pub fn merge_sets(subs1: &HashSet<SimpleSub>, subs2: &HashSet<SimpleSub>) -> HashSet<SimpleSub> {

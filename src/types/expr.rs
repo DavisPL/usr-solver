@@ -24,6 +24,17 @@ pub struct CharVar {
     pub name: String,
 }
 
+impl CharVar {
+    pub fn new(s: String) -> Self {
+        Self { name: s }
+    }
+    pub fn from_str(s: &str) -> Self {
+        Self {
+            name: s.to_string(),
+        }
+    }
+}
+
 /*
     Character expressions
 
