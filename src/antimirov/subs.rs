@@ -2,17 +2,14 @@
 //! Substitution terms, used for Antimirov derivatives
 //!
 
-//// TODO
-// use super::union_find::SubMerger;
-use super::union_find::{self, UnionFind};
+use super::union_find::SubMerger;
 
-use crate::antimirov::union_find::SubMerger;
 use crate::types::expr::{CharExpression, CharVar, MaybeCharExpression, StringIndex, StringVar};
 use crate::types::predicate::Predicate;
 use crate::types::regex::GenRegex;
 
 use std::cmp::{max, min};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ops::Index;
 use std::rc::Rc;
 
