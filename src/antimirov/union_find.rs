@@ -132,7 +132,7 @@ impl SubMerger {
             let char_expression = Rc::new(CharExpression::CharVar(var.as_ref().clone()));
             let id_var = self.expr_to_id[&char_expression];
             let found_expr = self.id_to_expr[&self.union_find.find(id_var)].clone();
-            match self.canonical_map.get(&char_expression) {
+            match self.get_canonical_rep(&char_expression) {
                 Some(value) => result.set_char_var(var.as_ref().clone(), value.as_ref().clone()),
                 None => {
                     if CharExpression::CharVar(deref.clone()) != *found_expr {
@@ -141,6 +141,13 @@ impl SubMerger {
                 }
             }
         }
+    }
+
+    pub fn get_canonical_rep(
+        &self,
+        char_expression: &Rc<CharExpression>,
+    ) -> Option<&Rc<CharExpression>> {
+        self.canonical_map.get(char_expression)
     }
 
     // PHASE 4: Set Str Maps
@@ -265,10 +272,6 @@ impl SubMerger {
         let mut prev: Option<Rc<CharExpression>> = None;
 
         for element in union_set {
-            if matches!(element.as_ref(), CharExpression::Literal(_)) {
-                self.canonical_map.insert(element.clone(), element.clone());
-            }
-
             if let Some(prev_exists) = prev {
                 let prev_id: usize;
                 let curr_id: usize;
@@ -286,7 +289,9 @@ impl SubMerger {
                     self.expr_to_id.insert(element.clone(), curr_id);
                     //self.expr_to_id[element.as_ref()] = curr_id;
                     self.id_to_expr.insert(curr_id, element.clone());
-                } // By this point in the code we should have the ID for the 2 elements we are unioning
+                }
+
+                // By this point in the code we should have the ID for the 2 elements we are unioning
                 if self.canonical_map.contains_key(&prev_exists)
                     && self.canonical_map.contains_key(element.as_ref())
                     && self.canonical_map[&prev_exists] != self.canonical_map[element.as_ref()]
