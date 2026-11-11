@@ -14,10 +14,10 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct SubMerger {
-    pub union_find: UnionFind<usize>,
-    pub expr_to_id: HashMap<Rc<CharExpression>, usize>,
-    pub id_to_expr: HashMap<usize, Rc<CharExpression>>,
-    pub canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>>,
+    union_find: UnionFind<usize>,
+    expr_to_id: HashMap<Rc<CharExpression>, usize>,
+    id_to_expr: HashMap<usize, Rc<CharExpression>>,
+    canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>>,
 }
 
 impl SubMerger {
@@ -201,7 +201,7 @@ impl SubMerger {
         Some(())
     }
 
-    // PHASE 5: Set Range Constraints
+    // PHASE 6: Set Range Constraints
     pub fn set_range_constraints(
         &mut self,
         range_constrs: BTreeMap<CharVar, RangeConstr>,
