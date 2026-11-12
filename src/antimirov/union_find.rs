@@ -11,24 +11,25 @@ pub use disjoint_sets::UnionFind;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
+use std::{unimplemented, unreachable};
 
 #[derive(Debug, Clone)]
 pub struct SubMerger {
     union_find: UnionFind<usize>,
     expr_to_id: HashMap<Rc<CharExpression>, usize>,
     id_to_expr: HashMap<usize, Rc<CharExpression>>,
-    canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>>,
+    canonical_map: HashMap<usize, usize>,
 }
 
 impl SubMerger {
     pub fn new_for_sub(substitutions: &AnySub) -> Self {
-        Self::new_with_capacity(substitutions.count_union_elems() + 1)
+        Self::new_with_capacity(substitutions.count_union_elems() + 2)
     }
 
     fn new_with_capacity(cap: usize) -> Self {
         let expr_to_id: HashMap<Rc<CharExpression>, usize> = HashMap::new();
         let id_to_expr: HashMap<usize, Rc<CharExpression>> = HashMap::new();
-        let canonical_map: HashMap<Rc<CharExpression>, Rc<CharExpression>> = HashMap::new();
+        let canonical_map: HashMap<usize, usize> = HashMap::new();
         let union_find: UnionFind<usize> = UnionFind::new(cap);
         Self {
             union_find,
@@ -126,20 +127,11 @@ impl SubMerger {
     }
 
     // PHASE 3: Set Char Maps
-    pub fn set_char_maps(&self, char_set: &HashSet<Rc<CharVar>>, result: &mut SimpleSub) {
+    pub fn set_char_maps(&mut self, char_set: &HashSet<Rc<CharVar>>, result: &mut SimpleSub) {
         for var in char_set {
-            let deref = var.as_ref();
             let char_expression = Rc::new(CharExpression::CharVar(var.as_ref().clone()));
-            let id_var = self.expr_to_id[&char_expression];
-            let found_expr = self.id_to_expr[&self.union_find.find(id_var)].clone();
-            match self.canonical_map.get(&char_expression) {
-                Some(value) => result.set_char_var(var.as_ref().clone(), value.as_ref().clone()),
-                None => {
-                    if CharExpression::CharVar(deref.clone()) != *found_expr {
-                        result.set_char_var(deref.clone(), found_expr.as_ref().clone());
-                    }
-                }
-            }
+            let canonical_repr = self.find_expr(char_expression);
+            result.set_char_var(var.as_ref().clone(), (*canonical_repr).clone());
         }
     }
 
@@ -265,41 +257,9 @@ impl SubMerger {
         let mut prev: Option<Rc<CharExpression>> = None;
 
         for element in union_set {
-            if matches!(element.as_ref(), CharExpression::Literal(_)) {
-                self.canonical_map.insert(element.clone(), element.clone());
-            }
-
             if let Some(prev_exists) = prev {
-                let prev_id: usize;
-                let curr_id: usize;
-                if self.expr_to_id.contains_key(&prev_exists) {
-                    prev_id = self.expr_to_id[&prev_exists];
-                } else {
-                    prev_id = self.expr_to_id.len() + 1;
-                    self.expr_to_id.insert(prev_exists.clone(), prev_id);
-                    self.id_to_expr.insert(prev_id, prev_exists.clone());
-                }
-                if self.expr_to_id.contains_key(element.as_ref()) {
-                    curr_id = self.expr_to_id[element.as_ref()];
-                } else {
-                    curr_id = self.expr_to_id.len() + 1;
-                    self.expr_to_id.insert(element.clone(), curr_id);
-                    //self.expr_to_id[element.as_ref()] = curr_id;
-                    self.id_to_expr.insert(curr_id, element.clone());
-                } // By this point in the code we should have the ID for the 2 elements we are unioning
-                if self.canonical_map.contains_key(&prev_exists)
-                    && self.canonical_map.contains_key(element.as_ref())
-                    && self.canonical_map[&prev_exists] != self.canonical_map[element.as_ref()]
-                {
+                if !self.union_exprs(prev_exists, element.clone()) {
                     return false;
-                }
-                self.union_find.union(prev_id, curr_id); //ERROR HERE
-                if self.canonical_map.contains_key(element.as_ref()) {
-                    self.canonical_map
-                        .insert(prev_exists, self.canonical_map[element.as_ref()].clone());
-                } else if self.canonical_map.contains_key(&prev_exists) {
-                    self.canonical_map
-                        .insert(element.clone(), self.canonical_map[&prev_exists].clone());
                 }
             }
             prev = Some(element.clone())
@@ -308,16 +268,100 @@ impl SubMerger {
     }
 
     // Helper function #2
-    pub fn find_set(&self, queries: &BTreeSet<CharExpression>) -> BTreeSet<CharExpression> {
+    pub fn find_set(&mut self, queries: &BTreeSet<CharExpression>) -> BTreeSet<CharExpression> {
         let mut ret_set = BTreeSet::new();
         for query in queries {
-            if !self.expr_to_id.contains_key(query) {
-                ret_set.insert(query.clone());
-            } else {
-                let id_var = self.expr_to_id[query];
-                ret_set.insert((*self.id_to_expr[&self.union_find.find(id_var)]).clone());
-            }
+            let query = Rc::new(query.clone());
+            let canonical_repr = self.find_expr(query);
+            ret_set.insert((*canonical_repr).clone());
         }
         ret_set
+    }
+
+    // Helper function #3
+    // Assigns ids to expr_1 and expr_2 if needed
+    // Unions expr_1 and expr_2 together in union_find
+    // Updates canonical_map accordingly
+    // Returns true if successful, false otherwise
+    fn union_exprs(&mut self, expr_1: Rc<CharExpression>, expr_2: Rc<CharExpression>) -> bool {
+        let id_1 = self.get_id_from_expr(expr_1.clone());
+        let id_2 = self.get_id_from_expr(expr_2.clone());
+        //Stores old canonical representives in case of literals
+        let old_canonical_expr_1 = self.find_expr(expr_1.clone());
+        let old_canonical_expr_2 = self.find_expr(expr_2.clone());
+        //Removes canonical mapping from old UF representitives
+        self.canonical_map.remove(&self.union_find.find(id_1));
+        self.canonical_map.remove(&self.union_find.find(id_2));
+        self.union_find.union(id_1, id_2);
+        let representative_id = self.union_find.find(id_1);
+        //Assigns canonical representative for new UF representitive
+        let old_canonical_id_1 = self.get_id_from_expr(old_canonical_expr_1.clone());
+        let old_canonical_id_2 = self.get_id_from_expr(old_canonical_expr_2.clone());
+        match (old_canonical_expr_1.as_ref(), old_canonical_expr_2.as_ref()) {
+            (CharExpression::CharVar(_), CharExpression::CharVar(_)) => self
+                .canonical_map
+                .insert(representative_id, representative_id),
+            (CharExpression::CharVar(_), CharExpression::Literal(_)) => self
+                .canonical_map
+                .insert(representative_id, old_canonical_id_2),
+            (CharExpression::Literal(_), CharExpression::CharVar(_)) => self
+                .canonical_map
+                .insert(representative_id, old_canonical_id_1),
+            (CharExpression::Literal(lit_1), CharExpression::Literal(lit_2)) => {
+                if lit_1 != lit_2 {
+                    return false;
+                } else {
+                    self.canonical_map
+                        .insert(representative_id, old_canonical_id_1)
+                }
+            }
+        };
+        true
+    }
+
+    // Helper function #4
+    // Finds canonical representative of expr
+    fn find_expr(&mut self, expr: Rc<CharExpression>) -> Rc<CharExpression> {
+        let expr_id = self.get_id_from_expr(expr);
+        let canonical_id = self.get_canonical_id(expr_id);
+        match self.get_expr_from_id(canonical_id) {
+            Some(canonical_expr) => canonical_expr.clone(),
+            None => unreachable!(),
+        }
+    }
+
+    // Helper function #5
+    // Find and returns id of expr from expr_to_id
+    // Assigns id if needed
+    fn get_id_from_expr(&mut self, expr: Rc<CharExpression>) -> usize {
+        let id: usize;
+        if self.expr_to_id.contains_key(&expr) {
+            id = self.expr_to_id[&expr];
+        } else {
+            id = self.expr_to_id.len() + 1;
+            self.expr_to_id.insert(expr.clone(), id);
+            self.id_to_expr.insert(id, expr.clone());
+        }
+        id
+    }
+
+    // Helper function #6
+    fn get_expr_from_id(&mut self, id: usize) -> Option<&Rc<CharExpression>> {
+        self.id_to_expr.get(&id)
+    }
+
+    //Helper function #7
+    //Returns canonical id of an input id
+    //Does so by getting the UF representstive, then getting the value of the UF representive in canonical map
+    //Assigns canonical mapping if id not in canonical map
+    fn get_canonical_id(&mut self, id: usize) -> usize {
+        let repr_id = self.union_find.find(id);
+        match self.canonical_map.get(&repr_id) {
+            Some(canonical_id) => *canonical_id,
+            None => {
+                self.canonical_map.insert(repr_id, repr_id);
+                repr_id
+            }
+        }
     }
 }
