@@ -11,7 +11,7 @@ pub use disjoint_sets::UnionFind;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
-use std::{unimplemented, unreachable};
+use std::unreachable;
 
 #[derive(Debug, Clone)]
 pub struct SubMerger {
@@ -135,11 +135,8 @@ impl SubMerger {
         }
     }
 
-    pub fn get_canonical_rep(
-        &self,
-        char_expression: &Rc<CharExpression>,
-    ) -> Option<&Rc<CharExpression>> {
-        self.canonical_map.get(char_expression)
+    pub fn get_canonical_rep(&self, id: usize) -> Option<&usize> {
+        self.canonical_map.get(&id)
     }
 
     // PHASE 4: Set Str Maps
