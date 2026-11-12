@@ -135,6 +135,13 @@ impl SubMerger {
         }
     }
 
+    pub fn get_canonical_rep(
+        &self,
+        char_expression: &Rc<CharExpression>,
+    ) -> Option<&Rc<CharExpression>> {
+        self.canonical_map.get(char_expression)
+    }
+
     // PHASE 4: Set Str Maps
     pub fn set_str_maps(
         &self,
